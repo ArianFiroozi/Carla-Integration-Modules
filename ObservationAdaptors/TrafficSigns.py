@@ -1,6 +1,6 @@
 def get_nearby_signs(ego_vehicle, radius=10):
     """
-    Get lane angle relative to ego vehicle heading 
+    Get traffic signs in a given radius of ego vehicle 
 
     Args:
         ego_vehicle: The ego vehicle actor.
