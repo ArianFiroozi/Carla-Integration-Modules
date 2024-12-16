@@ -16,6 +16,7 @@ class VehicleController():
             self.__init_control()
         else:
             self.__spawn_vehicle()
+        self.__init_reward_sensors()
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -32,6 +33,46 @@ class VehicleController():
             print("Vehicle spawned!")
         except:
             print("Unknown error occured")
+
+    def __init_reward_sensors(self):
+        blueprint_library = self.world.get_blueprint_library()
+
+        self.collision_happened = False
+        self.lane_invaded = False
+
+        def collision_callback(event):
+            self.collision_happened = True
+
+        def lane_callback(event):
+            self.lane_invaded = True
+
+        collision_sensor = blueprint_library.find('sensor.other.collision')
+        lane_sensor = blueprint_library.find('sensor.other.lane_invasion')
+
+        self.sensor_c = self.world.spawn_actor(collision_sensor, carla.Transform(), attach_to=self.vehicle)
+        self.sensor_l = self.world.spawn_actor(lane_sensor, carla.Transform(), attach_to=self.vehicle)
+
+        self.sensor_c.listen(collision_callback)
+        self.sensor_l.listen(lane_callback)
+
+    def get_reward(self):
+        reward = 0.0
+
+        velocity = self.vehicle.get_velocity()
+        speed = 3.6 * ((velocity.x**2 + velocity.y**2 + velocity.z**2)**0.5) ##km/h
+        reward += speed * 0.1
+
+        if self.collision_happened:
+            reward -= 100.0
+
+        if self.lane_invaded:
+            reward -= 50.0
+
+        
+        self.collision_happened = False
+        self.lane_invaded = False
+
+        return reward
 
     def exec_command(self, command):
         if command == Command.SPEED_UP:

@@ -23,6 +23,7 @@ while (True):
     lane_angle = get_lane_angle(ego_vehicle)
     traffic_signs = get_nearby_signs(ego_vehicle, radius=10)
 
+    print("reward:", vehicleController.get_reward())
     print("lane angle:", lane_angle)
     for sign in traffic_signs:
         print(f"Traffic Sign: {sign.id}, Type: {sign.type}, Location: {sign.transform.location}")
