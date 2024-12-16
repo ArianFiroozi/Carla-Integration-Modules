@@ -1,5 +1,7 @@
 import carla
 import enum
+import json
+
 class Command(enum.Enum):
     SPEED_UP=0,
     SPEED_DOWN=1,
@@ -17,6 +19,7 @@ class VehicleController():
         else:
             self.__spawn_vehicle()
         self.__init_reward_sensors()
+        self.get_config()
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -55,18 +58,26 @@ class VehicleController():
         self.sensor_c.listen(collision_callback)
         self.sensor_l.listen(lane_callback)
 
+    def get_config(self):
+        with open("reward_config.json", 'r') as file:
+            config = json.load(file)
+
+        self.speed_reward = config["speed_reward"]
+        self.collision_penalty = config["collision_penalty"]
+        self.lane_penalty = config["lane_penalty"]
+
     def get_reward(self):
         reward = 0.0
 
         velocity = self.vehicle.get_velocity()
         speed = 3.6 * ((velocity.x**2 + velocity.y**2 + velocity.z**2)**0.5) ##km/h
-        reward += speed * 0.1
+        reward += speed * self.speed_reward
 
         if self.collision_happened:
-            reward -= 100.0
+            reward -= self.collision_penalty
 
         if self.lane_invaded:
-            reward -= 50.0
+            reward -= self.lane_penalty
 
         
         self.collision_happened = False
