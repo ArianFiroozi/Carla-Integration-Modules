@@ -70,7 +70,7 @@ class VehicleController():
         reward = 0.0
 
         velocity = self.vehicle.get_velocity()
-        speed = 3.6 * ((velocity.x**2 + velocity.y**2 + velocity.z**2)**0.5) ##km/h
+        speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
         reward += speed * self.speed_reward
 
         if self.collision_happened:
