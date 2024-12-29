@@ -1,6 +1,6 @@
 import sys
 sys.path.append('.')
 
-from PedstrianSpawner import *
-from VehicleSpawner import *
-from ObjectSpawn.EgoVehicleSpawner import *
+from .PedstrianSpawner import *
+from .VehicleSpawner import *
+from .EgoVehicleSpawner import *

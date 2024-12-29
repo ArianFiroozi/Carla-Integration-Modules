@@ -27,7 +27,7 @@ def get_speed_matrices(ego_vehicle, lanes=2, sections=6, lane_width=4.0, section
 
     world = ego_vehicle.get_world()
     actors = world.get_actors()
-    dynamic_objects = actors.filter('vehicle.*') + actors.filter('walker.*')
+    dynamic_objects = actors.filter('vehicle.*') #+ actors.filter('walker.*')
     
     for obj in dynamic_objects:
         if obj.id == ego_vehicle.id:

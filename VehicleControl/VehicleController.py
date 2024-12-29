@@ -59,7 +59,7 @@ class VehicleController():
         self.sensor_l.listen(lane_callback)
 
     def get_config(self):
-        with open("reward_config.json", 'r') as file:
+        with open("VehicleControl/reward_config.json", 'r') as file:
             config = json.load(file)
 
         self.speed_reward = config["speed_reward"]
@@ -86,17 +86,18 @@ class VehicleController():
         return reward
 
     def exec_command(self, command):
-        if command == Command.SPEED_UP:
-            self.control.throttle = min(self.control.throttle + 0.1, 1.0)
+        print(command, Command.SPEED_UP.value)
+        if command == 0:#Command.SPEED_UP.value[0]:
+            self.control.throttle = min(self.control.throttle + 0.3, 1.0)
             self.control.brake = 0.0
-        elif command == Command.SPEED_DOWN:
-            self.control.throttle = max(self.control.throttle - 0.1, 0.0)
+        elif command == 1:#Command.SPEED_DOWN.value[0]:
+            self.control.throttle = max(self.control.throttle - 0.3, 0.0)
             self.control.brake = 0.2
-        elif command == Command.TURN_RIGHT:
+        elif command == 2:#Command.TURN_RIGHT.value[0]:
             self.control.steer = min(self.control.steer + 0.1, 1.0)
-        elif command == Command.TURN_LEFT:
+        elif command == 3:#Command.TURN_LEFT.value[0]:
             self.control.steer = max(self.control.steer - 0.1, -1.0)
-        elif command == Command.STOP:
+        elif command == 4:#Command.STOP.value[0]:
             self.control.throttle = 0.0
             self.control.brake = 1.0
         else:
