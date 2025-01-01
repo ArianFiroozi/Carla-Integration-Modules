@@ -1,4 +1,4 @@
-def get_nearby_signs(ego_vehicle, radius=10):
+def get_nearby_signs(ego_vehicle, world_map, radius=10):
     """
     Get traffic signs in a given radius of ego vehicle 
 
@@ -11,7 +11,7 @@ def get_nearby_signs(ego_vehicle, radius=10):
     """
         
     ego_location = ego_vehicle.get_location()
-    ego_waypoint = map.get_waypoint(ego_location)
+    ego_waypoint = world_map.get_waypoint(ego_location)
     landmarks = ego_waypoint.get_landmarks(radius, True)
     
     traffic_signs = [lm for lm in landmarks if lm.type == '1000001']

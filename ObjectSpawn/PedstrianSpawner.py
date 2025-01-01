@@ -1,32 +1,42 @@
 import carla
 import random
+import time
 
 def spawn_pedestrians(world, num_pedestrians=1):
     blueprint_library = world.get_blueprint_library()
-
-    walker_bp = blueprint_library.filter("walker.pedestrian.*")
-    walker_controller_bp = blueprint_library.find('controller.ai.walker')
-
-    spawn_points = []
-    for _ in range(num_pedestrians):
-        spawn_point = carla.Transform()
-        spawn_point.location = world.get_random_location_from_navigation()
-        if spawn_point.location:
-            spawn_points.append(spawn_point)
-
     walkers = []
-    controllers = []
-    for spawn_point in spawn_points:
-        walker = world.try_spawn_actor(random.choice(walker_bp), spawn_point)
-        if walker:
-            controller = world.spawn_actor(walker_controller_bp, carla.Transform(), walker)
-            controllers.append(controller)
-            walkers.append(walker)
-
-    for controller in controllers:
-        controller.start()
-        controller.go_to_location(world.get_random_location_from_navigation())
-        controller.set_max_speed(1.5)
-
-    print(f"Spawned {len(walkers)} pedestrians.")
+    num_spawned_peds=0
+    while num_spawned_peds<num_pedestrians:
+        bp = random.choice(blueprint_library.filter('walker'))
+        spawn_point = random.choice(world.get_map().get_spawn_points())
+        pedestrain = world.try_spawn_actor(bp, spawn_point)
+        if pedestrain:
+            num_spawned_peds+=1
+            walkers.append(pedestrain)
+            print(f"Spawned pedestrain {pedestrain.id} at {spawn_point.location}")
+    return walkers
    
+def step_peds(world, walkers):
+    blueprint_library = world.get_blueprint_library()
+    control = carla.WalkerControl()
+    for i, pedestrain in enumerate(walkers):
+        if (pedestrain.get_location().z<-10):
+            new_guy=None
+            while(new_guy==None):
+                bp = random.choice(blueprint_library.filter('walker'))
+                spawn_point = random.choice(world.get_map().get_spawn_points())
+                new_guy = world.try_spawn_actor(bp, spawn_point)
+
+            walkers[i]=new_guy
+            print("we have a new folk")
+
+        try:
+            control.speed = random.uniform(0.5, 1.0)
+            control.direction.y = random.choice([1,-1])
+            control.direction.x = random.choice([1,-1])
+            control.direction.z = 0
+            pedestrain.apply_control(control)
+            time.sleep(1)
+
+        except Exception as e:
+            print("nashod jadidesho sakhtam")

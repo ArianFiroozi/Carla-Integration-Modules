@@ -1,6 +1,6 @@
 import numpy as np
 
-def get_lane_angle(ego_vehicle):
+def get_lane_angle(ego_vehicle, world_map):
     """
     Get lane angle relative to ego vehicle heading 
 
@@ -13,7 +13,7 @@ def get_lane_angle(ego_vehicle):
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_vehicle.get_location()
-    ego_waypoint = map.get_waypoint(ego_location)
+    ego_waypoint = world_map.get_waypoint(ego_location)
 
     lane_vector = ego_waypoint.transform.get_forward_vector()
     road_angle = np.arctan2(lane_vector.y, lane_vector.x)

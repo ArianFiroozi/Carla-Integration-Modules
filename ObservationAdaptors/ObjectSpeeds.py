@@ -1,16 +1,16 @@
 import carla
 import numpy as np
 
-def get_speed_matrices(ego_vehicle, lanes=2, sections=6, lane_width=4.0, section_length=1.0):
+def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=4.0, cell_length=1.0):
     """
     Generate a speed matrix for nearby objects.
 
     Args:
         ego_vehicle: The ego vehicle actor.
-        lanes (int): Number of lanes.
-        sections (int): Number of sections per lane.
-        lane_width (float): Width of each lane (meters).
-        section_length (float): Length of each section (meters).
+        matrix_length (int): Number of matrix_length.
+        matrix_width (int): Number of matrix_width per lane.
+        cell_width (float): Width of each lane (meters).
+        cell_length (float): Length of each section (meters).
     
     Returns:
         1. np.ndarray: A matrix where each cell contains the speed of objects in that lane and section on x axis.
@@ -18,9 +18,9 @@ def get_speed_matrices(ego_vehicle, lanes=2, sections=6, lane_width=4.0, section
         3. np.ndarray: A matrix where each cell contains presence of objects in that lane and section.
     """
 
-    x_speed_matrix = np.zeros((lanes, sections))
-    y_speed_matrix = np.zeros((lanes, sections))
-    presence_matrix = np.zeros((lanes, sections))
+    x_speed_matrix = np.zeros((matrix_length, matrix_width))
+    y_speed_matrix = np.zeros((matrix_length, matrix_width))
+    presence_matrix = np.zeros((matrix_length, matrix_width))
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_transform.location
@@ -39,16 +39,16 @@ def get_speed_matrices(ego_vehicle, lanes=2, sections=6, lane_width=4.0, section
         dx = obj_transform.location.x - ego_location.x
         dy = obj_transform.location.y - ego_location.y
 
-        lane_index = int((dy + lane_width * lanes / 2) // lane_width) # fix if you want to drift inbetween the lanes
-        if lane_index < 0 or lane_index >= lanes:
+        x_idx = int((dx + cell_width * matrix_width / 2) // cell_width) # fix if you want to drift inbetween the matrix_width
+        if x_idx < 0 or x_idx >= matrix_width:
             continue
 
-        section_index = int((dx + sections * section_length / 2) // section_length)
-        if section_index < 0 or section_index >= sections:
+        y_idx = int((dy + matrix_length * cell_length / 2) // cell_length)
+        if y_idx < 0 or y_idx >= matrix_length:
             continue
 
-        x_speed_matrix[lane_index, section_index] += obj_velocity.x
-        y_speed_matrix[lane_index, section_index] += obj_velocity.y
-        presence_matrix[lane_index, section_index] = 1
+        x_speed_matrix[x_idx, y_idx] += obj_velocity.x
+        y_speed_matrix[x_idx, y_idx] += obj_velocity.y
+        presence_matrix[x_idx, y_idx] = 1
 
     return x_speed_matrix, y_speed_matrix, presence_matrix
