@@ -29,3 +29,11 @@ def load_opendrive_map(xodr_file_path):
     )
     print("Map successfully loaded into CARLA.")
     return world
+
+def destroy_all_actors(client):
+    world = client.get_world()
+    actors = world.get_actors()
+    for actor in actors:
+        if actor.is_alive:
+            actor.destroy()
+    
