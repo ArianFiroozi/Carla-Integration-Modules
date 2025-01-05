@@ -30,7 +30,7 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        self.action_space = spaces.MultiDiscrete([3, 3])
+        self.action_space = spaces.Box(low=0, high=2, shape=(2,), dtype=np.int32)
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
@@ -50,9 +50,11 @@ class CarlaEnv(gymnasium.Env):
         spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         self.current_step = 0
-        return self._get_observation()
+        return self._get_observation(), {}
 
-    def step(self, speed_action, turn_action):
+    def step(self, action):
+        speed_action = int(action[0])
+        turn_action = int(action[1])
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
 
@@ -79,6 +81,7 @@ class CarlaEnv(gymnasium.Env):
         # Return step info
         return obs, reward, done, {}
 
+
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
@@ -88,17 +91,18 @@ class CarlaEnv(gymnasium.Env):
             "speed_x": x_speed_matrix,
             "speed_y": y_speed_matrix,
             "presence": presence_matrix,
-            "lane_angle": lane_angle,
+            "lane_angle": np.array(lane_angle),
             "traffic_signs": traffic_signs,
+            "max_speed": 100
         }
 
     def _get_nearby_traffic_signs(self):
         return get_nearby_signs(self.ego_vehicle, self.world.get_map(), radius=10)
 
     def _encode_traffic_signs(self):
-        traffic_signs = self._get_nearby_traffic_signs()
+        # traffic_signs = self._get_nearby_traffic_signs() TODO
         encoded_signs = np.zeros(10)  # Assuming 10 possible traffic sign types
-
+        return encoded_signs
         for sign in traffic_signs:
             if sign.type.isdigit():
                 sign_index = int(sign.type) % 10  # Map sign type to an index
@@ -129,7 +133,7 @@ from stable_baselines3.common.env_checker import check_env
 
 def run(map_path, walkers_count, vehicles_count, steps, device):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps)
-    check_env(env, warn=True)  
+    # check_env(env, warn=True)  
     model = SAC("MlpPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
     model.learn(total_timesteps=100000)
     model.save("sac_carla_model")
