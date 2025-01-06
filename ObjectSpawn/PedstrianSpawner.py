@@ -13,13 +13,14 @@ def spawn_pedestrians(world, num_pedestrians=1):
         if pedestrain:
             num_spawned_peds+=1
             walkers.append(pedestrain)
-            print(f"Spawned pedestrain {pedestrain.id} at {spawn_point.location}")
+            #print(f"Spawned pedestrain {pedestrain.id} at {spawn_point.location}")
     return walkers
    
 def step_peds(world, walkers):
     blueprint_library = world.get_blueprint_library()
     control = carla.WalkerControl()
     for i, pedestrain in enumerate(walkers):
+        #print(f'ped {i} before if')
         if (pedestrain.get_location().z<-10):
             new_guy=None
             while(new_guy==None):
@@ -28,15 +29,15 @@ def step_peds(world, walkers):
                 new_guy = world.try_spawn_actor(bp, spawn_point)
 
             walkers[i]=new_guy
-            print("we have a new folk")
-
+            #print("we have a new folk")
+        #print(f'ped {i} after if')
         try:
             control.speed = random.uniform(0.5, 1.0)
             control.direction.y = random.choice([1,-1])
             control.direction.x = random.choice([1,-1])
             control.direction.z = 0
             pedestrain.apply_control(control)
-            time.sleep(1)
 
         except Exception as e:
-            print("nashod jadidesho sakhtam")
+            pass
+            # print("nashod jadidesho sakhtam")

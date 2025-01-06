@@ -3,16 +3,17 @@ import enum
 import json
 
 class Command(enum.Enum):
-    SPEED_UP=0,
-    SPEED_DOWN=1,
-    TURN_RIGHT=2,
-    TURN_LEFT=3,
-    STOP=4,
-    DO_NOT_TURN=5
+    SPEED_UP = 0
+    SPEED_DOWN = 1
+    TURN_RIGHT = 2
+    TURN_LEFT = 3
+    STOP = 4
+    DO_NOT_TURN = 5
+
     
 SPEED_UP = 0
 SPEED_DOWN = 1
-STOP = 3
+STOP = 2
 TURN_RIGHT = 0
 TURN_LEFT = 1
 DO_NOT_TURN = 2
@@ -41,7 +42,7 @@ class VehicleController():
             spawn_point = self.world.get_map().get_spawn_points()[0]
             self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
             self.__init_control()
-            print("Vehicle spawned!")
+            # print("Vehicle spawned!")
         except:
             print("Unknown error occured")
 
@@ -93,25 +94,25 @@ class VehicleController():
 
         return reward
     
-    def speed_action_convertor(speed_action):
+    def speed_action_convertor(self, speed_action):
         if speed_action == SPEED_UP:
-            return Command.SPEED_UP.value[0]
+            return Command.SPEED_UP.value
         elif speed_action == SPEED_DOWN:
-            return Command.SPEED_DOWN.value[0]
+            return Command.SPEED_DOWN.value
         else:
-            return Command.STOP.value[0]
+            return Command.STOP.value
         
-    def turn_action_convertor(turn_action):
+    def turn_action_convertor(self, turn_action):
         if turn_action == TURN_RIGHT:
-            return Command.TURN_RIGHT.value[0]
+            return Command.TURN_RIGHT.value
         elif turn_action == TURN_LEFT:
-            return Command.TURN_LEFT.value[0]
+            return Command.TURN_LEFT.value
         else:
-            return Command.DO_NOT_TURN.value[0]
+            return Command.DO_NOT_TURN.value
 
 
     def exec_command(self, command):
-        print(command, Command.SPEED_UP.value)
+        # print(command, Command.SPEED_UP.value)
         if command == 0:#Command.SPEED_UP.value[0]:
             self.control.throttle = min(self.control.throttle + 0.3, 1.0)
             self.control.brake = 0.0
@@ -131,4 +132,4 @@ class VehicleController():
             print("Unknown command!")
             
         self.vehicle.apply_control(self.control)
-        print(f"Command: {command} | Throttle: {self.control.throttle:.2f}, Steer: {self.control.steer:.2f}")
+        # print(f"Command: {command} | Throttle: {self.control.throttle:.2f}, Steer: {self.control.steer:.2f}")

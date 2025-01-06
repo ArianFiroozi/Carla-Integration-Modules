@@ -21,8 +21,8 @@ def spawn_vehicles(client, num_vehicles=1):
             vehicle.set_autopilot(True,traffic_manager.get_port())
             # vehicle.apply_control(carla.VehicleControl(throttle=0.5))
             vehicles.append(vehicle)
-            # print("kir")
+            # #print("kir")
             traffic_manager.vehicle_percentage_speed_difference(vehicle, random.randint(-30, 30))
-            print(f"Spawned vehicle {vehicle.id} at {spawn_point.location}")
+            #print(f"Spawned vehicle {vehicle.id} at {spawn_point.location}")
 
     return vehicles

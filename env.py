@@ -7,13 +7,17 @@ from LoadOpenDrive2 import *
 from ObjectSpawn import *
 from LoadOpenDrive2 import *
 import time
+from stable_baselines3 import SAC
+from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.monitor import Monitor
 
 import carla, random
 
 SUPPORTED_SIGNS_COUNT = 5
 
 class CarlaEnv(gymnasium.Env):
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=50000000):
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
@@ -40,9 +44,9 @@ class CarlaEnv(gymnasium.Env):
             "max_speed": spaces.Box(low=0, high=200, shape=(), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
         })
-        self.reset()
 
     def reset(self, seed = 12):
+        print(f'reseting')
         self.current_step = 0
         destroy_all_actors(self.client)
         self.ego_vehicle = spawn_ego_vehicle(self.world)
@@ -53,37 +57,50 @@ class CarlaEnv(gymnasium.Env):
         return self._get_observation(), {}
 
     def step(self, action):
+        #print (f'take action on step {self.current_step} : {action}')
         speed_action = int(action[0])
         turn_action = int(action[1])
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
 
+        #print (f'geting prev observation on step {self.current_step} :')
         prev_obs = self._get_observation()
+        #print (f'got prev obs on step {self.current_step} : {prev_obs}')
 
+        #print (f'ticking world on step {self.current_step} :')
         self.world.tick()
         # Step pedestrians
+        #print (f'steping peds on step {self.current_step} :')
         step_peds(self.world, self.walkers)
 
         # Calculate reward
+        #print (f'calculationg rewards on step {self.current_step} :')
         reward = self.vehicle_controller.get_reward()
+        #print (f'got reward {reward} on step {self.current_step} :')
 
         # Additional penalty or reward for traffic signs
         traffic_signs = self._get_nearby_traffic_signs()
         reward += self._process_traffic_signs(traffic_signs)
 
         # Get observation
+        #print (f'geting observation on step {self.current_step} :')
         obs = self._get_observation()
-
+        #print (f'got obs on step {self.current_step} : {obs}')
         # Check if done
         self.current_step += 1
+        print (f'startin step {self.current_step} :')
         done = self.current_step >= self.max_steps
+        truncated = False  # Update this based on your custom truncation logic, if any.
+        print(f'returning')
 
-        # Return step info
-        return obs, reward, done, {}
+        # Return step info TODO gets and error on step 100
+        return obs, reward, done, truncated, {}
+
 
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
+        #print (f'hora out index ta inja nist')
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
         traffic_signs = self._encode_traffic_signs()
 
@@ -101,7 +118,7 @@ class CarlaEnv(gymnasium.Env):
 
     def _encode_traffic_signs(self):
         # traffic_signs = self._get_nearby_traffic_signs() TODO
-        encoded_signs = np.zeros(10)  # Assuming 10 possible traffic sign types
+        encoded_signs = np.zeros(SUPPORTED_SIGNS_COUNT)  # Assuming 10 possible traffic sign types
         return encoded_signs
         for sign in traffic_signs:
             if sign.type.isdigit():
@@ -133,9 +150,22 @@ from stable_baselines3.common.env_checker import check_env
 
 def run(map_path, walkers_count, vehicles_count, steps, device):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps)
-    # check_env(env, warn=True)  
-    model = SAC("MlpPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
-    model.learn(total_timesteps=100000)
-    model.save("sac_carla_model")
+    
+    # Wrap the environment with Monitor and DummyVecEnv
+    env = Monitor(env)
+    env = DummyVecEnv([lambda: env])
+    #print(f"Environment type: {type(env)}")
+    
+    # Check the environment
+    # check_env(env, warn=True)
+    
+    try:
+        # Use MultiInputPolicy for dict observation space
+        model = SAC("MultiInputPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
+        model.learn(total_timesteps=100000)
+        #print(f'saving model')
+        model.save("sac_carla_model")
+    except Exception as e:
+        print(f"Error during model training: {e}")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
 run(map_path, 10, 10, 10000, "cuda")
