@@ -52,6 +52,7 @@ coverage.xml
 cover/
 
 ./sac_carla_model.zip
+./sac_carla/*
 
 # Translations
 *.mo
