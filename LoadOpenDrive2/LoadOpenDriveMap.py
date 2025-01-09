@@ -1,6 +1,6 @@
 import carla
 
-def load_opendrive_map(xodr_file_path):
+def load_opendrive_map(xodr_file_path, _client=None):
     """
     Loads given opendrive file in carla
     
@@ -10,8 +10,11 @@ def load_opendrive_map(xodr_file_path):
     Returns:
         world: Carla world created using given map
     """
-    client = carla.Client('localhost', 2000)
-    client.set_timeout(10.0)
+    if (_client is None):
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(10.0)
+    else :
+        client = _client
 
     with open(xodr_file_path, 'r') as file:
         xodr_data = file.read()
@@ -36,4 +39,5 @@ def destroy_all_actors(client):
     for actor in actors:
         if actor.is_alive:
             actor.destroy()
+# load_opendrive_map()
     

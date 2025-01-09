@@ -20,7 +20,7 @@ def step_peds(world, walkers):
     blueprint_library = world.get_blueprint_library()
     control = carla.WalkerControl()
     for i, pedestrain in enumerate(walkers):
-        #print(f'ped {i} before if')
+        #print(f'ped {i} before if')//TODO destroy fallen peds
         if (pedestrain.get_location().z<-10):
             new_guy=None
             while(new_guy==None):

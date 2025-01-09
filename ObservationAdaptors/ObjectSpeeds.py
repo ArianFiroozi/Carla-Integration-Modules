@@ -47,8 +47,8 @@ def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=
         if y_idx < 0 or y_idx >= matrix_length:
             continue
 
-        x_speed_matrix[x_idx, y_idx] += obj_velocity.x
-        y_speed_matrix[x_idx, y_idx] += obj_velocity.y
-        presence_matrix[x_idx, y_idx] = 1
+        x_speed_matrix[y_idx, x_idx] += obj_velocity.x
+        y_speed_matrix[y_idx, x_idx] += obj_velocity.y
+        presence_matrix[y_idx, x_idx] = 1
 
     return x_speed_matrix, y_speed_matrix, presence_matrix

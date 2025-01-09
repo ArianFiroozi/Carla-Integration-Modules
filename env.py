@@ -15,6 +15,7 @@ from stable_baselines3.common.monitor import Monitor
 import carla, random
 
 SUPPORTED_SIGNS_COUNT = 5
+LEAST_HEIGHT = -10
 
 class CarlaEnv(gymnasium.Env):
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000):
@@ -23,10 +24,11 @@ class CarlaEnv(gymnasium.Env):
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
         
-        load_opendrive_map(map_path)
-        
         self.client = carla.Client('localhost', 2000)
+        self.client.set_timeout(10.0)
+        load_opendrive_map(map_path, self.client)
         self.world = self.client.get_world()
+
         self.ego_vehicle = spawn_ego_vehicle(self.world)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
         spawn_vehicles(self.client, vehicles_count)
@@ -34,47 +36,68 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        self.action_space = spaces.Box(low=0, high=2, shape=(2,), dtype=np.int32)
+
+        self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
             "speed_y": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
             "presence": spaces.Box(low=0, high=1, shape=(3, 6), dtype=np.float32),
-            "lane_angle": spaces.Box(low=-np.pi, high=np.pi, shape=(), dtype=np.float32),
-            "max_speed": spaces.Box(low=0, high=200, shape=(), dtype=np.float32),
+            "lane_angle": spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
+            "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
         })
+        
 
     def reset(self, seed = 12):
         print(f'reseting')
         self.current_step = 0
-        destroy_all_actors(self.client)
+        load_opendrive_map(map_path, self.client)
+        self.world = self.client.get_world()
         self.ego_vehicle = spawn_ego_vehicle(self.world)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
         spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
-        self.current_step = 0
         return self._get_observation(), {}
 
-    def step(self, action):
-        #print (f'take action on step {self.current_step} : {action}')
+    def step(self, action): 
+        # time.sleep(0.1)
+        # spectator = self.world.get_spectator() 
+        # transform = self.ego_vehicle.get_transform() 
+        # spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50), carla.Rotation(pitch=-90))) 
+        # time.sleep(0.5)
+        print (f'geting prev observation on step {self.current_step} :')
+        prev_obs = self._get_observation()
+        print (f'got prev obs on step')
+        print(f'ego z location = {self.ego_vehicle.get_location().z}')
+        actors = self.world.get_actors()
+        for actor in actors:
+            print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
+        if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT):
+            self.reset()
+            return prev_obs, 0, False, False, {}
+        print (f'take action on step {self.current_step} : {action}')
         speed_action = int(action[0])
         turn_action = int(action[1])
+        print(f"executed command is: {self.vehicle_controller.speed_action_convertor(speed_action)}")
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-
-        #print (f'geting prev observation on step {self.current_step} :')
-        prev_obs = self._get_observation()
-        #print (f'got prev obs on step {self.current_step} : {prev_obs}')
-
+        # {self.current_step} : {prev_obs}')
+        # if (self.world)
         #print (f'ticking world on step {self.current_step} :')
-        self.world.tick()
+        try:
+            self.world.tick()
+            print (f'World has ticked')
+        except ...:
+            self.reset()
+            print("Exception supressed")
+            return prev_obs, 0, False, False, {}
         # Step pedestrians
-        #print (f'steping peds on step {self.current_step} :')
+        print (f'steping peds on step {self.current_step} :')
         step_peds(self.world, self.walkers)
 
         # Calculate reward
-        #print (f'calculationg rewards on step {self.current_step} :')
+        print (f'calculationg rewards on step {self.current_step} :')
         reward = self.vehicle_controller.get_reward()
         #print (f'got reward {reward} on step {self.current_step} :')
 
@@ -83,17 +106,16 @@ class CarlaEnv(gymnasium.Env):
         reward += self._process_traffic_signs(traffic_signs)
 
         # Get observation
-        #print (f'geting observation on step {self.current_step} :')
+        print (f'geting observation on step {self.current_step} :')
         obs = self._get_observation()
-        #print (f'got obs on step {self.current_step} : {obs}')
+        print (f'got obs on step')# {self.current_step} : {obs}')
         # Check if done
         self.current_step += 1
         print (f'startin step {self.current_step} :')
         done = self.current_step >= self.max_steps
         truncated = False  # Update this based on your custom truncation logic, if any.
         print(f'returning')
-
-        # Return step info TODO gets and error on step 100
+        # print(obs, reward, done, truncated)
         return obs, reward, done, truncated, {}
 
 
@@ -152,8 +174,8 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps)
     
     # Wrap the environment with Monitor and DummyVecEnv
-    env = Monitor(env)
-    env = DummyVecEnv([lambda: env])
+    # env = Monitor(env)
+    # env = DummyVecEnv([lambda: env])
     #print(f"Environment type: {type(env)}")
     
     # Check the environment
@@ -165,7 +187,8 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
         model.learn(total_timesteps=100000)
         #print(f'saving model')
         model.save("sac_carla_model")
+            # sleep(0.1)
     except Exception as e:
         print(f"Error during model training: {e}")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 10, 10, 10000, "cuda")
+run(map_path, 20, 20, 10000, "cuda")
