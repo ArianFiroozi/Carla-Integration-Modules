@@ -53,6 +53,7 @@ cover/
 
 ./sac_carla_model.zip
 ./sac_carla/*
+./sac_carla/*/*
 
 # Translations
 *.mo
