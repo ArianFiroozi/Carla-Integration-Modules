@@ -37,7 +37,7 @@ class CarlaEnv(gymnasium.Env):
         self.current_step = 0
 
 
-        self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
+        self.action_space = spaces.Box(low=0, high=12, shape=(2,), dtype=np.int32)
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
@@ -50,7 +50,7 @@ class CarlaEnv(gymnasium.Env):
         
 
     def reset(self, seed = 12):
-        print(f'reseting')
+        # #print(f'reseting')
         self.current_step = 0
         load_opendrive_map(map_path, self.client)
         self.world = self.client.get_world()
@@ -66,63 +66,63 @@ class CarlaEnv(gymnasium.Env):
         # transform = self.ego_vehicle.get_transform() 
         # spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50), carla.Rotation(pitch=-90))) 
         # time.sleep(0.5)
-        print (f'geting prev observation on step {self.current_step} :')
+        # #print (f'geting prev observation on step {self.current_step} :')
         prev_obs = self._get_observation()
-        print (f'got prev obs on step')
-        print(f'ego z location = {self.ego_vehicle.get_location().z}')
+        # #print (f'got prev obs on step')
+        #print(f'ego z location = {self.ego_vehicle.get_location().z}')
         actors = self.world.get_actors()
-        for actor in actors:
-            print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
+        # for actor in actors:
+            #print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
         if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT):
             self.reset()
             return prev_obs, 0, False, False, {}
-        print (f'take action on step {self.current_step} : {action}')
+        #print (f'take action on step {self.current_step} : {action}')
         speed_action = int(action[0])
         turn_action = int(action[1])
-        print(f"executed command is: {self.vehicle_controller.speed_action_convertor(speed_action)}")
+        #print(f"executed command is: {self.vehicle_controller.speed_action_convertor(speed_action)}")
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
         # {self.current_step} : {prev_obs}')
         # if (self.world)
-        #print (f'ticking world on step {self.current_step} :')
+        ##print (f'ticking world on step {self.current_step} :')
         try:
             self.world.tick()
-            print (f'World has ticked')
+            #print (f'World has ticked')
         except ...:
             self.reset()
-            print("Exception supressed")
+            #print("Exception supressed")
             return prev_obs, 0, False, False, {}
         # Step pedestrians
-        print (f'steping peds on step {self.current_step} :')
+        #print (f'steping peds on step {self.current_step} :')
         step_peds(self.world, self.walkers)
 
         # Calculate reward
-        print (f'calculationg rewards on step {self.current_step} :')
+        #print (f'calculationg rewards on step {self.current_step} :')
         reward = self.vehicle_controller.get_reward()
-        #print (f'got reward {reward} on step {self.current_step} :')
+        ##print (f'got reward {reward} on step {self.current_step} :')
 
         # Additional penalty or reward for traffic signs
         traffic_signs = self._get_nearby_traffic_signs()
         reward += self._process_traffic_signs(traffic_signs)
 
         # Get observation
-        print (f'geting observation on step {self.current_step} :')
+        #print (f'geting observation on step {self.current_step} :')
         obs = self._get_observation()
-        print (f'got obs on step')# {self.current_step} : {obs}')
+        #print (f'got obs on step')# {self.current_step} : {obs}')
         # Check if done
         self.current_step += 1
-        print (f'startin step {self.current_step} :')
+        #print (f'startin step {self.current_step} :')
         done = self.current_step >= self.max_steps
         truncated = False  # Update this based on your custom truncation logic, if any.
-        print(f'returning')
-        # print(obs, reward, done, truncated)
+        #print(f'returning')
+        # #print(obs, reward, done, truncated)
         return obs, reward, done, truncated, {}
 
 
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
-        #print (f'hora out index ta inja nist')
+        ##print (f'hora out index ta inja nist')
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
         traffic_signs = self._encode_traffic_signs()
 
@@ -176,7 +176,7 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     # Wrap the environment with Monitor and DummyVecEnv
     # env = Monitor(env)
     # env = DummyVecEnv([lambda: env])
-    #print(f"Environment type: {type(env)}")
+    ##print(f"Environment type: {type(env)}")
     
     # Check the environment
     # check_env(env, warn=True)
@@ -185,10 +185,10 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
         # Use MultiInputPolicy for dict observation space
         model = SAC("MultiInputPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
         model.learn(total_timesteps=100000)
-        #print(f'saving model')
+        ##print(f'saving model')
         model.save("sac_carla_model")
             # sleep(0.1)
-    except Exception as e:
-        print(f"Error during model training: {e}")
+    except ...:
+        print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 20, 20, 10000, "cuda")
+run(map_path, 3, 5, 40000, "cuda")

@@ -3,7 +3,7 @@ import numpy as np
 
 def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=4.0, cell_length=1.0):
     """
-    Generate a speed matrix for nearby objects.
+    Generate a speed matrix for nearby objects and mark cells that are off the road.
 
     Args:
         ego_vehicle: The ego vehicle actor.
@@ -29,6 +29,11 @@ def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=
     actors = world.get_actors()
     dynamic_objects = actors.filter('vehicle.*') #+ actors.filter('walker.*')
     
+    # Function to check if a location is on the road
+    def is_on_road(location):
+        waypoint = world.get_map().get_waypoint(location, project_to_road=False)
+        return waypoint is not None and not waypoint.is_intersection
+
     for obj in dynamic_objects:
         if obj.id == ego_vehicle.id:
             continue
@@ -50,5 +55,14 @@ def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=
         x_speed_matrix[y_idx, x_idx] += obj_velocity.x
         y_speed_matrix[y_idx, x_idx] += obj_velocity.y
         presence_matrix[y_idx, x_idx] = 1
+
+    # Mark cells that are out of the road with 1
+    for i in range(matrix_length):
+        for j in range(matrix_width):
+            cell_x = ego_location.x + (j - matrix_width // 2) * cell_width
+            cell_y = ego_location.y + (i - matrix_length // 2) * cell_length
+            cell_location = carla.Location(x=cell_x, y=cell_y)
+            if not is_on_road(cell_location):
+                presence_matrix[i, j] = 1
 
     return x_speed_matrix, y_speed_matrix, presence_matrix
