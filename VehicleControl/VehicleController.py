@@ -6,12 +6,12 @@ class Command(enum.Enum):
     SPEED_UP = 0
     SPEED_DOWN = 1
     TURN_RIGHT = 2
-    REVERSE = 6
+    REVERSE = 7
 
     TURN_LEFT = 3
     STOP = 4
     DO_NOT_TURN = 5
-    # DO_NOT_TURN2=6
+    GO_STRAIGHT=6
 
     
 SPEED_UP = 0
@@ -22,7 +22,7 @@ REVERSE = 3
 TURN_RIGHT = 0
 TURN_LEFT = 1
 DO_NOT_TURN = 2
-DO_NOT_TURN2 = 3
+GO_STRAIGHT = 3
 
 class VehicleController():
     def __init__(self, world, vehicle=None):
@@ -81,16 +81,25 @@ class VehicleController():
         self.collision_penalty = config["collision_penalty"]
         self.lane_penalty = config["lane_penalty"]
 
-    def get_reward(self):
-        reward = 0.0
+    def get_reward(self, observation=None):
+        reward = -10.0
 
         velocity = self.vehicle.get_velocity()
+        velocity *= -0.3 if self.control.reverse==False else 1
         speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
         reward += speed * self.speed_reward
+        MIN_TRESH = 2
+        if (speed < MIN_TRESH and speed > -MIN_TRESH):
+            reward -=0.01
+
+        if (speed > 0 and observation["presence"][1][3]):
+            reward -= 2
+        elif(speed < 0 and observation["presence"][1][1]):
+            reward -= 2
 
         if self.collision_happened:
             reward -= self.collision_penalty
-
+            print("Kalaps")
         if self.lane_invaded:
             reward -= self.lane_penalty
 
@@ -98,6 +107,7 @@ class VehicleController():
         self.collision_happened = False
         self.lane_invaded = False
 
+        # print(reward)
         return reward
         # return 0
     
@@ -112,6 +122,7 @@ class VehicleController():
         elif speed_action==REVERSE:
             return Command.REVERSE.value
         else:
+            print(f"speed_action : {speed_action}")
             return -1
         
     def turn_action_convertor(self, turn_action):
@@ -120,9 +131,12 @@ class VehicleController():
             return Command.TURN_RIGHT.value
         elif turn_action == TURN_LEFT:
             return Command.TURN_LEFT.value
-        elif turn_action == DO_NOT_TURN or turn_action == DO_NOT_TURN2:
+        elif turn_action == DO_NOT_TURN:
             return Command.DO_NOT_TURN.value
+        elif turn_action == GO_STRAIGHT:
+            return Command.GO_STRAIGHT.value
         else:
+            print(f"turn_action : {turn_action}")
             return -1
 
 
@@ -147,10 +161,12 @@ class VehicleController():
         elif command == 5:#Command.DO_NOT_TURN.value[0]:
             pass
         elif command == 6:#Command.DO_NOT_TURN.value[0]:
+            self.control.steer = 0
+        elif command == 7:#Command.DO_NOT_TURN.value[0]:
             self.control.reverse=True
             self.control.throttle=0.5
             
         else:
-            print("Unknown command!")
+            print(f"Unknown command : {command}")
         self.vehicle.apply_control(self.control)
         # print(f"Command: {command} | Throttle: {self.control.throttle:.2f}, Steer: {self.control.steer:.2f}")

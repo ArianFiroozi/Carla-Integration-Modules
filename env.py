@@ -70,12 +70,12 @@ class CarlaEnv(gymnasium.Env):
         prev_obs = self._get_observation()
         # #print (f'got prev obs on step')
         #print(f'ego z location = {self.ego_vehicle.get_location().z}')
-        actors = self.world.get_actors()
         # for actor in actors:
             #print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
         if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT):
-            self.reset()
-            return prev_obs, 0, False, False, {}
+            return prev_obs, 0, True, False, {}
+        
+        done = self.current_step >= self.max_steps
         #print (f'take action on step {self.current_step} : {action}')
         speed_action = int(action[0])
         turn_action = int(action[1])
@@ -95,10 +95,12 @@ class CarlaEnv(gymnasium.Env):
         # Step pedestrians
         #print (f'steping peds on step {self.current_step} :')
         step_peds(self.world, self.walkers)
-
+        if self.vehicle_controller.collision_happened:
+            done = True
+            self.vehicle_controller.collision_happened=False
         # Calculate reward
         #print (f'calculationg rewards on step {self.current_step} :')
-        reward = self.vehicle_controller.get_reward()
+        reward = self.vehicle_controller.get_reward(prev_obs)
         ##print (f'got reward {reward} on step {self.current_step} :')
 
         # Additional penalty or reward for traffic signs
@@ -108,13 +110,16 @@ class CarlaEnv(gymnasium.Env):
         # Get observation
         #print (f'geting observation on step {self.current_step} :')
         obs = self._get_observation()
+        # if (obs["presence"].sum() > 7):
+        #     print (f'presence : {obs["presence"]}')
         #print (f'got obs on step')# {self.current_step} : {obs}')
         # Check if done
         self.current_step += 1
         #print (f'startin step {self.current_step} :')
-        done = self.current_step >= self.max_steps
+        
         truncated = False  # Update this based on your custom truncation logic, if any.
         #print(f'returning')
+        
         # #print(obs, reward, done, truncated)
         return obs, reward, done, truncated, {}
 
@@ -184,7 +189,7 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     try:
         # Use MultiInputPolicy for dict observation space
         model = SAC("MultiInputPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
-        model.learn(total_timesteps=100000)
+        model.learn(total_timesteps=steps)
         ##print(f'saving model')
         model.save("sac_carla_model")
             # sleep(0.1)
