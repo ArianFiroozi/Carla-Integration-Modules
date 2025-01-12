@@ -18,6 +18,7 @@ SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
 
 class CarlaEnv(gymnasium.Env):
+    metadata = {"render_modes": ["human"], "render_fps": 60}
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000):
         super(CarlaEnv, self).__init__()
         
@@ -31,7 +32,7 @@ class CarlaEnv(gymnasium.Env):
 
         self.ego_vehicle = spawn_ego_vehicle(self.world)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-        spawn_vehicles(self.client, vehicles_count)
+        self.vehicles = spawn_vehicles(self.client, vehicles_count)
         self.walkers = spawn_pedestrians(self.world, walkers_count)
         self.max_steps = max_steps
         self.current_step = 0
@@ -52,11 +53,29 @@ class CarlaEnv(gymnasium.Env):
     def reset(self, seed = 12):
         # #print(f'reseting')
         self.current_step = 0
-        load_opendrive_map(map_path, self.client)
-        self.world = self.client.get_world()
+
+        actor_filters=['sensor.other.collision', 'vehicle.*', 'walker.*']
+        for filter in actor_filters:
+            for actor in self.world.get_actors().filter(filter):
+                if actor.is_alive:
+                    # if actor.type_id=='controller.ai.walker':
+                    #     try: 
+                    #         actor.stop()
+                    #     except ...:
+                    #         print("ai not attached")
+                    actor.destroy()
+        # self.ego_vehicle.destroy()
+        # self.client.get_trafficmanager().reload()
+        # self.world.destroy()
+        self.world = self.client.reload_world()
+        print([actor.type_id for actor in self.world.get_actors()])
+
+        # load_opendrive_map(map_path, self.client)
+        # self.world = self.client.get_world()
+
         self.ego_vehicle = spawn_ego_vehicle(self.world)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-        spawn_vehicles(self.client, self.vehicles_count)
+        self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         return self._get_observation(), {}
 

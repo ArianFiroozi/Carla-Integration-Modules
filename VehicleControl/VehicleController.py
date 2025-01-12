@@ -82,7 +82,7 @@ class VehicleController():
         self.lane_penalty = config["lane_penalty"]
 
     def get_reward(self, observation=None):
-        reward = -10.0
+        reward = 0.0
 
         velocity = self.vehicle.get_velocity()
         velocity *= -0.3 if self.control.reverse==False else 1
@@ -90,7 +90,7 @@ class VehicleController():
         reward += speed * self.speed_reward
         MIN_TRESH = 2
         if (speed < MIN_TRESH and speed > -MIN_TRESH):
-            reward -=0.01
+            reward -=0.1
 
         if (speed > 0 and observation["presence"][1][3]):
             reward -= 2
@@ -151,9 +151,9 @@ class VehicleController():
             self.control.brake = 0.2
             self.control.reverse=False
         elif command == 2:#Command.TURN_RIGHT.value[0]:
-            self.control.steer = min(self.control.steer + 0.1, 1.0)
+            self.control.steer = min(self.control.steer + 0.2, 1.0)
         elif command == 3:#Command.TURN_LEFT.value[0]:
-            self.control.steer = max(self.control.steer - 0.1, -1.0)
+            self.control.steer = max(self.control.steer - 0.2, -1.0)
         elif command == 4:#Command.STOP.value[0]:
             self.control.reverse=False
             self.control.throttle = 0.0
