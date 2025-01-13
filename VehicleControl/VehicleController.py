@@ -90,7 +90,7 @@ class VehicleController():
         reward += speed * self.speed_reward
         MIN_TRESH = 2
         if (speed < MIN_TRESH and speed > -MIN_TRESH):
-            reward -=0.1
+            reward -=1
 
         if (speed > 0 and observation["presence"][1][3]):
             reward -= 2

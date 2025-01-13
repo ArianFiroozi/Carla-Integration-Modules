@@ -51,29 +51,43 @@ class CarlaEnv(gymnasium.Env):
         
 
     def reset(self, seed = 12):
-        # #print(f'reseting')
+        print(f'reseting')
         self.current_step = 0
 
-        actor_filters=['sensor.other.collision', 'vehicle.*', 'walker.*']
-        for filter in actor_filters:
-            for actor in self.world.get_actors().filter(filter):
-                if actor.is_alive:
-                    # if actor.type_id=='controller.ai.walker':
-                    #     try: 
-                    #         actor.stop()
-                    #     except ...:
-                    #         print("ai not attached")
-                    actor.destroy()
+        # print(f'actors count is : {len(self.world.get_actors())}')
+        # actor_filters=['sensor.other.collision', 'vehicle.*', 'walker.*']
+        # for filter in actor_filters:
+        #     for actor in self.world.get_actors().filter(filter):
+        #         if actor.is_alive:
+        #             # if actor.type_id=='controller.ai.walker':
+        #             #     try: 
+        #             #         actor.stop()
+        #             #     except ...:
+        #             #         print("ai not attached")
+        #             actor.destroy()
         # self.ego_vehicle.destroy()
         # self.client.get_trafficmanager().reload()
         # self.world.destroy()
-        self.world = self.client.reload_world()
-        print([actor.type_id for actor in self.world.get_actors()])
+        # try:
+        #     self.world = self.client.reload_world()
+        # except Exception as e : 
+        #     print (f'reloading error was : {e}')
+        # print(f'reloaded the world')
+        # settings = self.world.get_settings()
+        # settings.fixed_delta_seconds=10
+        # self.world.apply_settings(settings)
 
-        # load_opendrive_map(map_path, self.client)
-        # self.world = self.client.get_world()
+        # print([actor.type_id for actor in self.world.get_actors()])
+
+        load_opendrive_map(map_path, self.client)
+        self.world = self.client.get_world()
 
         self.ego_vehicle = spawn_ego_vehicle(self.world)
+
+        transform=self.ego_vehicle.get_transform()
+        location=carla.Location(x=transform.location.x-10, y=transform.location.y-10,z=10)
+        self.world.get_spectator().set_transform(carla.Transform(location, carla.Rotation(yaw=0.0, pitch=0)))
+
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
         self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
@@ -91,8 +105,6 @@ class CarlaEnv(gymnasium.Env):
         #print(f'ego z location = {self.ego_vehicle.get_location().z}')
         # for actor in actors:
             #print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
-        if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT):
-            return prev_obs, 0, True, False, {}
         
         done = self.current_step >= self.max_steps
         #print (f'take action on step {self.current_step} : {action}')
@@ -116,10 +128,18 @@ class CarlaEnv(gymnasium.Env):
         step_peds(self.world, self.walkers)
         if self.vehicle_controller.collision_happened:
             done = True
+            print(f'step colision')
             self.vehicle_controller.collision_happened=False
+        if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not done):
+            print("oftadam")
+            # return prev_obs, 0, True, False, {}
+            done = True
         # Calculate reward
         #print (f'calculationg rewards on step {self.current_step} :')
         reward = self.vehicle_controller.get_reward(prev_obs)
+        if done:
+            print(f'decresed colision penalty')
+            reward += -100
         ##print (f'got reward {reward} on step {self.current_step} :')
 
         # Additional penalty or reward for traffic signs
@@ -140,7 +160,7 @@ class CarlaEnv(gymnasium.Env):
         #print(f'returning')
         
         # #print(obs, reward, done, truncated)
-        return obs, reward, done, truncated, {}
+        return obs, reward, done , truncated, {}
 
 
 
@@ -198,8 +218,8 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps)
     
     # Wrap the environment with Monitor and DummyVecEnv
-    # env = Monitor(env)
-    # env = DummyVecEnv([lambda: env])
+    env = Monitor(env)
+    env = DummyVecEnv([lambda: env])
     ##print(f"Environment type: {type(env)}")
     
     # Check the environment
@@ -207,7 +227,7 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     
     try:
         # Use MultiInputPolicy for dict observation space
-        model = SAC("MultiInputPolicy", env, verbose=1, tensorboard_log="./sac_carla/", device=device)
+        model = SAC("MultiInputPolicy", env, verbose=2, tensorboard_log="./sac_carla/")
         model.learn(total_timesteps=steps)
         ##print(f'saving model')
         model.save("sac_carla_model")
@@ -215,4 +235,4 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     except ...:
         print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 3, 5, 40000, "cuda")
+run(map_path, 0, 0, 40000, "cuda")
