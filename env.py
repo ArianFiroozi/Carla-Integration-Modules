@@ -38,7 +38,7 @@ class CarlaEnv(gymnasium.Env):
         self.current_step = 0
 
 
-        self.action_space = spaces.Box(low=0, high=12, shape=(2,), dtype=np.int32)
+        self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
@@ -235,4 +235,4 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     except ...:
         print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 0, 0, 40000, "cuda")
+run(map_path, 0, 10, 40000, "cuda")

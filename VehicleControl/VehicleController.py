@@ -141,7 +141,7 @@ class VehicleController():
 
 
     def exec_command(self, command):
-        print(f'taking action : {command}')
+        # print(f'taking action : {command}')
         if command == 0:#Command.SPEED_UP.value[0]:
             self.control.throttle = min(self.control.throttle + 0.3, 1.0)
             self.control.brake = 0.0
