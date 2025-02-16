@@ -80,8 +80,10 @@ class CarlaEnv(gymnasium.Env):
 
         # print([actor.type_id for actor in self.world.get_actors()])
 
-        load_opendrive_map(map_path, self.client)
+        load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
         self.world = self.client.get_world()
+
+        self.__set_world_settings()
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
 
@@ -93,6 +95,18 @@ class CarlaEnv(gymnasium.Env):
         self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         return self._get_observation(), {}
+    
+    def __set_world_settings(self, no_rendering_mode=False, fixed_delta_seconds=0.1): #TODO: parameters
+        settings = self.world.get_settings()
+        settings.synchronous_mode = True
+        self.client.get_trafficmanager().set_synchronous_mode(True)
+        settings.no_rendering_mode = no_rendering_mode
+        settings.fixed_delta_seconds = fixed_delta_seconds
+        settings.substepping = True
+        settings.max_substep_delta_time = 0.01
+        settings.max_substeps = 10
+        self.world.apply_settings(settings)
+
 
     def step(self, action): 
         # time.sleep(0.1)
