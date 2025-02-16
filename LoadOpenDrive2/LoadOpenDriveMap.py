@@ -11,14 +11,15 @@ def load_opendrive_map(xodr_file_path, _client=None):
         world: Carla world created using given map
     """
     if (_client is None):
+        print (f'fail to use client')
         client = carla.Client('localhost', 2000)
         client.set_timeout(10.0)
     else :
         client = _client
-
+    print(f'opening map file')
     with open(xodr_file_path, 'r') as file:
         xodr_data = file.read()
-
+    print(f'generating world')
     world = client.generate_opendrive_world(
         xodr_data,
         carla.OpendriveGenerationParameters(

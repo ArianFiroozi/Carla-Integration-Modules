@@ -112,7 +112,7 @@ class VehicleController():
         # return 0
     
     def speed_action_convertor(self, speed_action):
-        speed_action//=3
+        # speed_action//=3
         if speed_action == SPEED_UP:
             return Command.SPEED_UP.value
         elif speed_action == SPEED_DOWN:
@@ -126,7 +126,7 @@ class VehicleController():
             return -1
         
     def turn_action_convertor(self, turn_action):
-        turn_action//=3
+        # turn_action//=3
         if turn_action == TURN_RIGHT:
             return Command.TURN_RIGHT.value
         elif turn_action == TURN_LEFT:
@@ -141,7 +141,7 @@ class VehicleController():
 
 
     def exec_command(self, command):
-        # print(f'taking action : {command}')
+        print(f'taking action : {command}')
         if command == 0:#Command.SPEED_UP.value[0]:
             self.control.throttle = min(self.control.throttle + 0.3, 1.0)
             self.control.brake = 0.0
