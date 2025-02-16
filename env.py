@@ -19,11 +19,12 @@ LEAST_HEIGHT = -10
 
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000):
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
+        self.init_speed=init_speed
         
         self.client = carla.Client('localhost', 2000)
         self.client.set_timeout(10.0)
@@ -82,7 +83,7 @@ class CarlaEnv(gymnasium.Env):
         load_opendrive_map(map_path, self.client)
         self.world = self.client.get_world()
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world)
+        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
 
         transform=self.ego_vehicle.get_transform()
         location=carla.Location(x=transform.location.x-10, y=transform.location.y-10,z=10)
@@ -214,8 +215,8 @@ class CarlaEnv(gymnasium.Env):
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 
-def run(map_path, walkers_count, vehicles_count, steps, device):
-    env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps)
+def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
+    env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps, init_speed=init_speed)
     
     # Wrap the environment with Monitor and DummyVecEnv
     env = Monitor(env)
@@ -235,4 +236,4 @@ def run(map_path, walkers_count, vehicles_count, steps, device):
     except ...:
         print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 0, 10, 40000, "cuda")
+run(map_path, 0, 10, 40000, "cuda", 0.7)
