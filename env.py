@@ -55,31 +55,7 @@ class CarlaEnv(gymnasium.Env):
         print(f'reseting')
         self.current_step = 0
 
-        # print(f'actors count is : {len(self.world.get_actors())}')
-        # actor_filters=['sensor.other.collision', 'vehicle.*', 'walker.*']
-        # for filter in actor_filters:
-        #     for actor in self.world.get_actors().filter(filter):
-        #         if actor.is_alive:
-        #             # if actor.type_id=='controller.ai.walker':
-        #             #     try: 
-        #             #         actor.stop()
-        #             #     except ...:
-        #             #         print("ai not attached")
-        #             actor.destroy()
-        # self.ego_vehicle.destroy()
-        # self.client.get_trafficmanager().reload()
-        # self.world.destroy()
-        # try:
-        #     self.world = self.client.reload_world()
-        # except Exception as e : 
-        #     print (f'reloading error was : {e}')
-        # print(f'reloaded the world')
-        # settings = self.world.get_settings()
-        # settings.fixed_delta_seconds=10
-        # self.world.apply_settings(settings)
-
-        # print([actor.type_id for actor in self.world.get_actors()])
-
+        # self.__set_world_asynch()
         load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
         self.world = self.client.get_world()
 
@@ -95,6 +71,12 @@ class CarlaEnv(gymnasium.Env):
         self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         return self._get_observation(), {}
+
+    def __set_world_asynch(self):
+        settings = self.world.get_settings()
+        settings.synchronous_mode = False
+        self.client.get_trafficmanager().set_synchronous_mode(False)
+        self.world.apply_settings(settings)
     
     def __set_world_settings(self, no_rendering_mode=False, fixed_delta_seconds=0.1): #TODO: parameters
         settings = self.world.get_settings()
@@ -109,37 +91,17 @@ class CarlaEnv(gymnasium.Env):
 
 
     def step(self, action): 
-        # time.sleep(0.1)
-        # spectator = self.world.get_spectator() 
-        # transform = self.ego_vehicle.get_transform() 
-        # spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50), carla.Rotation(pitch=-90))) 
-        # time.sleep(0.5)
-        # #print (f'geting prev observation on step {self.current_step} :')
-        prev_obs = self._get_observation()
-        # #print (f'got prev obs on step')
-        #print(f'ego z location = {self.ego_vehicle.get_location().z}')
-        # for actor in actors:
-            #print(f'actor {actor.type_id} location is : {actor.get_location().z}', end="-")
-        
+        prev_obs = self._get_observation()        
         done = self.current_step >= self.max_steps
-        #print (f'take action on step {self.current_step} : {action}')
         speed_action = int(action[0])
         turn_action = int(action[1])
-        #print(f"executed command is: {self.vehicle_controller.speed_action_convertor(speed_action)}")
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-        # {self.current_step} : {prev_obs}')
-        # if (self.world)
-        ##print (f'ticking world on step {self.current_step} :')
         try:
             self.world.tick()
-            #print (f'World has ticked')
         except ...:
             self.reset()
-            #print("Exception supressed")
             return prev_obs, 0, False, False, {}
-        # Step pedestrians
-        #print (f'steping peds on step {self.current_step} :')
         step_peds(self.world, self.walkers)
         if self.vehicle_controller.collision_happened:
             done = True
@@ -147,41 +109,29 @@ class CarlaEnv(gymnasium.Env):
             self.vehicle_controller.collision_happened=False
         if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not done):
             print("oftadam")
-            # return prev_obs, 0, True, False, {}
             done = True
-        # Calculate reward
-        #print (f'calculationg rewards on step {self.current_step} :')
+            
         reward = self.vehicle_controller.get_reward(prev_obs)
         if done:
             print(f'decresed colision penalty')
             reward += -100
-        ##print (f'got reward {reward} on step {self.current_step} :')
-
-        # Additional penalty or reward for traffic signs
+            
         traffic_signs = self._get_nearby_traffic_signs()
         reward += self._process_traffic_signs(traffic_signs)
 
-        # Get observation
-        #print (f'geting observation on step {self.current_step} :')
         obs = self._get_observation()
         # if (obs["presence"].sum() > 7):
         #     print (f'presence : {obs["presence"]}')
         #print (f'got obs on step')# {self.current_step} : {obs}')
-        # Check if done
         self.current_step += 1
-        #print (f'startin step {self.current_step} :')
         
-        truncated = False  # Update this based on your custom truncation logic, if any.
-        #print(f'returning')
-        
-        # #print(obs, reward, done, truncated)
+        truncated = False
         return obs, reward, done , truncated, {}
 
 
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
-        ##print (f'hora out index ta inja nist')
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
         traffic_signs = self._encode_traffic_signs()
 
@@ -199,11 +149,11 @@ class CarlaEnv(gymnasium.Env):
 
     def _encode_traffic_signs(self):
         # traffic_signs = self._get_nearby_traffic_signs() TODO
-        encoded_signs = np.zeros(SUPPORTED_SIGNS_COUNT)  # Assuming 10 possible traffic sign types
+        encoded_signs = np.zeros(SUPPORTED_SIGNS_COUNT)
         return encoded_signs
         for sign in traffic_signs:
             if sign.type.isdigit():
-                sign_index = int(sign.type) % 10  # Map sign type to an index
+                sign_index = int(sign.type) % 10
                 encoded_signs[sign_index] = 1
 
         return encoded_signs
@@ -232,21 +182,13 @@ from stable_baselines3.common.env_checker import check_env
 def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps, init_speed=init_speed)
     
-    # Wrap the environment with Monitor and DummyVecEnv
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
-    ##print(f"Environment type: {type(env)}")
-    
-    # Check the environment
-    # check_env(env, warn=True)
     
     try:
-        # Use MultiInputPolicy for dict observation space
         model = SAC("MultiInputPolicy", env, verbose=2, tensorboard_log="./sac_carla/")
         model.learn(total_timesteps=steps)
-        ##print(f'saving model')
         model.save("sac_carla_model")
-            # sleep(0.1)
     except ...:
         print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
