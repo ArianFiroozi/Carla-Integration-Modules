@@ -3,8 +3,19 @@ import carla
 def spawn_ego_vehicle(world, init_speed=0):
     blueprint_library = world.get_blueprint_library()
     vehicle_bp = blueprint_library.filter('vehicle.*model3*')[0]
-    spawn_point = world.get_map().get_spawn_points()[0]
-    vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+
+    spawn_points = world.get_map().get_spawn_points()
+
+    vehicle=None
+    for i in range(len(spawn_points)):
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_points[i])
+        if vehicle!=None:
+            break
+        else:
+            print("ego vehicle spawn failed! retrying...")
+    if vehicle==None:
+        raise Exception(0)
+
     
     control = carla.VehicleControl()
     control.throttle = init_speed

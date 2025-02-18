@@ -17,10 +17,10 @@ def get_lane_angle(ego_vehicle, world_map):
     ego_waypoint = world_map.get_waypoint(ego_location)
 
     lane_vector = ego_waypoint.transform.get_forward_vector()
-    road_angle = torch.arctan2(lane_vector.y, lane_vector.x)
+    road_angle = np.arctan2(lane_vector.y, lane_vector.x)
 
     car_forward_vector = ego_transform.get_forward_vector()
-    car_heading = torch.arctan2(car_forward_vector.y, car_forward_vector.x)
+    car_heading = np.arctan2(car_forward_vector.y, car_forward_vector.x)
     
     relative_angle = car_heading - road_angle
     return relative_angle

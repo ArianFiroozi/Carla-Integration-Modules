@@ -49,27 +49,28 @@ class CarlaEnv(gymnasium.Env):
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
         })
-        
 
     def reset(self, seed = 12):
-        print(f'reseting')
+        print(f'reseting...')
         self.current_step = 0
 
-        # self.__set_world_asynch()
-        load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
+        # load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
+        self.vehicle_controller.sensor_c.destroy()
+        self.vehicle_controller.sensor_l.destroy()
+        if hasattr(self.ego_vehicle, 'is_listening') and self.ego_vehicle.is_listening:
+            self.ego_vehicle.stop()
+        if self.ego_vehicle.is_alive:
+            self.ego_vehicle.destroy()
+
         self.world = self.client.get_world()
 
         self.__set_world_settings()
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
-
-        transform=self.ego_vehicle.get_transform()
-        location=carla.Location(x=transform.location.x-10, y=transform.location.y-10,z=10)
-        self.world.get_spectator().set_transform(carla.Transform(location, carla.Rotation(yaw=0.0, pitch=0)))
-
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-        self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
-        self.walkers = spawn_pedestrians(self.world, self.walkers_count)
+
+        # self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
+        # self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         return self._get_observation(), {}
 
     def __set_world_asynch(self):
@@ -88,7 +89,6 @@ class CarlaEnv(gymnasium.Env):
         settings.max_substep_delta_time = 0.01
         settings.max_substeps = 10
         self.world.apply_settings(settings)
-
 
     def step(self, action): 
         prev_obs = self._get_observation()        
@@ -126,9 +126,10 @@ class CarlaEnv(gymnasium.Env):
         self.current_step += 1
         
         truncated = False
+        if self.current_step>200: #not allowing an episode run more than 200 steps. TODO: checkfor accuracy
+            done=True
+
         return obs, reward, done , truncated, {}
-
-
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
