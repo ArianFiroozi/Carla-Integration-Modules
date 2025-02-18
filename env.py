@@ -1,18 +1,18 @@
 from gymnasium import spaces
 import gymnasium
 import numpy as np
+import torch
 from ObservationAdaptors import *
 from VehicleControl import *
 from LoadOpenDrive2 import *
 from ObjectSpawn import *
 from LoadOpenDrive2 import *
-import time
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 
-import carla, random
+import carla
 
 SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
@@ -42,10 +42,10 @@ class CarlaEnv(gymnasium.Env):
         self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
 
         self.observation_space = spaces.Dict({
-            "speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
-            "speed_y": spaces.Box(low=-np.inf, high=np.inf, shape=(3, 6), dtype=np.float32),
+            "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(3, 6), dtype=np.float32),
+            "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(3, 6), dtype=np.float32),
             "presence": spaces.Box(low=0, high=1, shape=(3, 6), dtype=np.float32),
-            "lane_angle": spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),
+            "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
         })
@@ -139,7 +139,7 @@ class CarlaEnv(gymnasium.Env):
             "speed_x": x_speed_matrix,
             "speed_y": y_speed_matrix,
             "presence": presence_matrix,
-            "lane_angle": np.array(lane_angle),
+            "lane_angle": torch.asarray(lane_angle),
             "traffic_signs": traffic_signs,
             "max_speed": 100
         }
@@ -176,6 +176,7 @@ class CarlaEnv(gymnasium.Env):
 
     def close(self):
         pass
+
 from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 
@@ -186,7 +187,7 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
     env = DummyVecEnv([lambda: env])
     
     try:
-        model = SAC("MultiInputPolicy", env, verbose=2, tensorboard_log="./sac_carla/")
+        model = SAC("MultiInputPolicy", env, verbose=2, tensorboard_log="./sac_carla/", device='cuda')
         model.learn(total_timesteps=steps)
         model.save("sac_carla_model")
     except ...:

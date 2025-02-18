@@ -1,5 +1,6 @@
 import carla
 import numpy as np
+import torch
 
 def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=4.0, cell_length=1.0):
     """
@@ -18,9 +19,9 @@ def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=
         3. np.ndarray: A matrix where each cell contains presence of objects in that lane and section.
     """
 
-    x_speed_matrix = np.zeros((matrix_length, matrix_width))
-    y_speed_matrix = np.zeros((matrix_length, matrix_width))
-    presence_matrix = np.zeros((matrix_length, matrix_width))
+    x_speed_matrix = torch.zeros((matrix_length, matrix_width))
+    y_speed_matrix = torch.zeros((matrix_length, matrix_width))
+    presence_matrix = torch.zeros((matrix_length, matrix_width))
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_transform.location
