@@ -13,6 +13,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
 import os
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 
 import carla
@@ -41,6 +42,7 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
+        self.__set_world_settings()
 
         self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
 
@@ -67,7 +69,6 @@ class CarlaEnv(gymnasium.Env):
 
         self.world = self.client.get_world()
 
-        # self.__set_world_settings()
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
@@ -200,8 +201,10 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
         model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/", n_epochs=7)
     
     try:
+        checkpoint_callback = CheckpointCallback(save_freq=100, save_path='./checkpoints/', name_prefix='ppo_carla_checkpoint')
+
         # model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/")
-        model.learn(total_timesteps=steps)
+        model.learn(total_timesteps=steps, callback=checkpoint_callback)
         print ("saving model")
         model.save("ppo_carla_model")
     except ...:
