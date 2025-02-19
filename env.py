@@ -11,6 +11,9 @@ from stable_baselines3 import SAC
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3 import PPO
+import os
+
 
 import carla
 
@@ -27,7 +30,7 @@ class CarlaEnv(gymnasium.Env):
         self.init_speed=init_speed
         
         self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(10.0)
+        self.client.set_timeout(5.0)
         load_opendrive_map(map_path, self.client)
         self.world = self.client.get_world()
 
@@ -51,7 +54,7 @@ class CarlaEnv(gymnasium.Env):
         })
 
     def reset(self, seed = 12):
-        print(f'reseting...')
+        # print(f'reseting...')
         self.current_step = 0
 
         # load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
@@ -64,7 +67,7 @@ class CarlaEnv(gymnasium.Env):
 
         self.world = self.client.get_world()
 
-        self.__set_world_settings()
+        # self.__set_world_settings()
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
@@ -86,7 +89,7 @@ class CarlaEnv(gymnasium.Env):
         settings.no_rendering_mode = no_rendering_mode
         settings.fixed_delta_seconds = fixed_delta_seconds
         settings.substepping = True
-        settings.max_substep_delta_time = 0.01
+        settings.max_substep_delta_time = 0.1
         settings.max_substeps = 10
         self.world.apply_settings(settings)
 
@@ -100,20 +103,21 @@ class CarlaEnv(gymnasium.Env):
         try:
             self.world.tick()
         except ...:
+            print ("tick fail")
             self.reset()
             return prev_obs, 0, False, False, {}
         step_peds(self.world, self.walkers)
         if self.vehicle_controller.collision_happened:
             done = True
-            print(f'step colision')
+            # print(f'step colision')
             self.vehicle_controller.collision_happened=False
         if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not done):
-            print("oftadam")
+            # print("oftadam")
             done = True
             
         reward = self.vehicle_controller.get_reward(prev_obs)
         if done:
-            print(f'decresed colision penalty')
+            # print(f'decresed colision penalty')
             reward += -100
             
         traffic_signs = self._get_nearby_traffic_signs()
@@ -186,12 +190,21 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
     
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
+    model_path = "ppo_carla_model"
+
+    if os.path.exists(model_path + ".zip"):
+        print("Loading existing model...")
+        model = PPO.load(model_path, env=env, n_epochs=7)
+    else:
+        print("Creating new model...")
+        model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/", n_epochs=7)
     
     try:
-        model = SAC("MultiInputPolicy", env, verbose=2, tensorboard_log="./sac_carla/", device='cuda')
+        # model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/")
         model.learn(total_timesteps=steps)
-        model.save("sac_carla_model")
+        print ("saving model")
+        model.save("ppo_carla_model")
     except ...:
         print(f"Error during model training: ")
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 0, 10, 40000, "cuda", 0.7)
+run(map_path, 0, 10, 2000000, "cuda", 0.7)
