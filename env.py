@@ -18,6 +18,7 @@ from IPython.display import clear_output
 
 import carla
 
+MAX_ITER_IN_EPISODE=500
 SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
 
@@ -145,7 +146,7 @@ class CarlaEnv(gymnasium.Env):
             self.last_heartbeat_time = current_time
         
         truncated = False
-        if self.current_step>200: #not allowing an episode run more than 200 steps. TODO: checkfor accuracy
+        if self.current_step>MAX_ITER_IN_EPISODE:
             done=True
 
         return obs, reward, done , truncated, {}
@@ -223,7 +224,11 @@ def get_latest_checkpoint(base_path='./checkpoints/checkpoint'):
     while True:
         file_name = f"{base_path}{folder_index-1}/ppo_carla_checkpoint_{file_num}000_steps.zip"
         if not os.path.exists(file_name):
-            break
+            if file_num==1 and folder_index != 0:
+                folder_index-=1
+                continue
+            else:
+                break
         file_num += 1
     if file_num==1 and folder_index==0:
         return ""
