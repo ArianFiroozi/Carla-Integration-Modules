@@ -18,7 +18,7 @@ from IPython.display import clear_output
 
 import carla
 
-MAX_ITER_IN_EPISODE=500
+MAX_ITER_IN_EPISODE=5000
 SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
 
@@ -46,9 +46,9 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        self.__set_world_settings()
+        # self.__set_world_settings()
 
-        self.action_space = spaces.Box(low=0, high=3, shape=(2,), dtype=np.int32)
+        self.action_space = spaces.MultiDiscrete([4,4])
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(3, 6), dtype=np.float32),

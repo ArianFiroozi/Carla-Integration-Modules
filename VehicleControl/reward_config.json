@@ -1,6 +1,6 @@
 {
-      "speed_reward": 10,
-      "collision_penalty": -100,
-      "lane_penalty": -2
+      "speed_reward": 1,
+      "collision_penalty": -2000,
+      "lane_penalty": -2000
   }
   

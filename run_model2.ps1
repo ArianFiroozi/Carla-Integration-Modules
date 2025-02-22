@@ -1,13 +1,23 @@
-$timeout = 60  # Seconds without heartbeat before restart
+$timeout = 30  # Seconds without heartbeat before restart
 $pythonExe = "C:/Users/H/anaconda3/envs/torch-gpu/python.exe"
 $scriptPath = "c:/Users/H/Desktop/IOT/Carla-Integration-Modules/env.py"
 $heartbeatFile = "heartbeat.txt"
+$exePath = "C:\Users\H\Desktop\Carla\CarlaUE4.exe"
+$port = 2000
 
 function Start-Training {
     # Start process with output in current window
     $process = Start-Process -FilePath $pythonExe -ArgumentList $scriptPath -PassThru -NoNewWindow
     Write-Host "Started training with PID $($process.Id)"
     return $process
+}
+
+function Check-Port {
+    param (
+        [int]$port
+    )
+    $portInUse = (Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue) -ne $null
+    return $portInUse
 }
 
 while ($true) {
@@ -46,6 +56,15 @@ while ($true) {
     # Cleanup
     if (-not $trainingProcess.HasExited) {
         Stop-Process -Id $trainingProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    # Check if port 2000 is not in use and run .exe file
+    if (-not (Check-Port -port $port)) {
+        Write-Host "Port $port is not in use. Running $exePath..."
+        Start-Process -FilePath $exePath -NoNewWindow 
+        Start-Sleep -Seconds 30 
+    } else {
+        Write-Host "Port $port is in use. Skipping $exePath execution."
     }
 
     # Cool-down before restart

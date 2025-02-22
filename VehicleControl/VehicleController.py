@@ -85,23 +85,23 @@ class VehicleController():
         reward = 0.0
 
         velocity = self.vehicle.get_velocity()
-        velocity *= -0.3 if self.control.reverse==False else 1
+        # velocity *= 1 if self.control.reverse==False else -0.5
         speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
-        reward += speed * self.speed_reward
+        reward += speed * self.speed_reward * (0.1 if self.control.reverse==False else -0.05)
         MIN_TRESH = 2
-        if (speed < MIN_TRESH and speed > -MIN_TRESH):
-            reward -=1
+        # if (speed < MIN_TRESH and speed > -MIN_TRESH):
+        #     reward -=1
 
-        if (speed > 0 and observation["presence"][1][3]):
-            reward -= 2
-        elif(speed < 0 and observation["presence"][1][1]):
-            reward -= 2
+        # if (speed > 0 and observation["presence"][1][3]):
+        #     reward -= 2
+        # elif(speed < 0 and observation["presence"][1][1]):
+        #     reward -= 2
 
         if self.collision_happened:
-            reward -= self.collision_penalty
+            reward += self.collision_penalty
             print("Kalaps")
         if self.lane_invaded:
-            reward -= self.lane_penalty
+            reward += self.lane_penalty
 
         
         self.collision_happened = False
