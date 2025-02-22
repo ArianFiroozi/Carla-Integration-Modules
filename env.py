@@ -14,12 +14,15 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
 import os
 from stable_baselines3.common.callbacks import CheckpointCallback
-
+from IPython.display import clear_output
 
 import carla
 
 SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
+
+with open("training.pid", "w") as f:
+    f.write(str(os.getpid()))
 
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
@@ -54,6 +57,9 @@ class CarlaEnv(gymnasium.Env):
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
         })
+        self.last_heartbeat_time = time.time()
+        with open("heartbeat.txt", "w") as f:
+            f.write(str(self.last_heartbeat_time))
 
     def reset(self, seed = 12):
         # print(f'reseting...')
@@ -75,6 +81,7 @@ class CarlaEnv(gymnasium.Env):
 
         # self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         # self.walkers = spawn_pedestrians(self.world, self.walkers_count)
+        # clear_output(wait=True)
         return self._get_observation(), {}
 
     def __set_world_asynch(self):
@@ -102,7 +109,9 @@ class CarlaEnv(gymnasium.Env):
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
         try:
-            self.world.tick()
+            # print("ticking")
+            self.world.tick(5.0)
+            # print("ticked")
         except ...:
             print ("tick fail")
             self.reset()
@@ -129,6 +138,11 @@ class CarlaEnv(gymnasium.Env):
         #     print (f'presence : {obs["presence"]}')
         #print (f'got obs on step')# {self.current_step} : {obs}')
         self.current_step += 1
+        current_time = time.time()
+        if current_time - self.last_heartbeat_time >= 10.0:
+            with open("heartbeat.txt", "w") as f:
+                f.write(str(current_time))
+            self.last_heartbeat_time = current_time
         
         truncated = False
         if self.current_step>200: #not allowing an episode run more than 200 steps. TODO: checkfor accuracy
@@ -195,13 +209,13 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
 
     if os.path.exists(model_path + ".zip"):
         print("Loading existing model...")
-        model = PPO.load(model_path, env=env, n_epochs=7)
+        model = PPO.load(model_path, env=env, n_epochs=10)
     else:
         print("Creating new model...")
-        model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/", n_epochs=7)
+        model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/", n_epochs=10)
     
     try:
-        checkpoint_callback = CheckpointCallback(save_freq=100, save_path='./checkpoints/', name_prefix='ppo_carla_checkpoint')
+        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./checkpoints/', name_prefix='ppo_carla_checkpoint')
 
         # model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/")
         model.learn(total_timesteps=steps, callback=checkpoint_callback)
