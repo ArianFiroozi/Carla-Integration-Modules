@@ -46,7 +46,7 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        self.__set_world_settings()
+        # self.__set_world_settings()
 
         self.action_space = spaces.MultiDiscrete([4,4])
 
@@ -112,7 +112,7 @@ class CarlaEnv(gymnasium.Env):
         try:
             print(prev_obs['presence'])
             print("-------------------------------------------------------")
-            time.sleep(0.5)
+            # time.sleep(0.5)
             self.world.tick(5.0)
         except ...:
             print ("tick fail")
@@ -260,5 +260,6 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
         model.save("ppo_carla_model")
     except ...:
         print(f"Error during model training: ")
+# map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
 run(map_path, 0, 10, 2000000, "cuda", 0.7)

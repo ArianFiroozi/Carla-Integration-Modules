@@ -30,10 +30,10 @@ def get_speed_matrices(ego_vehicle, matrix_length=12, matrix_width=6, cell_width
     actors = world.get_actors()
     dynamic_objects = actors.filter('vehicle.*') #+ actors.filter('walker.*')
     
-    # Function to check if a location is on the road
+    # Function to check if a location is on the road TODO: this is wrong
     def is_on_road(location):
         waypoint = world.get_map().get_waypoint(location, project_to_road=False)
-        return waypoint is not None and not waypoint.is_intersection
+        return waypoint is not None 
 
     for obj in dynamic_objects:
         if obj.id == ego_vehicle.id:
@@ -63,7 +63,11 @@ def get_speed_matrices(ego_vehicle, matrix_length=12, matrix_width=6, cell_width
             cell_x = ego_location.x + (j - matrix_width // 2) * cell_width
             cell_y = ego_location.y + (i - matrix_length // 2) * cell_length
             cell_location = carla.Location(x=cell_x, y=cell_y)
-            if not is_on_road(cell_location):
-                pass
-                # presence_matrix[i, j] = 1
+            if not is_on_road(cell_location) and presence_matrix[i,j]==0:
+                presence_matrix[i, j] = 2
+
+    x_idx = int((cell_width * matrix_width / 2) // cell_width)
+    y_idx = int((matrix_length * cell_length / 2) // cell_length)
+
+    presence_matrix[y_idx, x_idx]=9
     return x_speed_matrix, y_speed_matrix, presence_matrix
