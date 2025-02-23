@@ -97,11 +97,11 @@ class VehicleController():
         # elif(speed < 0 and observation["presence"][1][1]):
         #     reward -= 2
 
-        if self.collision_happened:
+        if self.collision_happened or self.vehicle.get_location().z <= -5:
             reward += self.collision_penalty
             print("Kalaps")
-        if self.lane_invaded:
-            reward += self.lane_penalty
+        # if self.lane_invaded: # DO NOT CLEAR THIS
+        #     reward += self.lane_penalty
 
         
         self.collision_happened = False

@@ -46,14 +46,14 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        # self.__set_world_settings()
+        self.__set_world_settings()
 
         self.action_space = spaces.MultiDiscrete([4,4])
 
         self.observation_space = spaces.Dict({
-            "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(3, 6), dtype=np.float32),
-            "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(3, 6), dtype=np.float32),
-            "presence": spaces.Box(low=0, high=1, shape=(3, 6), dtype=np.float32),
+            "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(12, 6), dtype=np.float32),
+            "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(12, 6), dtype=np.float32),
+            "presence": spaces.Box(low=0, high=1, shape=(12, 6), dtype=np.float32),
             "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
@@ -110,9 +110,10 @@ class CarlaEnv(gymnasium.Env):
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
         try:
-            # print("ticking")
+            print(prev_obs['presence'])
+            print("-------------------------------------------------------")
+            time.sleep(0.5)
             self.world.tick(5.0)
-            # print("ticked")
         except ...:
             print ("tick fail")
             self.reset()

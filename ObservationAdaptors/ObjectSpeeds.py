@@ -2,7 +2,7 @@ import carla
 import numpy as np
 import torch
 
-def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=4.0, cell_length=1.0):
+def get_speed_matrices(ego_vehicle, matrix_length=12, matrix_width=6, cell_width=4.0, cell_length=4.0):
     """
     Generate a speed matrix for nearby objects and mark cells that are off the road.
 
@@ -64,6 +64,6 @@ def get_speed_matrices(ego_vehicle, matrix_length=3, matrix_width=6, cell_width=
             cell_y = ego_location.y + (i - matrix_length // 2) * cell_length
             cell_location = carla.Location(x=cell_x, y=cell_y)
             if not is_on_road(cell_location):
-                presence_matrix[i, j] = 1
-
+                pass
+                # presence_matrix[i, j] = 1
     return x_speed_matrix, y_speed_matrix, presence_matrix
