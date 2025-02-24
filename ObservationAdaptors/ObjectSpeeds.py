@@ -1,39 +1,24 @@
 import carla
 import numpy as np
 import torch
+import math
 
-def get_speed_matrices(ego_vehicle, matrix_length=12, matrix_width=6, cell_width=4.0, cell_length=4.0):
+def get_speed_matrices(ego_vehicle, matrix_length=25, matrix_width=11, cell_width=2.0, cell_length=2.0):
     """
-    Generate a speed matrix for nearby objects and mark cells that are off the road.
-
-    Args:
-        ego_vehicle: The ego vehicle actor.
-        matrix_length (int): Number of matrix_length.
-        matrix_width (int): Number of matrix_width per lane.
-        cell_width (float): Width of each lane (meters).
-        cell_length (float): Length of each section (meters).
-    
-    Returns:
-        1. np.ndarray: A matrix where each cell contains the speed of objects in that lane and section on x axis.
-        2. np.ndarray: A matrix where each cell contains the speed of objects in that lane and section on y axis.
-        3. np.ndarray: A matrix where each cell contains presence of objects in that lane and section.
+    Generate speed matrices aligned with the ego vehicle's heading.
     """
-
     x_speed_matrix = torch.zeros((matrix_length, matrix_width))
     y_speed_matrix = torch.zeros((matrix_length, matrix_width))
     presence_matrix = torch.zeros((matrix_length, matrix_width))
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_transform.location
+    ego_yaw = ego_transform.rotation.yaw
+    theta = math.radians(ego_yaw)
 
     world = ego_vehicle.get_world()
     actors = world.get_actors()
-    dynamic_objects = actors.filter('vehicle.*') #+ actors.filter('walker.*')
-    
-    # Function to check if a location is on the road TODO: this is wrong
-    def is_on_road(location):
-        waypoint = world.get_map().get_waypoint(location, project_to_road=False)
-        return waypoint is not None 
+    dynamic_objects = actors.filter('vehicle.*')
 
     for obj in dynamic_objects:
         if obj.id == ego_vehicle.id:
@@ -42,32 +27,60 @@ def get_speed_matrices(ego_vehicle, matrix_length=12, matrix_width=6, cell_width
         obj_transform = obj.get_transform()
         obj_velocity = obj.get_velocity()
 
+        # Calculate global displacement
         dx = obj_transform.location.x - ego_location.x
         dy = obj_transform.location.y - ego_location.y
 
-        x_idx = int((dx + cell_width * matrix_width / 2) // cell_width) # fix if you want to drift inbetween the matrix_width
+        # Rotate to local coordinates
+        dx_local = dx * math.cos(theta) + dy * math.sin(theta)
+        dy_local = -dx * math.sin(theta) + dy * math.cos(theta)
+
+        # Calculate x_idx (lateral)
+        x_offset = (matrix_width // 2) * cell_width
+        x_idx = int((dy_local + x_offset) // cell_width)
         if x_idx < 0 or x_idx >= matrix_width:
             continue
 
-        y_idx = int((dy + matrix_length * cell_length / 2) // cell_length)
+        # Calculate y_idx (longitudinal)
+        y_offset = (matrix_length // 2) * cell_length
+        y_idx = int((dx_local + y_offset) // cell_length)
         if y_idx < 0 or y_idx >= matrix_length:
             continue
 
-        x_speed_matrix[y_idx, x_idx] += obj_velocity.x
-        y_speed_matrix[y_idx, x_idx] += obj_velocity.y
+        # Rotate velocity to local coordinates
+        vx = obj_velocity.x
+        vy = obj_velocity.y
+        vx_local = vx * math.cos(theta) + vy * math.sin(theta)
+        vy_local = -vx * math.sin(theta) + vy * math.cos(theta)
+
+        x_speed_matrix[y_idx, x_idx] += vx_local
+        y_speed_matrix[y_idx, x_idx] += vy_local
         presence_matrix[y_idx, x_idx] = 1
 
-    # Mark cells that are out of the road with 1
+    # Mark off-road cells
     for i in range(matrix_length):
         for j in range(matrix_width):
-            cell_x = ego_location.x + (j - matrix_width // 2) * cell_width
-            cell_y = ego_location.y + (i - matrix_length // 2) * cell_length
-            cell_location = carla.Location(x=cell_x, y=cell_y)
-            if not is_on_road(cell_location) and presence_matrix[i,j]==0:
-                presence_matrix[i, j] = 2
+            if presence_matrix[i, j] == 0:
+                # Local cell position
+                dx_cell_local = (i - matrix_length // 2) * cell_length
+                dy_cell_local = (j - matrix_width // 2) * cell_width
 
-    x_idx = int((cell_width * matrix_width / 2) // cell_width)
-    y_idx = int((matrix_length * cell_length / 2) // cell_length)
+                # Rotate to global coordinates
+                dx_global = dx_cell_local * math.cos(theta) - dy_cell_local * math.sin(theta)
+                dy_global = dx_cell_local * math.sin(theta) + dy_cell_local * math.cos(theta)
 
-    presence_matrix[y_idx, x_idx]=9
+                cell_x = ego_location.x + dx_global
+                cell_y = ego_location.y + dy_global
+                cell_location = carla.Location(x=cell_x, y=cell_y)
+
+                if not is_on_road(cell_location, world):
+                    presence_matrix[i, j] = 2
+
+    # Mark ego vehicle's position
+    presence_matrix[matrix_length // 2, matrix_width // 2] = 9
+
     return x_speed_matrix, y_speed_matrix, presence_matrix
+
+def is_on_road(location, world):
+    waypoint = world.get_map().get_waypoint(location, project_to_road=False)
+    return waypoint is not None

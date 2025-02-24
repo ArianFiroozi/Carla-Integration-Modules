@@ -51,9 +51,9 @@ class CarlaEnv(gymnasium.Env):
         self.action_space = spaces.MultiDiscrete([4,4])
 
         self.observation_space = spaces.Dict({
-            "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(12, 6), dtype=np.float32),
-            "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(12, 6), dtype=np.float32),
-            "presence": spaces.Box(low=0, high=1, shape=(12, 6), dtype=np.float32),
+            "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
+            "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
+            "presence": spaces.Box(low=0, high=1, shape=(25, 11), dtype=np.float32),
             "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
@@ -110,8 +110,8 @@ class CarlaEnv(gymnasium.Env):
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
         try:
-            print(prev_obs['presence'])
-            print("-------------------------------------------------------")
+            # print(prev_obs['presence'])
+            # print("-------------------------------------------------------")
             # time.sleep(0.5)
             self.world.tick(5.0)
         except ...:
@@ -245,11 +245,19 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
     latest_checkpoint=get_latest_checkpoint()
     if latest_checkpoint != "":
         print(f"Loading existing model: {latest_checkpoint}")
-        model = PPO.load(latest_checkpoint, verbose=2, env=env, n_epochs=10)
+        model = PPO.load(latest_checkpoint, verbose=2, env=env, n_epochs=10, batch_size=128, learning_rate=3e-4, clip_range=0.2)
     else:
         print("Creating new model...")
-        model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/", n_epochs=10)
-    
+        model = PPO(
+            "MultiInputPolicy",
+            env,
+            verbose=2,
+            tensorboard_log="./ppo_carla/",
+            n_epochs=10,
+            batch_size=128,
+            learning_rate=3e-4,
+            clip_range=0.2,
+        )    
     try:
         checkpoints_folder = create_checkpoints_folder()
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=checkpoints_folder, name_prefix='ppo_carla_checkpoint')
