@@ -1,4 +1,5 @@
 import carla
+import random 
 
 def spawn_ego_vehicle(world, init_speed=0):
     blueprint_library = world.get_blueprint_library()
@@ -7,7 +8,9 @@ def spawn_ego_vehicle(world, init_speed=0):
     spawn_points = world.get_map().get_spawn_points()
 
     vehicle=None
-    for i in range(len(spawn_points)):
+    shuffeled_idx = [i for i in range(len(spawn_points))]
+    random.shuffle(shuffeled_idx)
+    for i in shuffeled_idx:
         vehicle = world.try_spawn_actor(vehicle_bp, spawn_points[i])
         if vehicle!=None:
             break

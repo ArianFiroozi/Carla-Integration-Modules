@@ -269,5 +269,5 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
     except ...:
         print(f"Error during model training: ")
 # map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
-map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/simple_map.xodr"
-run(map_path, 0, 10, 2000000, "cuda", 0.7)
+map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/harder.xodr"
+run(map_path, 0, 0, 2000000, "cuda", 0.7)
