@@ -15,6 +15,7 @@ from stable_baselines3 import PPO
 import os
 from stable_baselines3.common.callbacks import CheckpointCallback
 from IPython.display import clear_output
+from manual_controller import *
 
 import carla
 
@@ -235,39 +236,45 @@ def get_latest_checkpoint(base_path='./checkpoints/checkpoint'):
         return ""
     return f"{base_path}{folder_index-1}/ppo_carla_checkpoint_{file_num-1}000_steps.zip"
 
-def run(map_path, walkers_count, vehicles_count, steps, device, init_speed):
+def run(map_path, walkers_count, vehicles_count, steps, device, init_speed, manual_mode=False):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps, init_speed=init_speed)
     
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
     model_path = "ppo_carla_model"
+    
+    if manual_mode:
+        # Use the manual controller
+        controller = ManualController(env)
+        controller.run()
+        
+    else :
+        latest_checkpoint=get_latest_checkpoint()
+        if latest_checkpoint != "":
+            print(f"Loading existing model: {latest_checkpoint}")
+            model = PPO.load(latest_checkpoint, verbose=2, env=env, n_epochs=10, batch_size=128, learning_rate=3e-4, clip_range=0.2)
+        else:
+            print("Creating new model...")
+            model = PPO(
+                "MultiInputPolicy",
+                env,
+                verbose=2,
+                tensorboard_log="./ppo_carla/",
+                n_epochs=10,
+                batch_size=128,
+                learning_rate=3e-4,
+                clip_range=0.2,
+            )    
+        try:
+            checkpoints_folder = create_checkpoints_folder()
+            checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=checkpoints_folder, name_prefix='ppo_carla_checkpoint')
 
-    latest_checkpoint=get_latest_checkpoint()
-    if latest_checkpoint != "":
-        print(f"Loading existing model: {latest_checkpoint}")
-        model = PPO.load(latest_checkpoint, verbose=2, env=env, n_epochs=10, batch_size=128, learning_rate=3e-4, clip_range=0.2)
-    else:
-        print("Creating new model...")
-        model = PPO(
-            "MultiInputPolicy",
-            env,
-            verbose=2,
-            tensorboard_log="./ppo_carla/",
-            n_epochs=10,
-            batch_size=128,
-            learning_rate=3e-4,
-            clip_range=0.2,
-        )    
-    try:
-        checkpoints_folder = create_checkpoints_folder()
-        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=checkpoints_folder, name_prefix='ppo_carla_checkpoint')
-
-        # model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/")
-        model.learn(total_timesteps=steps, callback=checkpoint_callback)
-        print ("saving model")
-        model.save("ppo_carla_model")
-    except ...:
-        print(f"Error during model training: ")
+            # model = PPO("MultiInputPolicy", env, verbose=2, tensorboard_log="./ppo_carla/")
+            model.learn(total_timesteps=steps, callback=checkpoint_callback)
+            print ("saving model")
+            model.save("ppo_carla_model")
+        except ...:
+            print(f"Error during model training: ")
 # map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/harder.xodr"
 run(map_path, 0, 0, 2000000, "cuda", 0.7)
