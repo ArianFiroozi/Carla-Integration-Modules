@@ -56,7 +56,7 @@ class ManualController:
             elif keyboard.is_pressed('t'):
                 turn_action = 2 # Do not turn
             else :
-                continue
+                turn_action = 2
             
             # Combine actions into a list compatible with env.step()
             action = [speed_action, turn_action]
