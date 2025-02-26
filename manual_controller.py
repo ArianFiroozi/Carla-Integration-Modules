@@ -38,21 +38,21 @@ class ManualController:
 
             # Map keyboard inputs to actions
             if keyboard.is_pressed('w'):
-                speed_action = Command.SPEED_UP  # Accelerate
+                speed_action = 0  # Accelerate
             elif keyboard.is_pressed('s'):
-                speed_action = Command.SPEED_DOWN  # Brake
+                speed_action = 1  # Brake
             elif keyboard.is_pressed('space'):
-                speed_action = Command.STOP  # stop
+                speed_action = 2  # stop
             elif keyboard.is_pressed('r'):
-                speed_action = Command.REVERSE  # Brake
+                speed_action = 3  # Brake
             if keyboard.is_pressed('a'):
-                turn_action = Command.TURN_LEFT   # Steer left
+                turn_action = 1   # Steer left
             elif keyboard.is_pressed('d'):
-                turn_action = Command.TURN_RIGHT   # Steer right
+                turn_action = 0   # Steer right
             elif keyboard.is_pressed('f'):
-                turn_action = Command.GO_STRAIGHT  # Brake
+                turn_action = 3  # Brake
             else:
-                turn_action = Command.DO_NOT_TURN
+                turn_action = 2
             
             # Combine actions into a list compatible with env.step()
             action = [speed_action, turn_action]
