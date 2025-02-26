@@ -50,9 +50,11 @@ class ManualController:
             elif keyboard.is_pressed('d'):
                 turn_action = 0   # Steer right
             elif keyboard.is_pressed('f'):
-                turn_action = 3  # Brake
-            else:
-                turn_action = 2
+                turn_action = 3  # Go straight
+            elif keyboard.is_pressed('t'):
+                turn_action = 2 # Do not turn
+            else :
+                continue
             
             # Combine actions into a list compatible with env.step()
             action = [speed_action, turn_action]
