@@ -13,7 +13,7 @@ def get_speed_matrices(ego_vehicle, matrix_length=25, matrix_width=11, cell_widt
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_transform.location
-    ego_velocity = self.ego_vehicle.get_velocity()
+    ego_velocity = ego_vehicle.get_velocity()
     vx_ego = ego_velocity.x
     vy_ego = ego_velocity.y
     ego_yaw = ego_transform.rotation.yaw

@@ -47,7 +47,7 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        self.__set_world_settings()
+        # self.__set_world_settings()
 
         self.action_space = spaces.MultiDiscrete([5,4])
 
@@ -60,7 +60,7 @@ class CarlaEnv(gymnasium.Env):
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
             "ego_speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
             "ego_speed_y": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
-            "ego_in_lane_position_x": spaces.Box(low=-10, high=10, shape=(1,), dtype=np.float32),  # Lateral offset, assuming lane width ~10m
+            "ego_in_lane_position_x": spaces.Box(low=-100, high=100, shape=(1,), dtype=np.float32),  # Lateral offset, assuming lane width ~10m
             "throttle": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
             "brake": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
             "steering_angle": spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32),
@@ -193,7 +193,7 @@ class CarlaEnv(gymnasium.Env):
             "max_speed": 100,
             "ego_speed_x": np.array([vx_local], dtype=np.float32),
             "ego_speed_y": np.array([vy_local], dtype=np.float32),
-            "ego_position_x": np.array([lateral_offset], dtype=np.float32),
+            "ego_in_lane_position_x": np.array([lateral_offset], dtype=np.float32),
             "throttle": np.array([throttle], dtype=np.float32),
             "brake": np.array([brake], dtype=np.float32),
             "steering_angle": np.array([steering], dtype=np.float32),
@@ -309,4 +309,4 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed, manu
             print(f"Error during model training: ")
 # map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
 map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/harder.xodr"
-run(map_path, 0, 0, 2000000, "cuda", 0.7)
+run(map_path, 0, 0, 2000000, "cuda", 0)
