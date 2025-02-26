@@ -1,6 +1,7 @@
 import keyboard
 import time
 import carla
+from VehicleControl import *
 
 class ManualController:
     def __init__(self, env):
@@ -37,14 +38,22 @@ class ManualController:
 
             # Map keyboard inputs to actions
             if keyboard.is_pressed('w'):
-                speed_action = 1  # Accelerate
+                speed_action = Command.SPEED_UP  # Accelerate
             elif keyboard.is_pressed('s'):
-                speed_action = 2  # Brake
+                speed_action = Command.SPEED_DOWN  # Brake
+            elif keyboard.is_pressed('space'):
+                speed_action = Command.STOP  # stop
+            elif keyboard.is_pressed('r'):
+                speed_action = Command.REVERSE  # Brake
             if keyboard.is_pressed('a'):
-                turn_action = 1   # Steer left
+                turn_action = Command.TURN_LEFT   # Steer left
             elif keyboard.is_pressed('d'):
-                turn_action = 2   # Steer right
-
+                turn_action = Command.TURN_RIGHT   # Steer right
+            elif keyboard.is_pressed('f'):
+                turn_action = Command.GO_STRAIGHT  # Brake
+            else:
+                turn_action = Command.DO_NOT_TURN
+            
             # Combine actions into a list compatible with env.step()
             action = [speed_action, turn_action]
 
@@ -52,6 +61,7 @@ class ManualController:
                 # Step the environment with the chosen action
                 obs, reward, self.done, truncated, info = self.env.step(action)
                 print(f"Step: {self.env.current_step}, Reward: {reward}, Done: {self.done}")
+                print(f'obs is : {obs}')
             
             if self.done:
                 # Episode ended, wait for reset or quit
