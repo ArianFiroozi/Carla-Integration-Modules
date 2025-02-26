@@ -7,6 +7,7 @@ class Command(enum.Enum):
     SPEED_DOWN = 1
     TURN_RIGHT = 2
     REVERSE = 7
+    CONSTANT_SPEED = 8
 
     TURN_LEFT = 3
     STOP = 4
@@ -18,6 +19,7 @@ SPEED_UP = 0
 SPEED_DOWN = 1
 STOP = 2
 REVERSE = 3
+CONSTANT = 4
 
 TURN_RIGHT = 0
 TURN_LEFT = 1
@@ -121,6 +123,8 @@ class VehicleController():
             return Command.STOP.value
         elif speed_action==REVERSE:
             return Command.REVERSE.value
+        elif speed_action==CONSTANT:
+            return Command.CONSTANT_SPEED.value
         else:
             print(f"speed_action : {speed_action}")
             return -1
@@ -147,7 +151,7 @@ class VehicleController():
             self.control.brake = 0.0
             self.control.reverse=False
         elif command == 1:#Command.SPEED_DOWN.value[0]:
-            self.control.throttle = max(self.control.throttle - 0.3, -1.0)
+            self.control.throttle = max(self.control.throttle - 0.3, 0)
             self.control.brake = 0.2
             self.control.reverse=False
         elif command == 2:#Command.TURN_RIGHT.value[0]:
@@ -165,6 +169,8 @@ class VehicleController():
         elif command == 7:#Command.DO_NOT_TURN.value[0]:
             self.control.reverse=True
             self.control.throttle=0.5
+        elif command == 8:
+            pass
             
         else:
             print(f"Unknown command : {command}")

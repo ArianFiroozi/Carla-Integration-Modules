@@ -46,7 +46,7 @@ class ManualController:
             elif keyboard.is_pressed('r'):
                 speed_action = 3  # Brake
             else :
-                speed_action = 2
+                speed_action = 4
             if keyboard.is_pressed('left'):
                 turn_action = 1   # Steer left
             elif keyboard.is_pressed('right'):

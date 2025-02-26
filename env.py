@@ -47,9 +47,9 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
 
-        # self.__set_world_settings()
+        self.__set_world_settings()
 
-        self.action_space = spaces.MultiDiscrete([4,4])
+        self.action_space = spaces.MultiDiscrete([5,4])
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
