@@ -89,7 +89,7 @@ class VehicleController():
         speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
         reward += speed * self.speed_reward * (0.1 if self.control.reverse==False else -0.05)
         MIN_TRESH = 2
-        # if (speed < MIN_TRESH and speed > -MIN_TRESH):
+        # if (sp0eed < MIN_TRESH and speed > -MIN_TRESH):
         #     reward -=1
 
         # if (speed > 0 and observation["presence"][1][3]):

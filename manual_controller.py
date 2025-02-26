@@ -45,6 +45,8 @@ class ManualController:
                 speed_action = 2  # stop
             elif keyboard.is_pressed('r'):
                 speed_action = 3  # Brake
+            else :
+                speed_action = 2
             if keyboard.is_pressed('left'):
                 turn_action = 1   # Steer left
             elif keyboard.is_pressed('right'):
@@ -79,4 +81,4 @@ class ManualController:
                         return
                     time.sleep(0.1)  # Pause to avoid busy-waiting
             else:
-                time.sleep(0.1)  # Control loop rate to match simulation
+                time.sleep(1)  # Control loop rate to match simulation
