@@ -239,16 +239,15 @@ def get_latest_checkpoint(base_path='./checkpoints/checkpoint'):
 def run(map_path, walkers_count, vehicles_count, steps, device, init_speed, manual_mode=False):
     env = CarlaEnv(map_path, walkers_count, vehicles_count, max_steps=steps, init_speed=init_speed)
     
-    env = Monitor(env)
-    env = DummyVecEnv([lambda: env])
-    model_path = "ppo_carla_model"
-    
     if manual_mode:
         # Use the manual controller
         controller = ManualController(env)
         controller.run()
         
     else :
+        env = Monitor(env)
+        env = DummyVecEnv([lambda: env])
+        model_path = "ppo_carla_model"
         latest_checkpoint=get_latest_checkpoint()
         if latest_checkpoint != "":
             print(f"Loading existing model: {latest_checkpoint}")
