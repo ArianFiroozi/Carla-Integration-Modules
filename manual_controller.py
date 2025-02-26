@@ -67,9 +67,9 @@ class ManualController:
             
             if self.done:
                 # Episode ended, wait for reset or quit
-                print("Episode ended. Press 'r' to reset or 'q' to quit.")
+                print("Episode ended. Press 'u' to reset or 'q' to quit.")
                 while True:
-                    if keyboard.is_pressed('r'):
+                    if keyboard.is_pressed('u'):
                         obs, _ = self.env.reset()
                         self.done = False
                         print("Environment reset.")
