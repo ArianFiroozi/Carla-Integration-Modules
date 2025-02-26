@@ -37,17 +37,17 @@ class ManualController:
             turn_action = 0
 
             # Map keyboard inputs to actions
-            if keyboard.is_pressed('w'):
+            if keyboard.is_pressed('up'):
                 speed_action = 0  # Accelerate
-            elif keyboard.is_pressed('s'):
+            elif keyboard.is_pressed('down'):
                 speed_action = 1  # Brake
             elif keyboard.is_pressed('space'):
                 speed_action = 2  # stop
             elif keyboard.is_pressed('r'):
                 speed_action = 3  # Brake
-            if keyboard.is_pressed('a'):
+            if keyboard.is_pressed('left'):
                 turn_action = 1   # Steer left
-            elif keyboard.is_pressed('d'):
+            elif keyboard.is_pressed('right'):
                 turn_action = 0   # Steer right
             elif keyboard.is_pressed('f'):
                 turn_action = 3  # Go straight
