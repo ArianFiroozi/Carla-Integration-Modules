@@ -169,6 +169,7 @@ class VehicleController():
         elif command == 7:#Command.DO_NOT_TURN.value[0]:
             self.control.reverse=True
             self.control.throttle=0.5
+            self.control.brake = 0.0
         elif command == 8:
             pass
             
