@@ -58,6 +58,13 @@ class CarlaEnv(gymnasium.Env):
             "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
+            "ego_speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+            "ego_speed_y": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
+            "ego_in_lane_position_x": spaces.Box(low=-10, high=10, shape=(1,), dtype=np.float32),  # Lateral offset, assuming lane width ~10m
+            "throttle": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
+            "brake": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
+            "steering_angle": spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32),
+            "reverse": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
         })
         self.last_heartbeat_time = time.time()
         with open("heartbeat.txt", "w") as f:
@@ -154,9 +161,28 @@ class CarlaEnv(gymnasium.Env):
         return obs, reward, done , truncated, {}
 
     def _get_observation(self):
-        x_speed_matrix, y_speed_matrix, presence_matrix = get_speed_matrices(self.ego_vehicle)
+        x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = \
+            get_speed_matrices(self.ego_vehicle)
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
         traffic_signs = self._encode_traffic_signs()
+        
+        control = self.ego_vehicle.get_control()
+        throttle = control.throttle
+        brake = control.brake
+        steering = control.steer
+        reverse = 1.0 if control.reverse else 0.0
+        
+        map = self.world.get_map()
+        waypoint = map.get_waypoint(self.ego_vehicle.get_location(), project_to_road=True)
+        lane_center = waypoint.transform.location
+        ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
+        theta = np.radians(ego_yaw)
+        ego_location = self.ego_vehicle.get_transform().location
+        # Vector from lane center to ego vehicle in global coordinates
+        dx_global = ego_location.x - lane_center.x
+        dy_global = ego_location.y - lane_center.y
+        # Rotate to local coordinates (lateral offset is along local y-axis)
+        lateral_offset = -dx_global * np.sin(theta) + dy_global * np.cos(theta)
 
         return {
             "speed_x": x_speed_matrix,
@@ -164,7 +190,14 @@ class CarlaEnv(gymnasium.Env):
             "presence": presence_matrix,
             "lane_angle": torch.asarray(lane_angle),
             "traffic_signs": traffic_signs,
-            "max_speed": 100
+            "max_speed": 100,
+            "ego_speed_x": np.array([vx_local], dtype=np.float32),
+            "ego_speed_y": np.array([vy_local], dtype=np.float32),
+            "ego_position_x": np.array([lateral_offset], dtype=np.float32),
+            "throttle": np.array([throttle], dtype=np.float32),
+            "brake": np.array([brake], dtype=np.float32),
+            "steering_angle": np.array([steering], dtype=np.float32),
+            "reverse": np.array([reverse], dtype=np.float32),
         }
 
     def _get_nearby_traffic_signs(self):

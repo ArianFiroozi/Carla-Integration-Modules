@@ -13,8 +13,14 @@ def get_speed_matrices(ego_vehicle, matrix_length=25, matrix_width=11, cell_widt
 
     ego_transform = ego_vehicle.get_transform()
     ego_location = ego_transform.location
+    ego_velocity = self.ego_vehicle.get_velocity()
+    vx_ego = ego_velocity.x
+    vy_ego = ego_velocity.y
     ego_yaw = ego_transform.rotation.yaw
     theta = math.radians(ego_yaw)
+    vx_local_ego = vx_ego * np.cos(theta) + vy_ego * np.sin(theta)  # Forward speed (local x)
+    vy_local_ego = -vx_ego * np.sin(theta) + vy_ego * np.cos(theta)
+    
 
     world = ego_vehicle.get_world()
     actors = world.get_actors()
@@ -79,7 +85,7 @@ def get_speed_matrices(ego_vehicle, matrix_length=25, matrix_width=11, cell_widt
     # Mark ego vehicle's position
     presence_matrix[matrix_length // 2, matrix_width // 2] = 9
 
-    return x_speed_matrix, y_speed_matrix, presence_matrix
+    return x_speed_matrix, y_speed_matrix, presence_matrix, vx_local_ego, vy_local_ego
 
 def is_on_road(location, world):
     waypoint = world.get_map().get_waypoint(location, project_to_road=False)
