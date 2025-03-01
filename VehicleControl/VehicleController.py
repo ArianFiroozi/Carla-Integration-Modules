@@ -177,3 +177,37 @@ class VehicleController():
             print(f"Unknown command : {command}")
         self.vehicle.apply_control(self.control)
         # print(f"Command: {command} | Throttle: {self.control.throttle:.2f}, Steer: {self.control.steer:.2f}")
+        
+    def exec_delta_command(self, throttle_action, steer_action):
+        #steer_change = steer_action * 0.04
+        #max_speed = 130km/h
+        #max_throttle = 0.92
+        #throttle_change = throttle_action * 0.092  
+        throttle = self.control.throttle
+        throttle_change = throttle_action * 0.092
+        if (not self.control.reverse and throttle + throttle_change < 0):
+            self.control.throttle = -(throttle + throttle_change)
+            self.control.reverse = True 
+        elif (not self.control.reverse):
+            self.control.throttle = throttle + throttle_change
+        elif (self.control.reverse and throttle_change >= 0):
+            if (throttle_change >= throttle):
+                self.control.throttle = throttle_change - throttle
+                self.control.reverse = False
+            else : 
+                self.control.throttle = throttle - throttle_change
+        elif (self.control.reverse and throttle_change < 0):
+            throttle = throttle - throttle_change
+        else : 
+            pass
+        
+        self.control.throttle = min(throttle, 0.92)
+        
+        new_steer =  self.control.steer + steer_action * 0.04
+        if (new_steer < 0):
+            self.control.steer = max(new_steer, -0.4)
+        else: 
+            self.control.steer = min(new_steer, 0.4)
+        
+        self.vehicle.apply_control(self.control)
+         
