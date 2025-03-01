@@ -16,6 +16,7 @@ import os
 from stable_baselines3.common.callbacks import CheckpointCallback
 from IPython.display import clear_output
 from manual_controller import *
+import random
 
 import carla
 
@@ -85,7 +86,7 @@ class CarlaEnv(gymnasium.Env):
         self.world = self.client.get_world()
 
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
+        self.ego_vehicle = spawn_ego_vehicle(self.world, round(random.uniform(0, 1) / 0.3) * 0.3)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
 
         # self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
@@ -308,5 +309,5 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed, manu
         except ...:
             print(f"Error during model training: ")
 # map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
-map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/harder.xodr"
+map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/lab-map.xodr"
 run(map_path, 0, 0, 2000000, "cuda", 0)
