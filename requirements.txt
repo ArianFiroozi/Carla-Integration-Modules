@@ -94,8 +94,8 @@ stack-data @ file:///home/conda/feedstock_root/build_artifacts/stack_data_166963
 sympy @ file:///C:/b/abs_4ay0cgwu2w/croot/sympy_1734629241647/work
 tensorboard==2.14.0
 tensorboard-data-server==0.7.2
-torch==2.4.1
-torchaudio==2.4.1
+torch==2.6.0
+torchaudio==2.6.0
 torchvision==0.20.0
 tornado @ file:///D:/bld/tornado_1717722870081/work
 tqdm==4.67.1
