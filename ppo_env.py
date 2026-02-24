@@ -54,6 +54,13 @@ class CarlaEnv(gymnasium.Env):
         print(f'reseting')
         self.current_step = 0
 
+        vehicle = self.ego_vehicle  # Get the vehicle actor
+        bounding_box = vehicle.bounding_box    # Retrieve the bounding box
+        width = bounding_box.extent.y * 2      # Full width
+        length = bounding_box.extent.x * 2     # Full length
+        height = bounding_box.extent.z * 2     # Full height
+
+        print(f"Width: {width} meters, Length: {length} meters, Height: {height} meters")
         # print(f'actors count is : {len(self.world.get_actors())}')
         # actor_filters=['sensor.other.collision', 'vehicle.*', 'walker.*']
         # for filter in actor_filters:
