@@ -270,12 +270,18 @@ class CarlaEnv(gymnasium.Env):
         return get_nearby_signs(self.ego_vehicle, self.world.get_map(), radius=10)
 
     def _encode_traffic_signs(self):
-        # traffic_signs = self._get_nearby_traffic_signs() TODO
+        # 1. Fetch nearby traffic signs
+        traffic_signs = self._get_nearby_traffic_signs()
+        
+        # 2. Initialize the one-hot encoded array
         encoded_signs = np.zeros(SUPPORTED_SIGNS_COUNT)
-        return encoded_signs
+        
+        # 3. Process each sign and update the array
         for sign in traffic_signs:
+            # Check if the type is a valid digit to avoid ValueError
             if sign.type.isdigit():
-                sign_index = int(sign.type) % 10
+                # Use modulo SUPPORTED_SIGNS_COUNT to prevent index out of bounds
+                sign_index = int(sign.type) % SUPPORTED_SIGNS_COUNT
                 encoded_signs[sign_index] = 1
 
         return encoded_signs
