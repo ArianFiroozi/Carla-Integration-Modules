@@ -169,53 +169,62 @@ class CarlaEnv(gymnasium.Env):
 
     def step(self, action): 
         prev_obs = self._get_observation()        
-        done = self.current_step >= self.max_steps
+        
+        # 1. Define end-of-episode variables (both default to False)
+        terminated = False  # Indicates failure (collision or falling off the map)
+        truncated = False   # Indicates time ran out (max steps reached without failure)
+
         speed_action = int(action[0])
         turn_action = int(action[1])
+        
         self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
         self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
+        
         try:
-            # print(prev_obs['presence'])
-            # print("-------------------------------------------------------")
-            # time.sleep(0.5)
             self.world.tick()
-        except ...:
-            print ("tick fail")
+        except Exception as e:
+            print(f"tick fail: {e}")
+            # If tick fails, do not reward or penalize, just reset the environment
             self.reset()
             return prev_obs, 0, False, False, {}
+
         step_peds(self.world, self.walkers)
+
+        # 2. Check for failure (Terminated)
         if self.vehicle_controller.collision_happened:
-            done = True
-            # print(f'step colision')
-            self.vehicle_controller.collision_happened=False
-        if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not done):
-            # print("oftadam")
-            done = True
+            terminated = True
+            self.vehicle_controller.collision_happened = False
+        
+        if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not terminated):
+            terminated = True
             
+        # 3. Calculate reward
         reward = self.vehicle_controller.get_reward(prev_obs)
-        if done:
-            # print(f'decresed colision penalty')
+        
+        # Apply heavy penalty only on failure
+        if terminated:
             reward += -100
             
         traffic_signs = self._get_nearby_traffic_signs()
         reward += self._process_traffic_signs(traffic_signs)
 
         obs = self._get_observation()
-        # if (obs["presence"].sum() > 7):
-        #     print (f'presence : {obs["presence"]}')
-        #print (f'got obs on step')# {self.current_step} : {obs}')
+        
         self.current_step += 1
+        
+        # 4. Update Heartbeat
         current_time = time.time()
         if current_time - self.last_heartbeat_time >= 10.0:
             with open(HEARTBEAT_PATH, "w") as f:
                 f.write(str(current_time))
             self.last_heartbeat_time = current_time
         
-        truncated = False
-        if self.current_step>MAX_ITER_IN_EPISODE:
-            done=True
+        # 5. Check for timeout (Truncated)
+        if self.current_step >= self.max_steps:
+            truncated = True
 
-        return obs, reward, done , truncated, {}
+        # Gymnasium standard requires returning terminated and truncated separately
+        return obs, reward, terminated, truncated, {}
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = \
