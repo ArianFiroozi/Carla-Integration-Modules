@@ -256,7 +256,7 @@ class CarlaEnv(gymnasium.Env):
             "presence": presence_matrix,
             "lane_angle": torch.asarray(lane_angle),
             "traffic_signs": traffic_signs,
-            "max_speed": 100,
+            "max_speed": np.array([100.0], dtype=np.float32),
             "ego_speed_x": np.array([vx_local], dtype=np.float32),
             "ego_speed_y": np.array([vy_local], dtype=np.float32),
             "ego_in_lane_position_x": np.array([lateral_offset], dtype=np.float32),
