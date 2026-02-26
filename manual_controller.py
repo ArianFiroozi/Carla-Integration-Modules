@@ -16,6 +16,20 @@ class ManualController:
         transform = self.ego_vehicle.get_transform()
         spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50), carla.Rotation(pitch=-90)))
 
+
+    def _update_spectator(self):
+        spectator = self.world.get_spectator()
+        tr = self.ego_vehicle.get_transform()
+        forward = tr.get_forward_vector()
+
+        cam_loc = tr.location - forward * 8.0 + carla.Location(z=3.0)
+        cam_rot = carla.Rotation(pitch=-12.0, yaw=tr.rotation.yaw, roll=0.0)
+
+        spectator.set_transform(carla.Transform(cam_loc, cam_rot))
+            
+        
+        
+        
     def run(self):
         """Run the manual control loop."""
         print("Manual control mode activated.")
@@ -25,6 +39,8 @@ class ManualController:
         # Reset the environment to start
         obs, _ = self.env.reset()
         self.done = False
+        TARGET_DT = 0.05
+        next_time = time.time()
 
         while True:
             # Exit condition
@@ -64,8 +80,9 @@ class ManualController:
             if not self.done:
                 # Step the environment with the chosen action
                 obs, reward, self.done, truncated, info = self.env.step(action)
-                print(f"Step: {self.env.current_step}, Reward: {reward}, Done: {self.done}")
-                print(f'obs is : {obs}')
+                self._update_spectator()
+                # print(f"Step: {self.env.current_step}, Reward: {reward}, Done: {self.done}")
+                # print(f'obs is : {obs}')
             
             if self.done:
                 # Episode ended, wait for reset or quit
@@ -81,4 +98,9 @@ class ManualController:
                         return
                     time.sleep(0.1)  # Pause to avoid busy-waiting
             else:
-                time.sleep(1)  # Control loop rate to match simulation
+                next_time += TARGET_DT
+                sleep = next_time - time.time()
+                if sleep > 0:
+                    time.sleep(sleep)
+                else:
+                    next_time = time.time()

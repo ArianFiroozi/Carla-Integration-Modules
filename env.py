@@ -17,14 +17,34 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from IPython.display import clear_output
 from manual_controller import *
 import random
-
+from stable_baselines3 import SAC
+from stable_baselines3.common.env_checker import check_env
+import os
 import carla
+import os
+from pathlib import Path
+import time  
+
+
+
+
+
+REPO_ROOT = Path(__file__).resolve().parent
+
+RUN_DIR = REPO_ROOT / "runs"
+RUN_DIR.mkdir(exist_ok=True)
+
+PID_PATH = RUN_DIR / "training.pid"
+HEARTBEAT_PATH = RUN_DIR / "heartbeat.txt"
+
+CHECKPOINTS_DIR = REPO_ROOT / "checkpoints"
+CHECKPOINTS_DIR.mkdir(exist_ok=True)
 
 MAX_ITER_IN_EPISODE=5000
 SUPPORTED_SIGNS_COUNT = 5
 LEAST_HEIGHT = -10
 
-with open("training.pid", "w") as f:
+with open(PID_PATH, "w") as f:
     f.write(str(os.getpid()))
 
 class CarlaEnv(gymnasium.Env):
@@ -36,10 +56,25 @@ class CarlaEnv(gymnasium.Env):
         self.vehicles_count = vehicles_count
         self.init_speed=init_speed
         
-        self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(5.0)
-        load_opendrive_map(map_path, self.client)
+        self.client = carla.Client("localhost", 2000)
+        self.client.set_timeout(10.0)  
+
         self.world = self.client.get_world()
+        
+        if map_path:
+            map_path = str(Path(map_path))
+            if map_path.lower().endswith(".xodr") and os.path.exists(map_path):
+                print(f"Loading OpenDRIVE map: {map_path}")
+                load_opendrive_map(map_path, self.client)
+                self.world = self.client.get_world()
+            else:
+                print(f"Skipping OpenDRIVE load (file not found or not .xodr): {map_path}")
+                print("Using current CARLA map:", self.world.get_map().name)
+        else:
+            print("No map_path provided. Using current CARLA map:", self.world.get_map().name)
+
+        self._apply_sync(fixed_dt=0.05)
+        print("SYNC:", self.world.get_settings().synchronous_mode, "dt:", self.world.get_settings().fixed_delta_seconds)
 
         self.ego_vehicle = spawn_ego_vehicle(self.world)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
@@ -68,7 +103,7 @@ class CarlaEnv(gymnasium.Env):
             "reverse": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
         })
         self.last_heartbeat_time = time.time()
-        with open("heartbeat.txt", "w") as f:
+        with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
 
     def reset(self, seed = 12):
@@ -100,6 +135,27 @@ class CarlaEnv(gymnasium.Env):
         self.client.get_trafficmanager().set_synchronous_mode(False)
         self.world.apply_settings(settings)
     
+    
+    
+    def _apply_sync(self, fixed_dt=0.05):
+        # always grab the current world (after map load)
+        self.world = self.client.get_world()
+        settings = self.world.get_settings()
+
+        settings.synchronous_mode = True
+        settings.fixed_delta_seconds = fixed_dt
+
+        # ✅ physics stability
+        settings.substepping = True
+        settings.max_substep_delta_time = 0.01  # 100 Hz physics
+        settings.max_substeps = int(fixed_dt / settings.max_substep_delta_time) + 1
+
+        self.world.apply_settings(settings)
+
+        tm = self.client.get_trafficmanager()
+        tm.set_synchronous_mode(True)
+    
+    
     def __set_world_settings(self, no_rendering_mode=False, fixed_delta_seconds=0.1): #TODO: parameters
         settings = self.world.get_settings()
         settings.synchronous_mode = True
@@ -122,7 +178,7 @@ class CarlaEnv(gymnasium.Env):
             # print(prev_obs['presence'])
             # print("-------------------------------------------------------")
             # time.sleep(0.5)
-            self.world.tick(5.0)
+            self.world.tick()
         except ...:
             print ("tick fail")
             self.reset()
@@ -151,7 +207,7 @@ class CarlaEnv(gymnasium.Env):
         self.current_step += 1
         current_time = time.time()
         if current_time - self.last_heartbeat_time >= 10.0:
-            with open("heartbeat.txt", "w") as f:
+            with open(HEARTBEAT_PATH, "w") as f:
                 f.write(str(current_time))
             self.last_heartbeat_time = current_time
         
@@ -234,9 +290,6 @@ class CarlaEnv(gymnasium.Env):
     def close(self):
         pass
 
-from stable_baselines3 import SAC
-from stable_baselines3.common.env_checker import check_env
-import os
 
 def create_checkpoints_folder(base_path='./checkpoints/checkpoint'):
     folder_index = 0
@@ -308,6 +361,13 @@ def run(map_path, walkers_count, vehicles_count, steps, device, init_speed, manu
             model.save("ppo_carla_model")
         except ...:
             print(f"Error during model training: ")
-# map_path="c:/Users/H/Desktop/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/Town01_Opt.xodr"
-map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/lab-map.xodr"
-run(map_path, 0, 0, 2000000, "cuda", 0)
+            
+            
+            
+            
+            
+
+# map_path = "C:/Users/H/Desktop/IOT/Carla-Integration-Modules/LoadOpenDrive2/lab-map.xodr"
+if __name__ == "__main__":
+    map_path = r"C:\CARLA_0.9.15\WindowsNoEditor\CarlaUE4\Content\Carla\Maps\OpenDrive\Town01_Opt.xodr"
+    run(map_path, 0, 0, 2000000, "cuda", 0)
