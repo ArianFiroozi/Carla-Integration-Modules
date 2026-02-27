@@ -215,10 +215,10 @@ class ManualController:
 if __name__ == "__main__":
     from env import CarlaEnv
 
-    map_path = r"C:\carla\Carla-Integration-Modules\LoadOpenDrive2\simple_map.xodr"
+    map_path = r"C:\carla\Carla-Integration-Modules\LoadOpenDrive2\lab-map.xodr"
     
     
     env = CarlaEnv(map_path=map_path, walkers_count=0, vehicles_count=0, max_steps=2000, init_speed=0)
 
     controller = ManualController(env)
-    controller.run(record=True, base_name="simple_manual")
+    controller.run(record=True, base_name="lab_manual")

@@ -1,6 +1,8 @@
 import carla
 import enum
 import json
+import numpy as np
+
 
 class Command(enum.Enum):
     SPEED_UP = 0
@@ -25,6 +27,20 @@ TURN_RIGHT = 0
 TURN_LEFT = 1
 DO_NOT_TURN = 2
 GO_STRAIGHT = 3
+
+
+THROTTLE_STEP = 0.05        # was 0.3 (too aggressive)
+MAX_THROTTLE = 1         # cap forward throttle (prevents crazy speed)
+BRAKE_TAP = 0.10            # light brake for SPEED_DOWN
+BRAKE_FULL = 1.00           # STOP brake
+REVERSE_THROTTLE = 0.30     # was 0.5 (reverse was too strong)
+
+STEER_STEP = 0.05           # was 0.2 (too jerky)
+MAX_STEER = 1            # cap steering magnitude
+
+# THROTTLE_DECAY = 0.995      # ~0.5% decay per step
+# STEER_DECAY = 0.995
+
 
 class VehicleController():
     def __init__(self, world, vehicle=None):
@@ -143,40 +159,67 @@ class VehicleController():
             print(f"turn_action : {turn_action}")
             return -1
 
-
     def exec_command(self, command):
-        # print(f'taking action : {command}')
-        if command == 0:#Command.SPEED_UP.value[0]:
-            self.control.throttle = min(self.control.throttle + 0.3, 1.0)
+        if command == 0:  # SPEED_UP
+            self.control.throttle = min(self.control.throttle + THROTTLE_STEP, MAX_THROTTLE)
             self.control.brake = 0.0
-            self.control.reverse=False
-        elif command == 1:#Command.SPEED_DOWN.value[0]:
-            self.control.throttle = max(self.control.throttle - 0.3, 0)
-            self.control.brake = 0.2
-            self.control.reverse=False
-        elif command == 2:#Command.TURN_RIGHT.value[0]:
-            self.control.steer = min(self.control.steer + 0.2, 1.0)
-        elif command == 3:#Command.TURN_LEFT.value[0]:
-            self.control.steer = max(self.control.steer - 0.2, -1.0)
-        elif command == 4:#Command.STOP.value[0]:
-            self.control.reverse=False
+            self.control.reverse = False
+
+        elif command == 1:  # SPEED_DOWN
+            # reduce throttle gradually + tap brake
+            self.control.throttle = max(self.control.throttle - THROTTLE_STEP, 0.0)
+            self.control.brake = BRAKE_TAP
+            self.control.reverse = False
+
+        elif command == 4:  # STOP
+            self.control.reverse = False
             self.control.throttle = 0.0
-            self.control.brake = 1.0
-        elif command == 5:#Command.DO_NOT_TURN.value[0]:
-            pass
-        elif command == 6:#Command.DO_NOT_TURN.value[0]:
-            self.control.steer = 0
-        elif command == 7:#Command.DO_NOT_TURN.value[0]:
-            self.control.reverse=True
-            self.control.throttle=0.5
+            self.control.brake = BRAKE_FULL
+
+        elif command == 7:  # REVERSE
+            # reverse gently (doesn't rocket backwards)
+            self.control.reverse = True
+            self.control.throttle = REVERSE_THROTTLE
             self.control.brake = 0.0
-        elif command == 8:
+
+        elif command == 8:  # CONSTANT_SPEED
+            # keep throttle as-is, but release brake
+            self.control.brake = 0.0
+            # keep reverse flag as-is
+
+    
+        elif command == 2:  # TURN_RIGHT
+            self.control.steer = min(self.control.steer + STEER_STEP, MAX_STEER)
+
+        elif command == 3:  # TURN_LEFT
+            self.control.steer = max(self.control.steer - STEER_STEP, -MAX_STEER)
+
+        elif command == 5:  # DO_NOT_TURN
+            # keep current steer (no change)
             pass
-            
+
+        elif command == 6:  # GO_STRAIGHT
+            # auto-center steering
+            self.control.steer = 0.0
+
         else:
             print(f"Unknown command : {command}")
+
+        # # this part is not tested
+        # # Only decay throttle when you're not explicitly speeding up or reversing
+        # if command not in (0, 7, 4):  # not SPEED_UP, not REVERSE, not STOP
+        #     self.control.throttle *= THROTTLE_DECAY
+
+        # # Only decay steer when you're not actively turning
+        # if command not in (2, 3, 6):  # not TURN_RIGHT, not TURN_LEFT, not GO_STRAIGHT
+        #     self.control.steer *= STEER_DECAY
+
+        # # Safety clamp (always keep in valid bounds)
+        # self.control.throttle = float(np.clip(self.control.throttle, 0.0, 1.0))
+        # self.control.brake = float(np.clip(self.control.brake, 0.0, 1.0))
+        # self.control.steer = float(np.clip(self.control.steer, -1.0, 1.0))
+
         self.vehicle.apply_control(self.control)
-        # print(f"Command: {command} | Throttle: {self.control.throttle:.2f}, Steer: {self.control.steer:.2f}")
         
     def exec_delta_command(self, throttle_action, steer_action):
         #steer_change = steer_action * 0.04
