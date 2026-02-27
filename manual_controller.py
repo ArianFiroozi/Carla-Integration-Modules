@@ -68,24 +68,25 @@ class ManualController:
 
     def _get_action_from_keyboard(self):
         # speed mapping
-        if keyboard.is_pressed("up"):
-            speed_action = 0
-        elif keyboard.is_pressed("down"):
-            speed_action = 1
-        elif keyboard.is_pressed("space"):
-            speed_action = 2
-        elif keyboard.is_pressed("r"):
-            speed_action = 3
-        else:
+        if keyboard.is_pressed('up'):
+            speed_action = 0  # Accelerate
+        elif keyboard.is_pressed('down'):
+            speed_action = 1  # Brake
+        elif keyboard.is_pressed('space'):
+            speed_action = 2  # stop
+        elif keyboard.is_pressed('r'):
+            speed_action = 3  # reverse
+        else :
             speed_action = 4
-
-        # turn mapping
-        if keyboard.is_pressed("left"):
-            turn_action = 1
-        elif keyboard.is_pressed("right"):
-            turn_action = 0
-        else:
-            # default to GO_STRAIGHT (auto-center)
+        if keyboard.is_pressed('left'):
+            turn_action = 1   # Steer left
+        elif keyboard.is_pressed('right'):
+            turn_action = 0   # Steer right
+        elif keyboard.is_pressed('f'):
+            turn_action = 3  # Go straight
+        elif keyboard.is_pressed('t'):
+            turn_action = 2 # Do not turn
+        else :
             turn_action = 3
 
         return np.array([speed_action, turn_action], dtype=np.int64)
@@ -214,8 +215,10 @@ class ManualController:
 if __name__ == "__main__":
     from env import CarlaEnv
 
-    map_path = r"C:\carla\Carla-Integration-Modules\LoadOpenDrive2\Town01.xodr"
+    map_path = r"C:\carla\Carla-Integration-Modules\LoadOpenDrive2\simple_map.xodr"
+    
+    
     env = CarlaEnv(map_path=map_path, walkers_count=0, vehicles_count=0, max_steps=2000, init_speed=0)
 
     controller = ManualController(env)
-    controller.run(record=True, base_name="town01_manual")
+    controller.run(record=True, base_name="simple_manual")

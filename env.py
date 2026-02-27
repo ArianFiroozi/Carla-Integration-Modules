@@ -90,7 +90,7 @@ class CarlaEnv(gymnasium.Env):
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
             "speed_y": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
-            "presence": spaces.Box(low=0, high=1, shape=(25, 11), dtype=np.float32),
+            "presence": spaces.Box(low=0, high=9, shape=(25, 11), dtype=np.int64),
             "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
             "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
@@ -237,6 +237,18 @@ class CarlaEnv(gymnasium.Env):
         brake = control.brake
         steering = control.steer
         reverse = 1.0 if control.reverse else 0.0
+        
+
+        
+        # # 4 channel presence, todo   
+        # p = presence_matrix  
+        # presence_oh = np.stack([
+        #     (p == 0),
+        #     (p == 1),
+        #     (p == 2),
+        #     (p == 9),
+        # ], axis=-1).astype(np.float32)
+        
         
         map = self.world.get_map()
         waypoint = map.get_waypoint(self.ego_vehicle.get_location(), project_to_road=True)
