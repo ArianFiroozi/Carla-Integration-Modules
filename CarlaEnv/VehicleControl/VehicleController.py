@@ -258,3 +258,11 @@ class VehicleController():
         
         self.vehicle.apply_control(self.control)
          
+    def destroy(self):
+        if self.sensor_c is not None:
+            self.sensor_c.destroy()
+        if self.sensor_l is not None:
+            self.sensor_l.destroy()
+        if self.vehicle is not None:
+            self.vehicle.destroy()
+
