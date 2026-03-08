@@ -1,0 +1,218 @@
+NEW structure:
+
+
+Carla-Integration-Modules/
+│
+├── README.md
+├── requirements.txt
+├── LICENSE
+├── .gitignore
+│
+├── main/
+│   ├── train_ppo.py                 # formerly env.py’s main PPO training logic
+│   ├── eval_ppo.py                  # PPO evaluation (optional future use)
+│   ├── run_bc.py                    # Runs imitation model in CARLA (evaluation)
+│   ├── run_manual.py                # Runs manual controller for demo recording
+│   ├── build_dataset.py             # Balances and merges demos
+│   ├── inspect_dataset.py           # Analyze distribution / sanity check
+│   └── __init__.py
+│
+├── carla_env/
+│   ├── carla_env.py                 # Your current CarlaEnv class
+│   ├── map_loader.py                # From LoadOpenDrive2
+│   ├── vehicle_control/             # From VehicleControl/
+│   │   ├── VehicleController.py
+│   │   └── reward_config.json
+│   ├── observation_adaptors/        # From ObservationAdaptors/
+│   │   ├── LaneAngle.py
+│   │   ├── ObjectSpeeds.py
+│   │   ├── ObservationAdaptor.py
+│   │   ├── TrafficSigns.py
+│   └── object_spawn/                # From ObjectSpawn/
+│       ├── EgoVehicleSpawner.py
+│       ├── PedestrianSpawner.py
+│       ├── VehicleSpawner.py
+│
+├── imitation/
+│   ├── bc_policy.py                 # Policy & network definition
+│   ├── train_bc_cnn.py              # Training script
+│   ├── dataset.py                   # Dataset logic (moved from build_dataset)
+│   └── __init__.py
+│
+├── reinforcement/
+│   ├── ppo_training.py              # PPO fine-tuning script
+│   ├── checkpoints/                 # PPO ckpts go here
+│   ├── logs/                        # Training logs
+│   └── __init__.py
+│
+├── demos/                           # Raw `.npz` demos recorded from manual driving
+│
+├── data/                            # Built/processed datasets (balanced files)
+│
+├── models/
+│   ├── bc/                          # Saved imitation models (.pt)
+│   ├── ppo/                         # Saved PPO models (.zip)
+│   └── __init__.py
+│
+└── utils/
+    ├── config.py                    # From Config/configuration.py
+    ├── file_utils.py                # Helper for paths, saving/loading
+    └── __init__.py
+
+
+
+
+
+
+
+
+
+OLD: 
+
+
+PS C:\carla\Carla-Integration-Modules> tree /F
+Folder PATH listing
+Volume serial number is 0A93-4F54
+C:.
+│   .gitignore
+│   bc_policy.py
+│   build_dataset.py
+│   env.py
+│   image.png
+│   inspect_demo.py
+│   LICENSE
+│   manual_controller.py
+│   ppo_carla_model.zip
+│   README.md
+│   requirements.txt
+│   run_bc.py
+│   train_bc_cnn.py
+│
+├───archive
+│       CustomGymWrapper.ipynb
+│       env_old.py
+│       env_V2.py
+│       ppo_env.py
+│       run.py
+│       run_model.ps1
+│       run_model2.ps1
+│
+├───cache
+│   └───no_rendering_mode
+│           OpenDriveMap_c149ac14896a75e78cfa68d71406c79df9e422a6.tga
+│           Town10HD_Opt_a49910ad5e7021976e6371dcf7feb34775ce84b2.tga
+│
+├───checkpoints
+├───checkpoints_backup
+│       ppo_carla_997k_simple_map_single_spawn_cant_turn_left.zip
+│       ppo_carla_checkpoint_1513000_steps_goes__straight_line.zip
+│
+├───Config
+│       configuration.py
+│
+├───demos
+│       lab_manual2_20260304_160234_ep0000.npz
+│       lab_manual2_20260304_160343_ep0001.npz
+│       lab_manual2_20260304_160456_ep0002.npz
+│       lab_manual2_20260304_160518_ep0003.npz
+│       lab_manual2_20260304_160625_ep0004.npz
+│       lab_manual2_20260304_160733_ep0005.npz
+│       lab_manual3_20260304_161457_ep0000.npz
+│       lab_manual3_20260304_161509_ep0001.npz
+│       lab_manual3_20260304_161653_ep0002.npz
+│       lab_manual3_20260304_161839_ep0003.npz
+│       lab_manual4_20260304_162236_ep0000.npz
+│       lab_manual4_20260304_162405_ep0004.npz
+│       lab_manual4_20260304_162550_ep0006.npz
+│       lab_manual_20260304_155226_ep0000.npz
+│       lab_manual_20260304_155349_ep0001.npz
+│       lab_manual_20260304_155432_ep0002.npz
+│       lab_manual_20260304_155452_ep0003.npz
+│       lab_manual_20260304_155500_ep0004.npz
+│       lab_manual_20260304_155605_ep0005.npz
+│       lab_manual_20260304_155616_ep0006.npz
+│       lab_manual_20260304_155745_ep0007.npz
+│       lab_manual_20260304_155811_ep0008.npz
+│       lab_manual_20260304_155931_ep0009.npz
+│
+├───LoadOpenDrive2
+│   │   harder.xodr
+│   │   lab-map.xodr
+│   │   LoadOpenDriveMap.py
+│   │   real_world_map.xodr
+│   │   star-simple.xodr
+│   │   Town01.xodr
+│   │   __init__.py
+│   │
+│   └───__pycache__
+│           LoadOpenDriveMap.cpython-38.pyc
+│           __init__.cpython-38.pyc
+│
+├───loopback
+│       loopback_adapter.psl
+│       run_loopback.py
+│
+├───ObjectSpawn
+│   │   EgoVehicleSpawner.py
+│   │   PedstrianSpawner.py
+│   │   VehicleSpawner.py
+│   │   __init__.py
+│   │
+│   └───__pycache__
+│           EgoVehicleSpawner.cpython-38.pyc
+│           PedstrianSpawner.cpython-38.pyc
+│           VehicleSpawner.cpython-38.pyc
+│           __init__.cpython-38.pyc
+│
+├───ObservationAdaptors
+│   │   LaneAngle.py
+│   │   ObjectSpeeds.py
+│   │   ObservationAdaptor.py
+│   │   TrafficSigns.py
+│   │   __init__.py
+│   │
+│   └───__pycache__
+│           LaneAngle.cpython-38.pyc
+│           ObjectSpeeds.cpython-38.pyc
+│           TrafficSigns.cpython-38.pyc
+│           __init__.cpython-38.pyc
+│
+├───ppo_carla
+│   ├───PPO_1
+│   │       events.out.tfevents.1772629124.ManiHPC.22924.0
+│   │
+│   ├───PPO_2
+│   │       events.out.tfevents.1772629216.ManiHPC.5892.0
+│   │
+│   ├───PPO_3
+│   │       events.out.tfevents.1772629253.ManiHPC.8316.0
+│   │
+│   ├───PPO_4
+│   │       events.out.tfevents.1772629308.ManiHPC.13752.0
+│   │
+│   ├───PPO_5
+│   │       events.out.tfevents.1772629420.ManiHPC.5104.0
+│   │
+│   └───PPO_6
+│           events.out.tfevents.1772629481.ManiHPC.9556.0
+│
+├───runs
+│       heartbeat.txt
+│       training.pid
+│
+├───sac_carla
+├───VehicleControl
+│   │   reward_config.json
+│   │   VehicleController.py
+│   │   __init__.py
+│   │
+│   └───__pycache__
+│           VehicleController.cpython-38.pyc
+│           __init__.cpython-38.pyc
+│
+└───__pycache__
+        bc_policy.cpython-38.pyc
+        env.cpython-38.pyc
+        manual_controller.cpython-38.pyc
+
+PS C:\carla\Carla-Integration-Modules> 
