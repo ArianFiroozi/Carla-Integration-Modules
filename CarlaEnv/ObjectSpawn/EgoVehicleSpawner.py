@@ -6,7 +6,6 @@ def spawn_ego_vehicle(world, init_speed=0):
     vehicle_bp = blueprint_library.filter('vehicle.*model3*')[0]
 
     spawn_points = world.get_map().get_spawn_points()
-
     vehicle=None
     shuffeled_idx = [i for i in range(len(spawn_points))]
     random.shuffle(shuffeled_idx)

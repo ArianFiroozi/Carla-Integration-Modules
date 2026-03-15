@@ -68,7 +68,7 @@ class CarlaEnv(gymnasium.Env):
         self.walkers = spawn_pedestrians(self.world, walkers_count)
         self.max_steps = max_steps
         self.current_step = 0
-
+        self.map = self.world.get_map()
         # self.__set_world_settings()
 
         self.action_space = spaces.MultiDiscrete([5,4])
@@ -104,7 +104,7 @@ class CarlaEnv(gymnasium.Env):
         if self.ego_vehicle.is_alive:
             self.ego_vehicle.destroy()
 
-        self.world = self.client.get_world()
+        # self.world = self.client.get_world()
 
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, round(random.uniform(0, 1) / 0.3) * 0.3)
@@ -208,7 +208,8 @@ class CarlaEnv(gymnasium.Env):
         # 5. Check for timeout (Truncated)
         if self.current_step >= self.max_steps:
             truncated = True
-
+            
+  
         # Gymnasium standard requires returning terminated and truncated separately
         return obs, reward, terminated, truncated, {}
 
@@ -236,12 +237,14 @@ class CarlaEnv(gymnasium.Env):
         # ], axis=-1).astype(np.float32)
         
         
-        map = self.world.get_map()
+        map = self.map
         waypoint = map.get_waypoint(self.ego_vehicle.get_location(), project_to_road=True)
         lane_center = waypoint.transform.location
-        ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
+        transform = self.ego_vehicle.get_transform()
+        ego_yaw = transform.rotation.yaw
+        ego_location = transform.location
+
         theta = np.radians(ego_yaw)
-        ego_location = self.ego_vehicle.get_transform().location
         # Vector from lane center to ego vehicle in global coordinates
         dx_global = ego_location.x - lane_center.x
         dy_global = ego_location.y - lane_center.y

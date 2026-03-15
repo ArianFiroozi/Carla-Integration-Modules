@@ -66,6 +66,10 @@ class VehicleController():
         try:
             vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
             spawn_point = self.world.get_map().get_spawn_points()[0]
+            spawn_point.rotation.yaw += 180
+            # spawn_points = self.world.get_map().get_spawn_points()
+            # spawn_point = np.random.choice(spawn_points)
+
             self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
             self.__init_control()
             # print("Vehicle spawned!")
@@ -258,11 +262,3 @@ class VehicleController():
         
         self.vehicle.apply_control(self.control)
          
-    def destroy(self):
-        if self.sensor_c is not None:
-            self.sensor_c.destroy()
-        if self.sensor_l is not None:
-            self.sensor_l.destroy()
-        if self.vehicle is not None:
-            self.vehicle.destroy()
-
