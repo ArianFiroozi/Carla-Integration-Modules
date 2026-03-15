@@ -35,12 +35,13 @@ with open(PID_PATH, "w") as f:
 
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
+    
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
-        self.init_speed=init_speed
+        self.init_speed = init_speed
         
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)  
@@ -62,14 +63,17 @@ class CarlaEnv(gymnasium.Env):
         self._apply_sync(fixed_dt=0.05)
         print("SYNC:", self.world.get_settings().synchronous_mode, "dt:", self.world.get_settings().fixed_delta_seconds)
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world)
-        self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
+        # Do not spawn the ego vehicle here. Initialize as None.
+        self.ego_vehicle = None
+        self.vehicle_controller = None
+        
+        # NPCs can be spawned here if they persist across episodes
         self.vehicles = spawn_vehicles(self.client, vehicles_count)
         self.walkers = spawn_pedestrians(self.world, walkers_count)
+        
         self.max_steps = max_steps
         self.current_step = 0
         self.map = self.world.get_map()
-        # self.__set_world_settings()
 
         self.action_space = spaces.MultiDiscrete([5,4])
 
@@ -88,6 +92,7 @@ class CarlaEnv(gymnasium.Env):
             "steering_angle": spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32),
             "reverse": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
         })
+        
         self.last_heartbeat_time = time.time()
         with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
@@ -96,24 +101,33 @@ class CarlaEnv(gymnasium.Env):
         # print(f'reseting...')
         self.current_step = 0
 
-        # load_opendrive_map(map_path, self.client) #TODO: remove this, but keep in mind this breaks the spawns
-        self.vehicle_controller.sensor_c.destroy()
-        self.vehicle_controller.sensor_l.destroy()
-        if hasattr(self.ego_vehicle, 'is_listening') and self.ego_vehicle.is_listening:
-            self.ego_vehicle.stop()
-        if self.ego_vehicle.is_alive:
-            self.ego_vehicle.destroy()
+        # Check for None to safely destroy actors on the first reset
+        if self.vehicle_controller is not None:
+            if hasattr(self.vehicle_controller, 'sensor_c') and self.vehicle_controller.sensor_c is not None:
+                self.vehicle_controller.sensor_c.destroy()
+            if hasattr(self.vehicle_controller, 'sensor_l') and self.vehicle_controller.sensor_l is not None:
+                self.vehicle_controller.sensor_l.destroy()
 
-        # self.world = self.client.get_world()
+        if self.ego_vehicle is not None:
+            if hasattr(self.ego_vehicle, 'is_listening') and self.ego_vehicle.is_listening:
+                self.ego_vehicle.stop()
+            if self.ego_vehicle.is_alive:
+                self.ego_vehicle.destroy()
+            
+            # Tick the world to properly flush the destroy commands from the server
+            self.world.tick()
 
-
+        # Spawn the new vehicle
         self.ego_vehicle = spawn_ego_vehicle(self.world, round(random.uniform(0, 1) / 0.3) * 0.3)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
 
+        # Tick the world again so the new vehicle's physics and sensors initialize correctly
+        self.world.tick()
         # self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
         # self.walkers = spawn_pedestrians(self.world, self.walkers_count)
         # clear_output(wait=True)
         return self._get_observation(), {}
+
 
     def __set_world_asynch(self):
         settings = self.world.get_settings()
