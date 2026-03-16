@@ -22,13 +22,13 @@ class ManualController:
 
         # demo storage
         REPO_ROOT = Path(__file__).resolve().parents[1]
-        self.demo_dir = REPO_ROOT / "demos"
+        self.demo_dir = REPO_ROOT / "demos2"
         self.demo_dir.mkdir(exist_ok=True)
 
         # loop pacing (synchronous mode: env.step() ticks the world)
         self.sleep_seconds = 0.001
-        self.print_every = 200      
-        self.debug_grids = True      
+        self.print_every = 1000      
+        self.debug_grids = False      
 
     def _npify_obs(self, obs: dict):
         """Convert obs dict values to numpy arrays (float32 where appropriate)."""
@@ -78,7 +78,7 @@ class ManualController:
         elif keyboard.is_pressed('r'):
             speed_action = 3  # reverse
         else :
-            speed_action = 4
+            speed_action = 4 # constant
         if keyboard.is_pressed('left'):
             turn_action = 1   # Steer left
         elif keyboard.is_pressed('right'):
@@ -222,4 +222,4 @@ if __name__ == "__main__":
     env = CarlaEnv(map_path=map_path, walkers_count=0, vehicles_count=0, max_steps=2000, init_speed=0)
 
     controller = ManualController(env)
-    controller.run(record=True, base_name="lab_manual5")
+    controller.run(record=True, base_name="lab_manual11")
