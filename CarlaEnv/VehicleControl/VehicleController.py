@@ -4,8 +4,6 @@ import json
 import numpy as np
 from pathlib import Path
 
-
-
 class Command(enum.Enum):
     SPEED_UP = 0
     SPEED_DOWN = 1
@@ -30,7 +28,6 @@ TURN_LEFT = 1
 DO_NOT_TURN = 2
 GO_STRAIGHT = 3
 
-
 THROTTLE_STEP = 0.05        # was 0.3 (too aggressive)
 MAX_THROTTLE = 1         # cap forward throttle (prevents crazy speed)
 BRAKE_TAP = 0.10            # light brake for SPEED_DOWN
@@ -39,10 +36,6 @@ REVERSE_THROTTLE = 0.30     # was 0.5 (reverse was too strong)
 
 STEER_STEP = 0.05           # was 0.2 (too jerky)
 MAX_STEER = 1            # cap steering magnitude
-
-# THROTTLE_DECAY = 0.995      # ~0.5% decay per step
-# STEER_DECAY = 0.995
-
 
 class VehicleController():
     def __init__(self, world, vehicle=None):
@@ -67,12 +60,8 @@ class VehicleController():
             vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
             spawn_point = self.world.get_map().get_spawn_points()[0]
             spawn_point.rotation.yaw += 180
-            # spawn_points = self.world.get_map().get_spawn_points()
-            # spawn_point = np.random.choice(spawn_points)
-
             self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
             self.__init_control()
-            # print("Vehicle spawned!")
         except:
             print("Unknown error occured")
 
@@ -109,36 +98,20 @@ class VehicleController():
 
     def get_reward(self, observation=None):
         reward = 0.0
-
         velocity = self.vehicle.get_velocity()
-        # velocity *= 1 if self.control.reverse==False else -0.5
         speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
         reward += speed * self.speed_reward * (0.1 if self.control.reverse==False else -0.05)
-        MIN_TRESH = 2
-        # if (sp0eed < MIN_TRESH and speed > -MIN_TRESH):
-        #     reward -=1
-
-        # if (speed > 0 and observation["presence"][1][3]):
-        #     reward -= 2
-        # elif(speed < 0 and observation["presence"][1][1]):
-        #     reward -= 2
 
         if self.collision_happened or self.vehicle.get_location().z <= -5:
             reward += self.collision_penalty
             print("Kalaps")
-        # if self.lane_invaded: # DO NOT CLEAR THIS
-        #     reward += self.lane_penalty
-
         
         self.collision_happened = False
         self.lane_invaded = False
 
-        # print(reward)
         return reward
-        # return 0
     
     def speed_action_convertor(self, speed_action):
-        # speed_action//=3
         if speed_action == SPEED_UP:
             return Command.SPEED_UP.value
         elif speed_action == SPEED_DOWN:
@@ -154,7 +127,6 @@ class VehicleController():
             return -1
         
     def turn_action_convertor(self, turn_action):
-        # turn_action//=3
         if turn_action == TURN_RIGHT:
             return Command.TURN_RIGHT.value
         elif turn_action == TURN_LEFT:
@@ -172,68 +144,45 @@ class VehicleController():
             self.control.throttle = min(self.control.throttle + THROTTLE_STEP, MAX_THROTTLE)
             self.control.brake = 0.0
             self.control.reverse = False
-
         elif command == 1:  # SPEED_DOWN
-            # reduce throttle gradually + tap brake
             self.control.throttle = max(self.control.throttle - THROTTLE_STEP, 0.0)
             self.control.brake = BRAKE_TAP
             self.control.reverse = False
-
         elif command == 4:  # STOP
             self.control.reverse = False
             self.control.throttle = 0.0
             self.control.brake = BRAKE_FULL
-
         elif command == 7:  # REVERSE
-            # reverse gently (doesn't rocket backwards)
             self.control.reverse = True
             self.control.throttle = REVERSE_THROTTLE
             self.control.brake = 0.0
-
         elif command == 8:  # CONSTANT_SPEED
-            # keep throttle as-is, but release brake
             self.control.brake = 0.0
-            # keep reverse flag as-is
-
-    
         elif command == 2:  # TURN_RIGHT
             self.control.steer = min(self.control.steer + STEER_STEP, MAX_STEER)
-
         elif command == 3:  # TURN_LEFT
             self.control.steer = max(self.control.steer - STEER_STEP, -MAX_STEER)
-
         elif command == 5:  # DO_NOT_TURN
-            # keep current steer (no change)
             pass
-
         elif command == 6:  # GO_STRAIGHT
-            # auto-center steering
             self.control.steer = 0.0
-
         else:
             print(f"Unknown command : {command}")
 
-        # # this part is not tested
-        # # Only decay throttle when you're not explicitly speeding up or reversing
-        # if command not in (0, 7, 4):  # not SPEED_UP, not REVERSE, not STOP
-        #     self.control.throttle *= THROTTLE_DECAY
-
-        # # Only decay steer when you're not actively turning
-        # if command not in (2, 3, 6):  # not TURN_RIGHT, not TURN_LEFT, not GO_STRAIGHT
-        #     self.control.steer *= STEER_DECAY
-
-        # # Safety clamp (always keep in valid bounds)
-        # self.control.throttle = float(np.clip(self.control.throttle, 0.0, 1.0))
-        # self.control.brake = float(np.clip(self.control.brake, 0.0, 1.0))
-        # self.control.steer = float(np.clip(self.control.steer, -1.0, 1.0))
-
         self.vehicle.apply_control(self.control)
+
+    def exec_continuous_command(self, throttle, brake, steer):
+        """Cleanly execute a direct continuous action array from CarlaEnv"""
+        self.control.throttle = float(np.clip(throttle, 0.0, 1.0))
+        self.control.brake = float(np.clip(brake, 0.0, 1.0))
+        self.control.steer = float(np.clip(steer, -1.0, 1.0))
+        self.control.reverse = False  # Or add logic here if you want reverse in continuous
+        
+        # Apply the updated internal control state to the vehicle
+        self.vehicle.apply_control(self.control)
+
         
     def exec_delta_command(self, throttle_action, steer_action):
-        #steer_change = steer_action * 0.04
-        #max_speed = 130km/h
-        #max_throttle = 0.92
-        #throttle_change = throttle_action * 0.092  
         throttle = self.control.throttle
         throttle_change = throttle_action * 0.092
         if (not self.control.reverse and throttle + throttle_change < 0):
@@ -261,4 +210,3 @@ class VehicleController():
             self.control.steer = min(new_steer, 0.4)
         
         self.vehicle.apply_control(self.control)
-         

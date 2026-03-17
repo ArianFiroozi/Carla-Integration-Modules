@@ -36,12 +36,13 @@ with open(PID_PATH, "w") as f:
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5):
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete"):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
         self.init_speed = init_speed
+        self.action_mode = action_mode  # "discrete" or "continuous"
         
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)  
@@ -75,7 +76,17 @@ class CarlaEnv(gymnasium.Env):
         self.current_step = 0
         self.map = self.world.get_map()
 
-        self.action_space = spaces.MultiDiscrete([5,4])
+        # Set action space based on mode
+        if self.action_mode == "discrete":
+            self.action_space = spaces.MultiDiscrete([5,4])
+        elif self.action_mode == "continuous":
+            self.action_space = spaces.Box(
+                low=np.array([0.0, 0.0, -1.0]), 
+                high=np.array([1.0, 1.0, 1.0]), 
+                dtype=np.float32
+            )
+        else:
+            raise ValueError(f"Unsupported action_mode: {self.action_mode}")
 
         self.observation_space = spaces.Dict({
             "speed_x": spaces.Box(low=-torch.inf, high=torch.inf, shape=(25, 11), dtype=np.float32),
@@ -83,10 +94,10 @@ class CarlaEnv(gymnasium.Env):
             "presence": spaces.Box(low=0, high=9, shape=(25, 11), dtype=np.int64),
             "lane_angle": spaces.Box(low=-torch.pi, high=torch.pi, shape=(1,), dtype=np.float32),
             "max_speed": spaces.Box(low=0, high=200, shape=(1,), dtype=np.float32),
-            "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  # SUPPORTED_SIGNS_COUNT traffic signs encoded as one-hot
+            "traffic_signs": spaces.Box(low=0, high=1, shape=(SUPPORTED_SIGNS_COUNT,), dtype=np.float32),  
             "ego_speed_x": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
             "ego_speed_y": spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
-            "ego_in_lane_position_x": spaces.Box(low=-100, high=100, shape=(1,), dtype=np.float32),  # Lateral offset, assuming lane width ~10m
+            "ego_in_lane_position_x": spaces.Box(low=-100, high=100, shape=(1,), dtype=np.float32),  
             "throttle": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
             "brake": spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
             "steering_angle": spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32),
@@ -98,7 +109,6 @@ class CarlaEnv(gymnasium.Env):
             f.write(str(self.last_heartbeat_time))
 
     def reset(self, seed = 12):
-        # print(f'reseting...')
         self.current_step = 0
 
         # Check for None to safely destroy actors on the first reset
@@ -123,20 +133,9 @@ class CarlaEnv(gymnasium.Env):
 
         # Tick the world again so the new vehicle's physics and sensors initialize correctly
         self.world.tick()
-        # self.vehicles=spawn_vehicles(self.client, self.vehicles_count)
-        # self.walkers = spawn_pedestrians(self.world, self.walkers_count)
-        # clear_output(wait=True)
+        
         return self._get_observation(), {}
 
-
-    def __set_world_asynch(self):
-        settings = self.world.get_settings()
-        settings.synchronous_mode = False
-        self.client.get_trafficmanager().set_synchronous_mode(False)
-        self.world.apply_settings(settings)
-    
-    
-    
     def _apply_sync(self, fixed_dt=0.05):
         # always grab the current world (after map load)
         self.world = self.client.get_world()
@@ -154,37 +153,35 @@ class CarlaEnv(gymnasium.Env):
 
         tm = self.client.get_trafficmanager()
         tm.set_synchronous_mode(True)
-    
-    
-    def __set_world_settings(self, no_rendering_mode=False, fixed_delta_seconds=0.1): #TODO: parameters
-        settings = self.world.get_settings()
-        settings.synchronous_mode = True
-        self.client.get_trafficmanager().set_synchronous_mode(True)
-        settings.no_rendering_mode = no_rendering_mode
-        settings.fixed_delta_seconds = fixed_delta_seconds
-        settings.substepping = True
-        settings.max_substep_delta_time = 0.1
-        settings.max_substeps = 10
-        self.world.apply_settings(settings)
-
+        
+        
     def step(self, action): 
         prev_obs = self._get_observation()        
         
-        # 1. Define end-of-episode variables (both default to False)
-        terminated = False  # Indicates failure (collision or falling off the map)
-        truncated = False   # Indicates time ran out (max steps reached without failure)
+        # 1. Define end-of-episode variables
+        terminated = False  
+        truncated = False   
 
-        speed_action = int(action[0])
-        turn_action = int(action[1])
+        # Execute action based on mode
+        if self.action_mode == "discrete":
+            speed_action = int(action[0])
+            turn_action = int(action[1])
+            self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
+            self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
         
-        self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
-        self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
+        elif self.action_mode == "continuous":
+            # Delegate directly to VehicleController to keep self.control state synced!
+            throttle = float(action[0])
+            brake = float(action[1])
+            steer = float(action[2]) 
+            # if throttle < 0.1 and brake < 0.05:
+            #     throttle = 0.12
+            self.vehicle_controller.exec_continuous_command(throttle, brake, steer)
         
         try:
             self.world.tick()
         except Exception as e:
             print(f"tick fail: {e}")
-            # If tick fails, do not reward or penalize, just reset the environment
             self.reset()
             return prev_obs, 0, False, False, {}
 
@@ -201,7 +198,6 @@ class CarlaEnv(gymnasium.Env):
         # 3. Calculate reward
         reward = self.vehicle_controller.get_reward(prev_obs)
         
-        # Apply heavy penalty only on failure
         if terminated:
             reward += -100
             
@@ -223,8 +219,6 @@ class CarlaEnv(gymnasium.Env):
         if self.current_step >= self.max_steps:
             truncated = True
             
-  
-        # Gymnasium standard requires returning terminated and truncated separately
         return obs, reward, terminated, truncated, {}
 
     def _get_observation(self):
@@ -239,18 +233,6 @@ class CarlaEnv(gymnasium.Env):
         steering = control.steer
         reverse = 1.0 if control.reverse else 0.0
         
-
-        
-        # # 4 channel presence, todo   
-        # p = presence_matrix  
-        # presence_oh = np.stack([
-        #     (p == 0),
-        #     (p == 1),
-        #     (p == 2),
-        #     (p == 9),
-        # ], axis=-1).astype(np.float32)
-        
-        
         map = self.map
         waypoint = map.get_waypoint(self.ego_vehicle.get_location(), project_to_road=True)
         lane_center = waypoint.transform.location
@@ -259,10 +241,8 @@ class CarlaEnv(gymnasium.Env):
         ego_location = transform.location
 
         theta = np.radians(ego_yaw)
-        # Vector from lane center to ego vehicle in global coordinates
         dx_global = ego_location.x - lane_center.x
         dy_global = ego_location.y - lane_center.y
-        # Rotate to local coordinates (lateral offset is along local y-axis)
         lateral_offset = -dx_global * np.sin(theta) + dy_global * np.cos(theta)
 
         return {
@@ -285,24 +265,16 @@ class CarlaEnv(gymnasium.Env):
         return get_nearby_signs(self.ego_vehicle, self.world.get_map(), radius=10)
 
     def _encode_traffic_signs(self):
-        # 1. Fetch nearby traffic signs
         traffic_signs = self._get_nearby_traffic_signs()
-        
-        # 2. Initialize the one-hot encoded array
         encoded_signs = np.zeros(SUPPORTED_SIGNS_COUNT)
-        
-        # 3. Process each sign and update the array
         for sign in traffic_signs:
-            # Check if the type is a valid digit to avoid ValueError
             if sign.type.isdigit():
-                # Use modulo SUPPORTED_SIGNS_COUNT to prevent index out of bounds
                 sign_index = int(sign.type) % SUPPORTED_SIGNS_COUNT
                 encoded_signs[sign_index] = 1
-
         return encoded_signs
 
     def _process_traffic_signs(self, traffic_signs):
-        # penalty = 0
+                # penalty = 0
         # for sign in traffic_signs:
         #     if sign.type == "1000001":  # Example: stop sign
         #         penalty -= 5 if self.vehicle_controller.control.throttle > 0 else 0
@@ -312,10 +284,11 @@ class CarlaEnv(gymnasium.Env):
         #         if speed_kmh > 50:  # Assuming speed limit of 50 km/h
         #             penalty -= 1
         # return penalty
+        
         return 0
 
     def render(self, mode="human"):
-        pass  # Visualization logic can go here if needed
+        pass
 
     def close(self):
         pass
