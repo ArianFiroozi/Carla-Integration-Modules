@@ -21,8 +21,8 @@ class ManualController:
         self.env = env
 
         # demo storage
-        REPO_ROOT = Path(__file__).resolve().parents[1]
-        self.demo_dir = REPO_ROOT / "demos2"
+        REPO_ROOT = Path(__file__).resolve().parents[0]
+        self.demo_dir = REPO_ROOT / "data" / "demos2"
         self.demo_dir.mkdir(exist_ok=True)
 
         # loop pacing (synchronous mode: env.step() ticks the world)
@@ -222,4 +222,4 @@ if __name__ == "__main__":
     env = CarlaEnv(map_path=map_path, walkers_count=0, vehicles_count=0, max_steps=2000, init_speed=0)
 
     controller = ManualController(env)
-    controller.run(record=True, base_name="lab_manual11")
+    controller.run(record=True, base_name="lab_manual12")

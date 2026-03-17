@@ -4,9 +4,11 @@ from pathlib import Path
 from collections import Counter
 
 
+ROOT = Path(__file__).resolve().parents[0]
+DATA_DIR = ROOT / "data"
+DEMO_DIR = DATA_DIR / "demos"
 
-DEMO_DIR = Path("demos")
-OUT_PATH = Path("dataset_bc.npz")
+OUT_PATH = DATA_DIR / "processed" / "dataset_bc.npz"
 RNG_SEED = 42
 
 # Termination Filtering
@@ -21,11 +23,18 @@ IDLE_THROTTLE_THRESHOLD = 0.05
 IDLE_BRAKE_THRESHOLD = 0.05
 
 
+# JOINT_KEEP_PROBS = {
+#     (4,3): 0.2,  
+#     (4,0): 0.5,
+#     (4,1): 0.7,   
+# }
+
 JOINT_KEEP_PROBS = {
-    (4,3): 0.2,  
-    (4,0): 0.5,
-    (4,1): 0.7,   
+    (4,3): 1,  
+    (4,0): 1,
+    (4,1): 1,   
 }
+
 
 # Observation Bounds
 OBS_BOUNDS = {
@@ -47,6 +56,12 @@ OBS_BOUNDS = {
 # Action Maps
 SPEED_MAP = {0: "Accelerate", 1: "Brake", 2: "Stop", 3: "Reverse", 4: "Constant"}
 TURN_MAP = {0: "Right", 1: "Left", 2: "No Turn", 3: "Straight"}
+
+
+# Optional simplification
+SIMPLIFY_ACTIONS = False
+REMOVE_REVERSE = True
+REMOVE_NO_TURN = True
 
 
 def init_stats():
@@ -169,6 +184,52 @@ def build_keep_mask(d, stats, rng):
     return keep
 
 
+def simplify_actions(out_obs, out_actions, remove_reverse=False, remove_no_turn=False):
+    """
+    Simplifies the action space by optionally removing Reverse and/or No Turn.
+    Also reindexes remaining classes so they stay contiguous.
+
+    Args:
+        out_obs (dict): observation arrays
+        out_actions (np.ndarray): (N,2) action array
+        remove_reverse (bool)
+        remove_no_turn (bool)
+
+    Returns:
+        new_obs, new_actions
+    """
+
+    speed = out_actions[:, 0]
+    turn = out_actions[:, 1]
+
+    keep_mask = np.ones(len(out_actions), dtype=bool)
+
+    if remove_reverse:
+        keep_mask &= speed != 3  # Reverse index
+
+    if remove_no_turn:
+        keep_mask &= turn != 2  # No Turn index
+
+    new_actions = out_actions[keep_mask].copy()
+    new_obs = {k: v[keep_mask] for k, v in out_obs.items()}
+
+    unique_speed = sorted(np.unique(new_actions[:, 0]))
+    speed_map = {old: new for new, old in enumerate(unique_speed)}
+    for old, new in speed_map.items():
+        new_actions[new_actions[:, 0] == old, 0] = new
+
+    unique_turn = sorted(np.unique(new_actions[:, 1]))
+    turn_map = {old: new for new, old in enumerate(unique_turn)}
+    for old, new in turn_map.items():
+        new_actions[new_actions[:, 1] == old, 1] = new
+
+    print("\nAction simplification applied:")
+    print("Speed mapping:", speed_map)
+    print("Turn mapping :", turn_map)
+
+    return new_obs, new_actions
+
+
 def pass_1_compute_masks(files, stats, rng):
     """Iterates through files to determine keep masks and observation shapes."""
     keep_masks = []
@@ -281,38 +342,100 @@ def print_trim_statistics(stats):
     print("="*50)
 
 
-def visualize_data(out_actions):
-    """Generates distribution plots for the actions."""
-    sp, tr = out_actions[:, 0], out_actions[:, 1]
-    speed_counts = np.bincount(sp, minlength=5)
-    turn_counts = np.bincount(tr, minlength=4)
+def plot_feature_distributions(features, max_samples=100000):
+    """
+    Plots histograms for all collected scalar/array observation features.
+    Automatically flattens arrays and subsamples to avoid memory issues.
+    """
+    print("\nRendering feature distributions...")
+    n = len(features)
+    cols = 4
+    rows = int(np.ceil(n / cols))
 
-    # Speed
+    plt.figure(figsize=(cols * 5, rows * 3))
+
+    for i, (k, arr) in enumerate(features.items()):
+        # Flatten array to 1D for marginal histogram distribution
+        arr_flat = arr.reshape(-1)
+        
+        # Subsample if the array is massive to prevent Matplotlib from freezing
+        if len(arr_flat) > max_samples:
+            arr_flat = np.random.choice(arr_flat, max_samples, replace=False)
+
+        plt.subplot(rows, cols, i + 1)
+        plt.hist(arr_flat, bins=50, color='coral', edgecolor='black', alpha=0.7)
+        plt.title(k)
+        
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_brake_throttle_joint(data, bins=50):
+    """
+    Plots joint distribution of throttle and brake values.
+
+    Args:
+        data (dict): dataset dict loaded from npz
+        bins (int): histogram bins
+    """
+
+    throttle = data["obs_throttle"].reshape(-1)
+    brake = data["obs_brake"].reshape(-1)
+
+    plt.figure(figsize=(6,5))
+
+    h = plt.hist2d(
+        throttle,
+        brake,
+        bins=bins,
+        range=[[0,1],[0,1]],
+        cmap="viridis"
+    )
+
+    plt.colorbar(h[3], label="Frequency")
+    plt.xlabel("Throttle")
+    plt.ylabel("Brake")
+    plt.title("Throttle vs Brake Joint Distribution")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_speed_distribution(sp):
+    speed_counts = np.bincount(sp, minlength=5)
+
     plt.figure(figsize=(6, 4))
-    plt.bar([SPEED_MAP[i] for i in range(5)], speed_counts / speed_counts.sum())
+    plt.bar([SPEED_MAP[i] for i in range(5)],
+            speed_counts / max(1, speed_counts.sum()))
     plt.title("Speed Action Distribution")
     plt.ylabel("Probability")
     plt.xticks(rotation=30)
     plt.tight_layout()
     plt.show()
 
-    # Turn
+
+def plot_turn_distribution(tr):
+    turn_counts = np.bincount(tr, minlength=4)
+
     plt.figure(figsize=(6, 4))
-    plt.bar([TURN_MAP[i] for i in range(4)], turn_counts / turn_counts.sum())
+    plt.bar([TURN_MAP[i] for i in range(4)],
+            turn_counts / max(1, turn_counts.sum()))
     plt.title("Turn Action Distribution")
     plt.ylabel("Probability")
     plt.xticks(rotation=30)
     plt.tight_layout()
     plt.show()
 
-    # Joint Distribution
+
+def plot_joint_action_distribution(sp, tr):
     joint_matrix = np.zeros((5, 4), dtype=np.int64)
     np.add.at(joint_matrix, (sp, tr), 1)
-    joint_probs = joint_matrix / joint_matrix.sum()
+    joint_probs = joint_matrix / max(1, joint_matrix.sum())
 
     plt.figure(figsize=(7, 5))
     im = plt.imshow(joint_probs, cmap="viridis")
     plt.colorbar(im, label="Probability")
+
     plt.xticks(range(4), [TURN_MAP[i] for i in range(4)])
     plt.yticks(range(5), [SPEED_MAP[i] for i in range(5)])
     plt.xlabel("Turn")
@@ -322,11 +445,53 @@ def visualize_data(out_actions):
     for i in range(5):
         for j in range(4):
             if joint_probs[i, j] > 0:
-                plt.text(j, i, f"{joint_probs[i,j]:.2f}", ha="center", va="center", color="white", fontsize=9)
+                plt.text(
+                    j, i,
+                    f"{joint_probs[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="white",
+                    fontsize=9
+                )
 
     plt.tight_layout()
     plt.show()
 
+
+def plot_brake_throttle_hex(data):
+    throttle = data["obs_throttle"].reshape(-1)
+    brake = data["obs_brake"].reshape(-1)
+
+    plt.figure(figsize=(6,5))
+
+    plt.hexbin(
+        throttle,
+        brake,
+        gridsize=40,
+        cmap="inferno",
+        mincnt=1
+    )
+
+    plt.colorbar(label="Count")
+    plt.xlabel("Throttle")
+    plt.ylabel("Brake")
+    plt.title("Throttle vs Brake Joint Distribution")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_data(out_actions, out_obs):
+    """Main visualization entry point."""
+    sp = out_actions[:, 0]
+    tr = out_actions[:, 1]
+
+    plot_speed_distribution(sp)
+    plot_turn_distribution(tr)
+    plot_joint_action_distribution(sp, tr)
+    plot_feature_distributions(out_obs)
+    # plot_brake_throttle_joint(out_obs)
+    # plot_brake_throttle_hex(out_obs)
 
 def main(visualize=False):
     """
@@ -337,6 +502,7 @@ def main(visualize=False):
     """
     print(f"Starting dataset generation pipeline...")
     files = sorted(DEMO_DIR.glob("*.npz"))
+
     assert files, f"No demos found in {DEMO_DIR.resolve()}"
 
     rng = np.random.default_rng(RNG_SEED)
@@ -351,10 +517,9 @@ def main(visualize=False):
     print("PASS 2: Compiling final arrays...")
     out_obs, out_actions = pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes)
 
-    # Save to disk
-    save_dict = {**out_obs, "actions": out_actions}
-    np.savez_compressed(OUT_PATH, **save_dict)
-    print(f"✅ Successfully saved to: {OUT_PATH.resolve()}")
+
+
+
 
     # Output Reporting
     print_trim_statistics(stats)
@@ -363,8 +528,43 @@ def main(visualize=False):
     # Optional Visualization
     if visualize:
         print("\nRendering visualization plots...")
-        visualize_data(out_actions)
+        visualize_data(out_actions, out_obs)
+        
+        
+    if SIMPLIFY_ACTIONS:
+        out_obs, out_actions = simplify_actions(
+            out_obs,
+            out_actions,
+            remove_reverse=REMOVE_REVERSE,
+            remove_no_turn=REMOVE_NO_TURN
+        )
+        
+        
+        
+    # Save to disk
+    
+    
+    # rename selected observation keys to target_*
+    rename_keys = [
+        "obs_throttle",
+        "obs_brake",
+        "obs_steering_angle",
+        "obs_reverse"
+    ]
+
+    for k in rename_keys:
+        out_obs[f"target_{k[4:]}"] = out_obs.pop(k)  # remove obs_ and add target_
+
+    save_dict = {**out_obs, "actions": out_actions}
+
+    print(save_dict.keys())
+
+    np.savez_compressed(OUT_PATH, **save_dict)
+    print(f"✅ Successfully saved to: {OUT_PATH.resolve()}")
+
+
+
 
 
 if __name__ == "__main__":
-    main(visualize=False)
+    main(visualize=True)

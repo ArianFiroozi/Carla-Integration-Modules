@@ -5,10 +5,9 @@ from collections import Counter, defaultdict
 
 
 
+ROOT = Path(__file__).resolve().parents[0]
+DEMO_DIR = ROOT / "data" / "demos"
 
-
-
-DEMO_DIR = Path("demos2")
 
 SPEED_MAP = {
     0: "Accelerate",
