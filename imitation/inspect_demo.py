@@ -214,6 +214,7 @@ def main(visualize=False):
     stats, features = process_demos(files)
 
     print_statistics_report(stats)
+
     
 
     if visualize:

@@ -222,4 +222,4 @@ if __name__ == "__main__":
     env = CarlaEnv(map_path=map_path, walkers_count=0, vehicles_count=0, max_steps=2000, init_speed=0)
 
     controller = ManualController(env)
-    controller.run(record=True, base_name="lab_manual12")
+    controller.run(record=False, base_name="lab_manual12")

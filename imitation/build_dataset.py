@@ -9,6 +9,10 @@ DATA_DIR = ROOT / "data"
 DEMO_DIR = DATA_DIR / "demos"
 
 OUT_PATH = DATA_DIR / "processed" / "dataset_bc.npz"
+    
+    
+
+
 RNG_SEED = 42
 
 # Termination Filtering
@@ -59,7 +63,7 @@ TURN_MAP = {0: "Right", 1: "Left", 2: "No Turn", 3: "Straight"}
 
 
 # Optional simplification
-SIMPLIFY_ACTIONS = False
+SIMPLIFY_ACTIONS = True
 REMOVE_REVERSE = True
 REMOVE_NO_TURN = True
 
@@ -140,6 +144,58 @@ def validate_observations(d, stats):
 
     stats["obs_violation_frames"] += int((~valid_mask).sum())
     return valid_mask
+
+
+def remap_presence_grid(out_obs, mapping=None, verify=True):
+    """
+    Remaps categorical IDs in obs_presence to contiguous integers.
+
+    mapping:
+        0 -> empty
+        1 -> car
+        2 -> wall
+        9 -> ego
+
+    to
+
+        0 -> empty
+        1 -> car
+        2 -> wall
+        3 -> ego
+    """
+
+    if mapping is None:
+        mapping = {
+            0: 0,
+            1: 1,
+            2: 2,
+            9: 3
+        }
+
+    grid = out_obs["obs_presence"]
+
+    if verify:
+        values, counts = np.unique(grid, return_counts=True)
+        print("\nPresence grid BEFORE remapping:")
+        for v, c in zip(values, counts):
+            print(f"value {v}: {c}")
+
+    remapped = np.zeros_like(grid, dtype=np.int32)
+
+    for old, new in mapping.items():
+        remapped[grid == old] = new
+
+    out_obs["obs_presence"] = remapped.astype(np.float32)
+
+    if verify:
+        values, counts = np.unique(remapped, return_counts=True)
+        print("\nPresence grid AFTER remapping:")
+        for v, c in zip(values, counts):
+            print(f"value {v}: {c}")
+
+    return out_obs
+
+
 
 
 def build_keep_mask(d, stats, rng):
@@ -307,6 +363,26 @@ def print_distribution_summary(out_actions, files):
     counter = Counter(map(tuple, out_actions))
     for (speed, turn), count in counter.most_common(20):
         print(f"{SPEED_MAP[speed]:10s} | {TURN_MAP[turn]:10s} : {count:6d} ({100 * count / total:5.2f}%)")
+
+
+
+def print_minmax_summary(out_obs):
+    """
+    Prints min/max/mean/std for every observation in the dataset.
+    """
+    print("\n" + "="*50)
+    print("DATASET FEATURE SUMMARY")
+    print("="*50)
+
+    for k, arr in out_obs.items():
+        arr_flat = arr.reshape(-1)
+
+        print(f"\n{k}")
+        print(f"  shape : {arr.shape}")
+        print(f"  min   : {arr_flat.min():.6f}")
+        print(f"  max   : {arr_flat.max():.6f}")
+        print(f"  mean  : {arr_flat.mean():.6f}")
+        print(f"  std   : {arr_flat.std():.6f}")
 
 
 def print_trim_statistics(stats):
@@ -518,6 +594,13 @@ def main(visualize=False):
     out_obs, out_actions = pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes)
 
 
+    print_minmax_summary(out_obs)
+    
+    
+    
+    # Remap categorical grid IDs
+    out_obs = remap_presence_grid(out_obs)
+
 
 
 
@@ -561,8 +644,8 @@ def main(visualize=False):
 
     np.savez_compressed(OUT_PATH, **save_dict)
     print(f"✅ Successfully saved to: {OUT_PATH.resolve()}")
-
-
+    
+    
 
 
 
