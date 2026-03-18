@@ -2,70 +2,47 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import Counter
+import argparse
+from . import config
 
 
 ROOT = Path(__file__).resolve().parents[0]
-DATA_DIR = ROOT / "data"
-DEMO_DIR = DATA_DIR / "demos"
+DATA_DIR = config.DATA_DIR
+DEMO_DIR = config.DEMO_DIR
 
-OUT_PATH = DATA_DIR / "processed" / "dataset_bc.npz"
+OUT_PATH = config.DATASET_PATH
     
     
-
-
-RNG_SEED = 42
+RNG_SEED = config.BUILD_RNG_SEED
 
 # Termination Filtering
-DROP_TERMINATED = True
-DROP_LAST_N_BEFORE_TERMINATION = 10
+DROP_TERMINATED = config.DROP_TERMINATED
+DROP_LAST_N_BEFORE_TERMINATION = config.DROP_LAST_N_BEFORE_TERMINATION
 
 # Idle / Silence Filtering
-FILTER_IDLE_FRAMES = True
-IDLE_FILTER_MODE = "all"  # Options: "start" (only trim beginning) OR "all" (remove every idle frame)
-IDLE_SPEED_THRESHOLD = 0.3
-IDLE_THROTTLE_THRESHOLD = 0.05
-IDLE_BRAKE_THRESHOLD = 0.05
+FILTER_IDLE_FRAMES = config.FILTER_IDLE_FRAMES
+IDLE_FILTER_MODE = config.IDLE_FILTER_MODE
+IDLE_SPEED_THRESHOLD = config.IDLE_SPEED_THRESHOLD
+IDLE_THROTTLE_THRESHOLD = config.IDLE_THROTTLE_THRESHOLD
+IDLE_BRAKE_THRESHOLD = config.IDLE_BRAKE_THRESHOLD
 
 
-# JOINT_KEEP_PROBS = {
-#     (4,3): 0.2,  
-#     (4,0): 0.5,
-#     (4,1): 0.7,   
-# }
-
-JOINT_KEEP_PROBS = {
-    (4,3): 1,  
-    (4,0): 1,
-    (4,1): 1,   
-}
+JOINT_KEEP_PROBS = config.JOINT_KEEP_PROBS
 
 
 # Observation Bounds
-OBS_BOUNDS = {
-    "obs_speed_x": dict(low=-np.inf, high=np.inf),
-    "obs_speed_y": dict(low=-np.inf, high=np.inf),
-    "obs_presence": dict(low=0, high=9),
-    "obs_lane_angle": dict(low=-np.pi, high=np.pi),
-    "obs_max_speed": dict(low=0.0, high=200.0),
-    "obs_traffic_signs": dict(low=0.0, high=1.0),
-    "obs_ego_speed_x": dict(low=-np.inf, high=np.inf),
-    "obs_ego_speed_y": dict(low=-np.inf, high=np.inf),
-    "obs_ego_in_lane_position_x": dict(low=-100.0, high=100.0),
-    "obs_throttle": dict(low=0.0, high=1.0),
-    "obs_brake": dict(low=0.0, high=1.0),
-    "obs_steering_angle": dict(low=-1.0, high=1.0),
-    "obs_reverse": dict(low=0.0, high=1.0),
-}
+OBS_BOUNDS = config.OBS_BOUNDS
 
 # Action Maps
-SPEED_MAP = {0: "Accelerate", 1: "Brake", 2: "Stop", 3: "Reverse", 4: "Constant"}
-TURN_MAP = {0: "Right", 1: "Left", 2: "No Turn", 3: "Straight"}
+SPEED_MAP = config.SPEED_MAP
+TURN_MAP = config.TURN_MAP
 
 
 # Optional simplification
-SIMPLIFY_ACTIONS = True
-REMOVE_REVERSE = True
-REMOVE_NO_TURN = True
+SIMPLIFY_ACTIONS = config.SIMPLIFY_ACTIONS
+REMOVE_REVERSE = config.REMOVE_REVERSE
+REMOVE_NO_TURN = config.REMOVE_NO_TURN
+
 
 
 def init_stats():
@@ -418,7 +395,7 @@ def print_trim_statistics(stats):
     print("="*50)
 
 
-def plot_feature_distributions(features, max_samples=100000):
+def plot_feature_distributions(features, max_samples=config.FEATURE_HIST_MAX_SAMPLES):
     """
     Plots histograms for all collected scalar/array observation features.
     Automatically flattens arrays and subsamples to avoid memory issues.
@@ -650,4 +627,21 @@ def main(visualize=False):
 
 
 if __name__ == "__main__":
-    main(visualize=True)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--demo-dir", type=str, default=None)
+    parser.add_argument("--out-path", type=str, default=None)
+
+    parser.add_argument("--visualize", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.demo_dir:
+        DEMO_DIR = Path(args.demo_dir)
+
+    if args.out_path:
+        OUT_PATH = Path(args.out_path)
+
+    visualize_flag = args.visualize if args.visualize else config.BUILD_VISUALIZE
+
+    main(visualize=visualize_flag)

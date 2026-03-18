@@ -45,13 +45,14 @@ class BaseDataset(Dataset):
         if len(scalars) == 0:
             self.scalars = np.zeros((self.presence.shape[0], 1), dtype=np.float32)
         else:
+
             self.scalars = np.concatenate(scalars, axis=1)
-            # if self.scalars.shape[1] >= 4:
-            #     # TODO: THIS NORMALIZATION IS NOT DYNAMIC
-            #     self.scalars[:, 0] = self.scalars[:, 0] / np.pi   # lane_angle -> [-1,1]
-            #     self.scalars[:, 1] = self.scalars[:, 1] / 2.0     # lane_pos -> [-1,1]
-            #     self.scalars[:, 2] = self.scalars[:, 2] / 40.0    # speed_x -> [0,1]
-            #     self.scalars[:, 3] = self.scalars[:, 3] / 10.0    # speed_y -> ~[-1,1]
+            if self.scalars.shape[1] >= 4:
+                # TODO: THIS NORMALIZATION IS NOT DYNAMIC
+                self.scalars[:, 0] = self.scalars[:, 0] / np.pi   # lane_angle -> [-1,1]
+                self.scalars[:, 1] = self.scalars[:, 1] / 2.0     # lane_pos -> [-1,1]
+                self.scalars[:, 2] = np.clip(self.scalars[:, 2],-1,15) / 15    # speed_x -> [0,1]
+                self.scalars[:, 3] = np.clip(self.scalars[:, 3], -2,2) / 2    # speed_y -> ~[-1,1]
 
         # Normalize only if NOT using one-hot
         if not self.one_hot_presence:

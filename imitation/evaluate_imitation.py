@@ -1,58 +1,39 @@
 import time
 from collections import Counter
 from pathlib import Path
+import argparse
 
 import numpy as np
 import torch
 
 from CarlaEnv.env import CarlaEnv
-from .models.imitation_policy import ImitationPolicy  
+from .models.imitation_policy import ImitationPolicy
+
+from . import config
+
+
+ACTION_MODE = config.ACTION_MODE
+SIMPLIFIED_ACTION_SPACE = config.SIMPLIFY_ACTIONS
+DEVICE = config.DEVICE
+
+CONTINUOUS_MODEL = config.CONTINUOUS_MODEL_PATH
+DISCRETE_MODEL = config.DISCRETE_MODEL_PATH
+
+DEBUG_PRINT_STEPS = config.DEBUG_PRINT_STEPS
 
 
 
-ACTION_MODE = "continuous"  # "discrete" or "continuous"
-SIMPLIFIED_ACTION_SPACE = True
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-ROOT = Path(__file__).resolve().parents[1]
-CHECKPOINT_DIR = ROOT / "checkpoints"
-IMITATION_DIR = CHECKPOINT_DIR / "imitation"
-
-CONTINUOUS_MODEL = IMITATION_DIR / "bc_cnn_continuous.pt"
-DISCRETE_MODEL = IMITATION_DIR / "bc_cnn_discrete.pt"
-
-DEBUG_PRINT_STEPS = 50
 debug_counter = 0
 
 
 if SIMPLIFIED_ACTION_SPACE:
-    speed_map = {
-        0: "Accelerate",
-        1: "Brake",
-        2: "Stop",
-        3: "Constant",
-    }
+    speed_map = config.SIMPLIFY_SPEED_MAP
 
-    turn_map = {
-        0: "Right",
-        1: "Left",
-        2: "Straight",
-    }
+    turn_map = config.SIMPLIFY_TURN_MAP
 else:
-    speed_map = {
-        0: "Accelerate",
-        1: "Brake",
-        2: "Stop",
-        3: "Reverse",
-        4: "Constant",
-    }
+    speed_map = config.SPEED_MAP
 
-    turn_map = {
-        0: "Right",
-        1: "Left",
-        2: "No Turn",
-        3: "Straight",
-    }
+    turn_map = config.TURN_MAP
     
     
 def extract_grid_and_scalars(obs):
@@ -62,16 +43,14 @@ def extract_grid_and_scalars(obs):
     if torch.is_tensor(presence):
         presence = presence.cpu().numpy()
 
-    # lane_angle = obs["lane_angle"][0] / np.pi
-    # lane_pos = obs["ego_in_lane_position_x"][0] / 2.0
-    # speed_x = obs["ego_speed_x"][0] / 40.0
-    # speed_y = obs["ego_speed_y"][0] / 10.0
+    # TODO: this is  not dynamic
+    lane_angle = obs["lane_angle"][0] / np.pi
+    lane_pos = obs["ego_in_lane_position_x"][0] / 2.0
+    speed_x = np.clip(obs["ego_speed_x"][0], -1, 15) / 15.0
+    speed_y = np.clip(obs["ego_speed_y"][0], -2, 2) / 2.0
     
-    lane_angle = obs["lane_angle"][0]
-    lane_pos = obs["ego_in_lane_position_x"][0]
-    speed_x = obs["ego_speed_x"][0]
-    speed_y = obs["ego_speed_y"][0]
     grid = presence[None, :, :]
+    
     scalars = np.array([
         lane_angle,
         lane_pos,
@@ -80,7 +59,6 @@ def extract_grid_and_scalars(obs):
     ], dtype=np.float32)
 
     return grid, scalars
-
 
 def map_action_for_env(action):
     """
@@ -113,6 +91,10 @@ def process_continuous_output(out):
     # prevent throttle+brake conflict
     if brake > 0.05:
         throttle = 0.0
+    else:
+        brake= 0.0
+        
+
 
     return [throttle, brake, steer]
 
@@ -159,7 +141,13 @@ def predict_action(policy, obs):
                     f"[DEBUG] env action: "
                     f"throttle={env_action[0]:.3f}, brake={env_action[1]:.3f}, steer={env_action[2]:.3f}"
                 )
-                print("[DEBUG] scalars:", scalars.cpu().numpy())
+                print(
+                    f"lane_angle={obs['lane_angle'][0]:.3f}, "
+                    f"lane_pos={obs['ego_in_lane_position_x'][0]:.3f}, "
+                    f"vx={obs['ego_speed_x'][0]:.3f}, "
+                    f"vy={obs['ego_speed_y'][0]:.3f}"
+                )
+
                 print("-" * 40)
 
             debug_counter += 1
@@ -275,18 +263,36 @@ def load_policy():
 
 def main():
 
-    map_path = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\harder.xodr"
+    parser = argparse.ArgumentParser()
 
-    num_episodes = 30
-    max_steps = 2000
+    parser.add_argument("--map", type=str, default=config.CARLA_MAP_PATH)
+    parser.add_argument("--episodes", type=int, default=config.EVAL_NUM_EPISODES)
+    parser.add_argument("--max-steps", type=int, default=config.EVAL_MAX_STEPS)
+
+    parser.add_argument("--mode", choices=["discrete","continuous"], default=config.ACTION_MODE)
+    parser.add_argument("--device", default=config.DEVICE)
+
+    
+    args = parser.parse_args()
+    
+    global ACTION_MODE
+    global DEVICE
+    ACTION_MODE = args.mode
+    DEVICE = args.device
+
+    map_path = args.map
+    num_episodes = args.episodes
+    max_steps = args.max_steps
 
     env = CarlaEnv(
         map_path=map_path,
-        walkers_count=0,
-        vehicles_count=0,
+        walkers_count=config.CARLA_WALKERS,
+        vehicles_count=config.CARLA_VEHICLES,
         max_steps=max_steps,
-        init_speed=0,
+        init_speed=config.CARLA_INIT_SPEED,
+        action_mode=ACTION_MODE,
     )
+
 
     policy = load_policy()
 

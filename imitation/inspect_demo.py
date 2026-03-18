@@ -2,11 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import Counter, defaultdict
+import argparse
+from . import config
 
 
 
 ROOT = Path(__file__).resolve().parents[0]
-DEMO_DIR = ROOT / "data" / "demos"
+DEMO_DIR = config.DEMO_DIR
 
 
 SPEED_MAP = {
@@ -26,7 +28,7 @@ TURN_MAP = {
 
 
 
-def process_demos(files, max_feature_samples=200000):
+def process_demos(files, max_feature_samples=config.MAX_INSPECT_FEATURE_SAMPLES):
     """
     Makes a single pass over all demo files to collect:
     - Action distributions (marginal & joint)
@@ -194,16 +196,18 @@ def plot_feature_distributions(features):
 
 
 
-def main(visualize=False):
+def main(demo_dir=None, visualize=config.INSPECT_VISUALIZE, max_feature_samples=config.MAX_INSPECT_FEATURE_SAMPLES):
     """
     Main execution function.
     
     Args:
         visualize (bool): If True, plots histograms, heatmaps, and bar charts.
     """
-    files = sorted(DEMO_DIR.glob("*.npz"))
-    print(f"Found {len(files)} demos in {DEMO_DIR.resolve()}")
-    assert len(files) > 0, f"No demos found in {DEMO_DIR}"
+    demo_path = Path(demo_dir) if demo_dir else DEMO_DIR
+
+    files = sorted(demo_path.glob("*.npz"))
+    print(f"Found {len(files)} demos in {demo_path.resolve()}")
+    assert len(files) > 0, f"No demos found in {demo_path}"
 
     # Print structural info using the first file
     first_demo = np.load(files[0], allow_pickle=True)
@@ -211,7 +215,7 @@ def main(visualize=False):
 
     # Process all demos in a single optimized pass
     print("\nProcessing datasets (Extracting stats & features)...")
-    stats, features = process_demos(files)
+    stats, features = process_demos(files, max_feature_samples=max_feature_samples)
 
     print_statistics_report(stats)
 
@@ -231,4 +235,17 @@ def main(visualize=False):
 
 
 if __name__ == "__main__":
-    main(visualize=False)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--demo-dir", type=str, default=None)
+    parser.add_argument("--visualize", action="store_true")
+    parser.add_argument("--max-feature-samples", type=int, default=config.MAX_INSPECT_FEATURE_SAMPLES)
+
+    args = parser.parse_args()
+
+    visualize_flag = args.visualize if args.visualize else config.INSPECT_VISUALIZE
+
+    main(
+        demo_dir=args.demo_dir,
+        visualize=visualize_flag,
+        max_feature_samples=args.max_feature_samples
+    )

@@ -7,28 +7,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from sklearn.metrics import f1_score
+
 from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
 from .models.imitation_policy import ImitationPolicy
 
-
-
-
-
-
-
-ROOT = Path(__file__).resolve().parents[1]
-
-MODEL_DIR = ROOT / "checkpoints"
-DATA_DIR = ROOT / "imitation" / "data" / "processed" 
-DATA_PATH= DATA_DIR / "dataset_bc_v2.npz"
-
-IMITATION_MODEL = MODEL_DIR / "imitation"
-IMITATION_MODEL.mkdir(parents=True, exist_ok=True)
-
-CONTINUOUS_MODEL = IMITATION_MODEL / "bc_cnn_continuous.pt"
-DISCRETE_MODEL = IMITATION_MODEL / "bc_cnn_discrete.pt"
-
-
+from . import config
 
 
 
@@ -213,23 +196,24 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data", type=str,  default= DATA_PATH)
+    parser.add_argument("--data", type=str, default=config.DATASET_PATH)
 
     parser.add_argument(
         "--mode",
         choices=["discrete", "continuous"],
-        required=True,
+        default=config.ACTION_MODE,
     )
 
-    parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--batch", type=int, default=512)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--epochs", type=int, default=config.BC_EPOCHS)
+    parser.add_argument("--batch", type=int, default=config.BC_BATCH_SIZE)
+    parser.add_argument("--lr", type=float, default=config.BC_LR)
 
-    parser.add_argument("--val_split", type=float, default=0.1)
+    parser.add_argument("--val_split", type=float, default=config.BC_VAL_SPLIT)
 
-    parser.add_argument("--patience", type=int, default=10)
+    parser.add_argument("--patience", type=int, default=config.BC_PATIENCE)
 
-    parser.add_argument("--device", default="auto")
+    parser.add_argument("--device", default=config.DEVICE)
+
 
     args = parser.parse_args()
 
@@ -251,7 +235,7 @@ def main():
         speed_weights = compute_class_weights(actions[:, 0]).to(device)
         turn_weights = compute_class_weights(actions[:, 1]).to(device)
 
-    train_ds, val_ds = split_dataset(ds, args.val_split, seed=42)
+    train_ds, val_ds = split_dataset(ds, args.val_split, seed=config.BC_SPLIT_SEED)
 
     train_loader = DataLoader(
         train_ds,
@@ -370,7 +354,7 @@ def main():
             best_val = val_loss
             patience_counter = 0
 
-            save_path = CONTINUOUS_MODEL if args.mode == "continuous" else DISCRETE_MODEL
+            save_path = config.CONTINUOUS_MODEL_PATH if args.mode == "continuous" else config.DISCRETE_MODEL_PATH
 
             ckpt = {
                 "model_state": model.state_dict(),
