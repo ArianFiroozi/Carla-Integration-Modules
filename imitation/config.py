@@ -129,12 +129,17 @@ IDLE_SPEED_THRESHOLD = 0.3
 IDLE_THROTTLE_THRESHOLD = 0.05
 IDLE_BRAKE_THRESHOLD = 0.05
 
-JOINT_KEEP_PROBS = {
-    (4, 3): 1.0,
-    (4, 0): 1.0,
-    (4, 1): 1.0,
-}
+# JOINT_KEEP_PROBS = {
+#     (4, 3): 0.2,
+#     (4, 0): 0.5,
+#     (4, 1): 0.8,
+# }
 
+JOINT_KEEP_PROBS = {
+    (4, 3): 1,
+    (4, 0): 1,
+    (4, 1): 1,
+}
 
 # =========================================================
 # IMITATION LEARNING TRAINING
@@ -161,6 +166,13 @@ MANUAL_RECORD = False
 MANUAL_BASE_NAME = "manual_demo13"
 
 
+RECORD_DRIVE_MODE = "autopilot" # "manual" or "autopilot"
+
+AUTOPILOT_DEMO_DIR = DATA_DIR / "expert_demos"
+DEFAULT_AUTOPILOT_EPISODES = 10000
+
+
+
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
 # =========================================================
@@ -172,12 +184,14 @@ CARLA_VEHICLES = 0
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
+RANDOM_VEHICLE_START_POS = True
+RANDOM_EGO_START_POS = True
 
 # =========================================================
 # POLICY EVALUATION / ROLLOUT
 # =========================================================
 
-EVAL_NUM_EPISODES = 30
+EVAL_NUM_EPISODES = 10
 EVAL_MAX_STEPS = 2000
 EVAL_RENDER_LOG_EVERY = 200
 
@@ -186,10 +200,27 @@ EVAL_RENDER_LOG_EVERY = 200
 # DEBUG / VISUALIZATION
 # =========================================================
 
-DEBUG_PRINT_STEPS = 50
+DEBUG_PRINT_STEPS = 0
 
 INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
 BUILD_VISUALIZE = True
 FEATURE_HIST_MAX_SAMPLES = 100000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# TODO: add randomness to stuff

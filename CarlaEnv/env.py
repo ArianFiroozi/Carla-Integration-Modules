@@ -15,8 +15,6 @@ import random
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RL_ROOT = REPO_ROOT / "rl"
 
-
-
 RUN_DIR = RL_ROOT / "runs"
 RUN_DIR.mkdir(exist_ok=True)
 
@@ -36,7 +34,8 @@ with open(PID_PATH, "w") as f:
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete"):
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete" ,     random_ego_spawn=True,
+    random_vehicle_spawn=True ):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
@@ -46,6 +45,8 @@ class CarlaEnv(gymnasium.Env):
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)  
 
+        self.random_ego_spawn = random_ego_spawn
+        self.random_vehicle_spawn = random_vehicle_spawn
         self.world = self.client.get_world()
         
         if map_path:
@@ -72,7 +73,6 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
         self.map = self.world.get_map()
-
         # Set action space based on mode
         if self.action_mode == "discrete":
             self.action_space = spaces.MultiDiscrete([5,4])
@@ -104,20 +104,15 @@ class CarlaEnv(gymnasium.Env):
         self.last_heartbeat_time = time.time()
         with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
-            
-                
                 
     def reset(self, seed=None):
         self.current_step = 0
 
-    
         # RANDOMIZE SEED (so NPC spawns differ each episode)
         if seed is not None:
             random.seed(seed)
 
-
         # Check for None to safely destroy actors on the first reset
-
         if self.vehicle_controller is not None:
             if hasattr(self.vehicle_controller, 'sensor_c') and self.vehicle_controller.sensor_c is not None:
                 self.vehicle_controller.sensor_c.destroy()
@@ -129,9 +124,10 @@ class CarlaEnv(gymnasium.Env):
                 self.ego_vehicle.stop()
             if self.ego_vehicle.is_alive:
                 self.ego_vehicle.destroy()
-                
-                
-            # Tick the world to properly flush the destroy commands from the server
+            
+            
+            
+            # Tick the world to properly flush the destroy commands from the server    
             self.world.tick()
 
         if hasattr(self, "vehicles") and self.vehicles:
@@ -149,67 +145,55 @@ class CarlaEnv(gymnasium.Env):
                 except:
                     pass
             self.walkers = []
-
         # Tick so CARLA actually removes them
         self.world.tick()
 
-        self.vehicles = spawn_vehicles(self.client, self.vehicles_count)
+        self.vehicles = spawn_vehicles(self.client, self.vehicles_count, random_spawn=self.random_vehicle_spawn)
         self.walkers = spawn_pedestrians(self.world, self.walkers_count)
-
-        # Tick to initialize NPC physics
         self.world.tick()
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed)
+        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed, random_spawn=self.random_ego_spawn)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-
+        
         # Tick again so ego sensors + physics start stable
         self.world.tick()
 
         return self._get_observation(), {}
 
-
-
     def _apply_sync(self, fixed_dt=0.05):
-        # always grab the current world (after map load)
+        
+         # always grab the current world (after map load)
         self.world = self.client.get_world()
         settings = self.world.get_settings()
-
         settings.synchronous_mode = True
         settings.fixed_delta_seconds = fixed_dt
-
-        # physics stability
         settings.substepping = True
-        settings.max_substep_delta_time = 0.01  # 100 Hz physics
+        settings.max_substep_delta_time = 0.01   # 100 Hz physics
         settings.max_substeps = int(fixed_dt / settings.max_substep_delta_time) + 1
-
         self.world.apply_settings(settings)
 
         tm = self.client.get_trafficmanager()
         tm.set_synchronous_mode(True)
         
-        
-    def step(self, action): 
+    def step(self, action=None): 
         prev_obs = self._get_observation()        
-        
         # 1. Define end-of-episode variables
         terminated = False  
         truncated = False   
 
-        # Execute action based on mode
-        if self.action_mode == "discrete":
-            speed_action = int(action[0])
-            turn_action = int(action[1])
-            self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
-            self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-        
-        elif self.action_mode == "continuous":
-            # Delegate directly to VehicleController to keep self.control state synced!
-            throttle = float(action[0])
-            brake = float(action[1])
-            steer = float(action[2]) 
-            # if throttle < 0.1 and brake < 0.05:
-            #     throttle = 0.12
-            self.vehicle_controller.exec_continuous_command(throttle, brake, steer)
+        # Only execute manual control if 'action' is provided!
+        # This prevents overwriting the Traffic Manager when recording Autopilot.
+        if action is not None:
+            if self.action_mode == "discrete":
+                speed_action = int(action[0])
+                turn_action = int(action[1])
+                self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
+                self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
+            elif self.action_mode == "continuous":
+                throttle = float(action[0])
+                brake = float(action[1])
+                steer = float(action[2]) 
+                self.vehicle_controller.exec_continuous_command(throttle, brake, steer)
         
         try:
             self.world.tick()
@@ -230,7 +214,6 @@ class CarlaEnv(gymnasium.Env):
             
         # 3. Calculate reward
         reward = self.vehicle_controller.get_reward(prev_obs)
-        
         if terminated:
             reward += -100
             
@@ -238,8 +221,8 @@ class CarlaEnv(gymnasium.Env):
         reward += self._process_traffic_signs(traffic_signs)
 
         obs = self._get_observation()
-        
         self.current_step += 1
+        
         
         # 4. Update Heartbeat
         current_time = time.time()
@@ -248,6 +231,7 @@ class CarlaEnv(gymnasium.Env):
                 f.write(str(current_time))
             self.last_heartbeat_time = current_time
         
+        
         # 5. Check for timeout (Truncated)
         if self.current_step >= self.max_steps:
             truncated = True
@@ -255,8 +239,7 @@ class CarlaEnv(gymnasium.Env):
         return obs, reward, terminated, truncated, {}
 
     def _get_observation(self):
-        x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = \
-            get_speed_matrices(self.ego_vehicle)
+        x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = get_speed_matrices(self.ego_vehicle)
         lane_angle = get_lane_angle(self.ego_vehicle, self.world.get_map())
         traffic_signs = self._encode_traffic_signs()
         

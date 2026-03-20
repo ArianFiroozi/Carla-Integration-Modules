@@ -1,7 +1,7 @@
 import carla
 import random
 
-def spawn_vehicles(client, num_vehicles=0):
+def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
 
     world = client.get_world()
     traffic_manager = client.get_trafficmanager()
@@ -11,18 +11,31 @@ def spawn_vehicles(client, num_vehicles=0):
     vehicle_blueprints = blueprint_library.filter("vehicle.*")
 
     spawn_points = world.get_map().get_spawn_points()
-    random.shuffle(spawn_points)
 
     vehicles = []
-    for i in range(num_vehicles):
+
+    if random_spawn:
+        random.shuffle(spawn_points)
+
+    for i, spawn_point in enumerate(spawn_points):
+
+        if len(vehicles) >= num_vehicles:
+            break
+
         blueprint = random.choice(vehicle_blueprints)
-        spawn_point = random.choice(spawn_points)
+
         vehicle = world.try_spawn_actor(blueprint, spawn_point)
-        if vehicle:
-            vehicle.set_autopilot(True,traffic_manager.get_port())
-            # vehicle.apply_control(carla.VehicleControl(throttle=0.5))
-            vehicles.append(vehicle)
-            traffic_manager.vehicle_percentage_speed_difference(vehicle, random.randint(-30, 30))
-            #print(f"Spawned vehicle {vehicle.id} at {spawn_point.location}")
+
+        if vehicle is None:
+            continue
+
+        vehicle.set_autopilot(True, traffic_manager.get_port())
+
+        traffic_manager.vehicle_percentage_speed_difference(
+            vehicle,
+            random.randint(-30, 30)
+        )
+
+        vehicles.append(vehicle)
 
     return vehicles

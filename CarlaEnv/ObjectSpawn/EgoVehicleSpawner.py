@@ -6,7 +6,7 @@ def spawn_ego_vehicle(world,
                       init_speed=0.0,
                       random_spawn=True,
                       spawn_index=0,
-                      max_retries=50):
+                      max_retries=100):
 
     blueprint_library = world.get_blueprint_library()
     vehicle_bp = blueprint_library.filter("vehicle.*model3*")[0]
@@ -15,7 +15,7 @@ def spawn_ego_vehicle(world,
 
     vehicle = None
 
-    # ---------- RANDOM SPAWN ----------
+    # RANDOM SPAWN
     if random_spawn:
 
         indices = list(range(len(spawn_points)))
@@ -30,7 +30,7 @@ def spawn_ego_vehicle(world,
         if vehicle is None:
             raise RuntimeError("Failed to spawn ego vehicle at random spawn points")
 
-    # ---------- DETERMINISTIC SPAWN ----------
+    # DETERMINISTIC SPAWN
     else:
 
         spawn_point = spawn_points[spawn_index]
