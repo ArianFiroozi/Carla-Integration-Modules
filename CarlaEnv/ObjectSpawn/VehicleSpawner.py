@@ -1,7 +1,7 @@
 import carla
 import random
 
-def spawn_vehicles(client, num_vehicles=1):
+def spawn_vehicles(client, num_vehicles=0):
 
     world = client.get_world()
     traffic_manager = client.get_trafficmanager()
@@ -11,6 +11,7 @@ def spawn_vehicles(client, num_vehicles=1):
     vehicle_blueprints = blueprint_library.filter("vehicle.*")
 
     spawn_points = world.get_map().get_spawn_points()
+    random.shuffle(spawn_points)
 
     vehicles = []
     for i in range(num_vehicles):
