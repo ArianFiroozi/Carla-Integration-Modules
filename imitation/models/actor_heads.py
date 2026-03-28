@@ -48,26 +48,40 @@ class BCContinuousHead(nn.Module):
         
         actions = torch.cat([throttle, brake, steer], dim=1)
         return actions
-
-class PPOContinuousHead(nn.Module):
-    """
-    Continuous head for PPO.
-    Outputs Gaussian distribution parameters.
-    """
-
-    def __init__(self, latent_dim=128, action_dim=3):
+    
+    
+    
+    
+    
+class BCGaussianContinuousHead(nn.Module):
+    def __init__(self, latent_dim=128, action_dim=3, 
+                 log_std_min=-3, log_std_max=1):
         super().__init__()
 
         self.mean_head = nn.Linear(latent_dim, action_dim)
+        self.log_std_head = nn.Linear(latent_dim, action_dim)
 
-        # global trainable log_std parameter
-        self.log_std = nn.Parameter(torch.zeros(action_dim))
 
-    def forward(self, latent):
+        self.log_std_head.bias.data.fill_(-1.0)
 
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
+    def forward(self, latent, mode="bc"):
+        # Raw mean 
         mean = self.mean_head(latent)
 
-        # broadcast std across batch
-        std = torch.exp(self.log_std).expand_as(mean)
+        # Compute std
+        log_std = self.log_std_head(latent)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+        std = torch.exp(log_std)
+
+        # BC MODE: Bound mean to valid CARLA action ranges
+        if mode == "bc":
+            throttle = torch.sigmoid(mean[:, 0:1])
+            brake    = torch.sigmoid(mean[:, 1:2])
+            steer    = torch.tanh(mean[:, 2:3])
+            mean = torch.cat([throttle, brake, steer], dim=1)
 
         return mean, std
+

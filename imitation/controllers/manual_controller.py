@@ -49,6 +49,29 @@ class ManualController:
 
             out[k] = arr
         return out
+    
+    
+    
+    def _draw_lane(self):
+        world = self.env.world
+        ego = self.env.ego_vehicle
+        waypoint = world.get_map().get_waypoint(ego.get_location())
+
+        prev = waypoint.transform.location
+
+        for i in range(30):
+            waypoint = waypoint.next(2.0)[0]
+            cur = waypoint.transform.location
+
+            world.debug.draw_line(
+                prev,
+                cur,
+                thickness=0.1,
+                color=carla.Color(0,255,0),
+                life_time=0.1
+            )
+
+            prev = cur
 
     def _update_spectator(self):
         world = self.env.world
@@ -61,6 +84,8 @@ class ManualController:
         cam_loc = tr.location - forward * 8.0 + carla.Location(z=3.0)
         cam_rot = carla.Rotation(pitch=-12.0, yaw=tr.rotation.yaw, roll=0.0)
         spectator.set_transform(carla.Transform(cam_loc, cam_rot))
+        
+        self._draw_lane()
 
     def _get_action_from_keyboard(self):
         # speed mapping

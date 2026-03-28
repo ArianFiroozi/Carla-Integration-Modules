@@ -78,13 +78,15 @@ def map_action_for_env(action):
     return [speed, turn]
 
 
+prev_steer = 0.0
 
 def process_continuous_output(out):
     """
     model output → [throttle, brake, steer]
     out: np.array of shape (3,)
     """
-    throttle = float(np.clip(out[0], 0.0, 1.0))
+    global prev_steer
+    throttle = max(float(np.clip(out[0], 0.0, 1.0)),0.13)
     brake = float(np.clip(out[1], 0.0, 1.0))
     steer = float(np.clip(out[2], -1.0, 1.0))
 
@@ -93,7 +95,11 @@ def process_continuous_output(out):
         throttle = 0.0
     else:
         brake= 0.0
-        
+    
+    if config.SMOOTH_STEERING:  
+        steer = 0.7 * prev_steer + 0.3 * steer
+        prev_steer = steer
+        steer = np.clip(steer, -1.0, 1.0)
 
 
     return [throttle, brake, steer]
@@ -123,18 +129,36 @@ def predict_action(policy, obs):
             turn = torch.argmax(logits_turn, dim=1).item()
 
             env_action = map_action_for_env((speed, turn))
+            if debug_counter < DEBUG_PRINT_STEPS:
+                print(
+                    f"lane_angle={obs['lane_angle'][0]:.3f}, "
+                    f"lane_pos={obs['ego_in_lane_position_x'][0]:.3f}, "
+                    f"vx={obs['ego_speed_x'][0]:.3f}, "
+                    f"vy={obs['ego_speed_y'][0]:.3f}"
+                )
+                
+            debug_counter+=1
             return env_action, (speed, turn)
 
         else:
-            out = policy(grid, scalars).cpu().numpy()[0]
+            pred = policy(grid, scalars)
+
+            if isinstance(pred, tuple):
+                mean, std = pred
+                action = mean.cpu().numpy()[0]
+                uncertainty = std.cpu().numpy()[0]
+            else:
+                action = pred.cpu().numpy()[0]
+                uncertainty = None
 
             if debug_counter < DEBUG_PRINT_STEPS:
                 print(
                     f"[DEBUG] raw model output: "
-                    f"throttle={out[0]:.3f}, brake={out[1]:.3f}, steer={out[2]:.3f}"
+                    f"throttle={action[0]:.3f}, brake={action[1]:.3f}, steer={action[2]:.3f}"
                 )
-
-            env_action = process_continuous_output(out)
+                if uncertainty is not None:
+                    print(f"σ_throttle={uncertainty[0]:.3f}, σ_brake={uncertainty[1]:.3f}, σ_steer={uncertainty[2]:.3f}")
+            env_action = process_continuous_output(action)
 
             if debug_counter < DEBUG_PRINT_STEPS:
                 print(
@@ -239,8 +263,11 @@ def load_policy():
             n_turn=n_turn,
         ).to(DEVICE)
     else:
+        is_gaussian = config.IS_GAUSSIAN
+
         policy = ImitationPolicy(
             mode="continuous",
+            is_gaussian=is_gaussian,
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
         ).to(DEVICE)

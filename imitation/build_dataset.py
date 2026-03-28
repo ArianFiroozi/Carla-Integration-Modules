@@ -7,8 +7,9 @@ from . import config
 
 
 ROOT = Path(__file__).resolve().parents[0]
-DATA_DIR = config.DATA_DIR
-DEMO_DIR = config.DEMO_DIR
+
+
+DEMO_DIRS = config.DEMO_LIST
 
 OUT_PATH = config.DATASET_PATH
     
@@ -546,6 +547,27 @@ def visualize_data(out_actions, out_obs):
     # plot_brake_throttle_joint(out_obs)
     # plot_brake_throttle_hex(out_obs)
 
+
+def gather_demo_files(dirs):
+    """
+    Accepts a list of directories and gathers all .npz demo files from each.
+    Returns a sorted list of file paths.
+    """
+    all_files = []
+    for d in dirs:
+        path = Path(d)
+        if not path.exists():
+            print(f"[WARN] Directory does not exist: {path}")
+            continue
+        found = sorted(path.glob("*.npz"))
+        print(f"Found {len(found)} demos in {path.resolve()}")
+        all_files.extend(found)
+
+    assert len(all_files) > 0, "No demo files found in any provided directory."
+    return sorted(all_files)
+
+
+
 def main(visualize=False):
     """
     Main function to execute the dataset building pipeline.
@@ -554,9 +576,10 @@ def main(visualize=False):
         visualize (bool): If True, plots the dataset distribution distributions.
     """
     print(f"Starting dataset generation pipeline...")
-    files = sorted(DEMO_DIR.glob("*.npz"))
+    
+    
+    files = gather_demo_files(DEMO_DIRS)
 
-    assert files, f"No demos found in {DEMO_DIR.resolve()}"
 
     rng = np.random.default_rng(RNG_SEED)
     stats = init_stats()
@@ -629,15 +652,11 @@ def main(visualize=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--demo-dir", type=str, default=None)
     parser.add_argument("--out-path", type=str, default=None)
 
     parser.add_argument("--visualize", action="store_true")
 
     args = parser.parse_args()
-
-    if args.demo_dir:
-        DEMO_DIR = Path(args.demo_dir)
 
     if args.out_path:
         OUT_PATH = Path(args.out_path)

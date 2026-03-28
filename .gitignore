@@ -174,3 +174,5 @@ cython_debug/
 
 demos
 imitation/data/processed
+expert_demos
+LoadOpenDrive2

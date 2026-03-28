@@ -34,7 +34,7 @@ with open(PID_PATH, "w") as f:
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete" ,     random_ego_spawn=True,
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete" ,     random_ego_spawn=False,
     random_vehicle_spawn=True ):
         super(CarlaEnv, self).__init__()
         

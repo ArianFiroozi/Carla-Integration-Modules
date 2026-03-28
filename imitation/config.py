@@ -30,13 +30,30 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # =========================================================
 
 DATA_DIR = REPO_ROOT / "imitation" / "data"
-
-DEMO_DIR = DATA_DIR / "demos"
-DEMO_DIR_ALT = DATA_DIR / "demos2"
-
+EXPERT_DIR = DATA_DIR / "expert_demos"
+MANUAL_DIR = DATA_DIR / "demos"
 PROCESSED_DIR = DATA_DIR / "processed"
 
+
+
+
+
+
+AUTOPILOT_RECORD_DIR = EXPERT_DIR / "test"
+MANUAL_RECORD_DIR =  MANUAL_DIR / "town01_0car"
+
+
+
+
 DATASET_PATH = PROCESSED_DIR / "dataset_bc.npz"
+
+# input of build dataset and inspect demo
+DEMO_LIST= [
+    # EXPERT_DIR / "town01_0car",
+    MANUAL_DIR / "lab-map_0car"
+]
+
+
 
 
 # =========================================================
@@ -54,7 +71,7 @@ CONTINUOUS_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_continuous.pt"
 # ACTION SPACE
 # =========================================================
 
-ACTION_MODE = "continuous"   # "discrete" or "continuous"
+ACTION_MODE = "discrete"   # "discrete" or "continuous"
 
 SPEED_MAP = {
     0: "Accelerate",
@@ -71,12 +88,13 @@ TURN_MAP = {
     3: "Straight",
 }
 
-
+IS_GAUSSIAN = True
+SMOOTH_STEERING = True
 # =========================================================
 # ACTION SIMPLIFICATION
 # =========================================================
 
-SIMPLIFY_ACTIONS = True
+SIMPLIFY_ACTIONS = False
 REMOVE_REVERSE = True
 REMOVE_NO_TURN = True
 
@@ -120,7 +138,7 @@ OBS_BOUNDS = {
 # =========================================================
 
 DROP_TERMINATED = True
-DROP_LAST_N_BEFORE_TERMINATION = 10
+DROP_LAST_N_BEFORE_TERMINATION = 30
 
 FILTER_IDLE_FRAMES = True
 IDLE_FILTER_MODE = "all"
@@ -130,7 +148,7 @@ IDLE_THROTTLE_THRESHOLD = 0.05
 IDLE_BRAKE_THRESHOLD = 0.05
 
 # JOINT_KEEP_PROBS = {
-#     (4, 3): 0.2,
+#     (4, 3): 0.3,
 #     (4, 0): 0.5,
 #     (4, 1): 0.8,
 # }
@@ -145,7 +163,7 @@ JOINT_KEEP_PROBS = {
 # IMITATION LEARNING TRAINING
 # =========================================================
 
-BC_EPOCHS = 100
+BC_EPOCHS = 200
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -156,31 +174,29 @@ BC_PATIENCE = 10
 # MANUAL CONTROL / DEMO RECORDING
 # =========================================================
 
-MANUAL_DEMO_DIR = DEMO_DIR_ALT
+
 
 MANUAL_SLEEP_SECONDS = 0.001
-MANUAL_PRINT_EVERY = 1000
-MANUAL_DEBUG_GRIDS = False
+MANUAL_PRINT_EVERY = 200
+MANUAL_DEBUG_GRIDS = True
 
 MANUAL_RECORD = False
-MANUAL_BASE_NAME = "manual_demo13"
+MANUAL_BASE_NAME = "Town03"
 
 
-RECORD_DRIVE_MODE = "autopilot" # "manual" or "autopilot"
+RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
 
-AUTOPILOT_DEMO_DIR = DATA_DIR / "expert_demos"
-DEFAULT_AUTOPILOT_EPISODES = 10000
+DEFAULT_AUTOPILOT_EPISODES = 1000
 
-
+AUTOPILOT_DEMO_BASENAME = "autopilot_town03"
 
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
 # =========================================================
 
-CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\lab-map.xodr"
-
+CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 0
+CARLA_VEHICLES = 20
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -200,12 +216,12 @@ EVAL_RENDER_LOG_EVERY = 200
 # DEBUG / VISUALIZATION
 # =========================================================
 
-DEBUG_PRINT_STEPS = 0
+DEBUG_PRINT_STEPS = 50
 
 INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
-BUILD_VISUALIZE = True
+BUILD_VISUALIZE = False
 FEATURE_HIST_MAX_SAMPLES = 100000
 
 
