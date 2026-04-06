@@ -22,13 +22,18 @@ def spawn_ego_vehicle(world,
         random.shuffle(indices)
 
         for i in indices[:max_retries]:
-            vehicle = world.try_spawn_actor(vehicle_bp, spawn_points[i])
+
+            spawn_point = spawn_points[i]
+
+            vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
 
             if vehicle is not None:
                 break
 
         if vehicle is None:
             raise RuntimeError("Failed to spawn ego vehicle at random spawn points")
+        else:
+            print("Spawned ego vehicle at random spawn point")
 
     # DETERMINISTIC SPAWN
     else:
@@ -51,8 +56,9 @@ def spawn_ego_vehicle(world,
 
         if vehicle is None:
             raise RuntimeError("Failed to spawn ego vehicle at deterministic spawn")
+        else:
+            print("Spawned ego vehicle at deterministic spawn")
 
-    # ---------- INITIAL CONTROL ----------
     control = carla.VehicleControl(
         throttle=float(init_speed),
         steer=0.0,

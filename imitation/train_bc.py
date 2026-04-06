@@ -1,5 +1,6 @@
 import argparse
 import time
+import os
 import numpy as np
 from pathlib import Path
 import torch
@@ -12,7 +13,9 @@ from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
 from .models.imitation_policy import ImitationPolicy
 
 from . import config
-
+from utils.experiment_logger import ExperimentLogger
+from torch.utils.tensorboard import SummaryWriter
+import torch.nn.functional as F
 
 def get_device(device_arg):
     if device_arg == "auto":
@@ -250,6 +253,27 @@ def main():
 
 
     args = parser.parse_args()
+    # NEW ---- initialize experiment logger
+    experiment_name = f"bc_{args.mode}"
+    logger = ExperimentLogger(experiment_name)
+
+    logger.save_config({
+        "mode": args.mode,
+        "epochs": args.epochs,
+        "batch_size": args.batch,
+        "lr": args.lr,
+        "val_split": args.val_split,
+        "patience": args.patience,
+        "device": args.device,
+        "is_gaussian": args.is_gaussian
+    })
+
+    tb_writer = SummaryWriter(log_dir=f"{logger.logs_dir}/tb")
+
+
+    # NEW ----
+
+
 
     device = get_device(args.device)
 
@@ -432,6 +456,20 @@ def main():
 
             val_loss = val_metrics["loss"]
 
+            # JSON logger
+            logger.log_training(epoch, {
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "f1_speed": val_metrics["f1_speed"],
+                "f1_turn": val_metrics["f1_turn"]
+            })
+
+            # TensorBoard logs
+            tb_writer.add_scalar("loss/train", train_loss, epoch)
+            tb_writer.add_scalar("loss/val", val_loss, epoch)
+            tb_writer.add_scalar("metrics/f1_speed", val_metrics["f1_speed"], epoch)
+            tb_writer.add_scalar("metrics/f1_turn", val_metrics["f1_turn"], epoch)
+
             print(
                 f"Epoch {epoch:03d} | "
                 f"train={train_loss:.4f} | "
@@ -440,9 +478,8 @@ def main():
                 f"turn_f1={val_metrics['f1_turn']:.3f} | "
                 f"time={time.time()-t0:.1f}s"
             )
+
         else:
-            # Because criterion is a custom function that unpacks (mean, std), 
-            # train_epoch_continuous works out of the box without needing changes.
             train_loss = train_epoch_continuous(
                 model, train_loader, opt, criterion, device
             )
@@ -451,9 +488,25 @@ def main():
                 model, val_loader, device, is_gaussian=args.is_gaussian
             )
 
-            val_loss = val_metrics["loss"] # Pulls nll or mse depending on mode
+            val_loss = val_metrics["loss"]
+
+            # JSON logger
+            logger.log_training(epoch, {
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "mse": val_metrics["mse"],
+                "mae": val_metrics["mae"]
+            })
+
+            # TensorBoard logs
+            tb_writer.add_scalar("loss/train", train_loss, epoch)
+            tb_writer.add_scalar("loss/val", val_loss, epoch)
+            tb_writer.add_scalar("metrics/mse", val_metrics["mse"], epoch)
+            tb_writer.add_scalar("metrics/mae", val_metrics["mae"], epoch)
 
             if args.is_gaussian:
+                tb_writer.add_scalar("metrics/nll", val_metrics["nll"], epoch)
+
                 print(
                     f"Epoch {epoch:03d} | "
                     f"train_nll={train_loss:.5f} | "
@@ -471,26 +524,53 @@ def main():
                     f"time={time.time()-t0:.1f}s"
                 )
 
-        # Early Stopping / Checkpointing
+
+
+        # # save every epoch
+        # checkpoint_path = os.path.join(
+        #     logger.model_dir,
+        #     f"checkpoint_epoch_{epoch}.pt"
+        # )
+
+        # torch.save({
+        #     "epoch": epoch,
+        #     "model_state_dict": model.state_dict(),
+        #     "optimizer_state_dict": opt.state_dict(),
+        #     "val_loss": val_loss,
+        #     "mode": args.mode,
+        #     "is_gaussian": args.mode == "continuous" and args.is_gaussian,
+        #     "scalar_dim": scalar_dim,
+        #     "grid_channels": grid_channels
+        # }, checkpoint_path)
+
+        # -------- Best model + Early stopping --------
         if val_loss < best_val:
             best_val = val_loss
             patience_counter = 0
 
-            save_path = config.CONTINUOUS_MODEL_PATH if args.mode == "continuous" else config.DISCRETE_MODEL_PATH
-
-            ckpt = {
-                "model_state": model.state_dict(),
+            best_model_path = os.path.join(
+                logger.model_dir,
+                "best_model.pt"
+            )
+            
+            ckpt= {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": opt.state_dict(),
+                "val_loss": val_loss,
                 "mode": args.mode,
-                "is_gaussian": args.mode == "continuous" and args.is_gaussian, # Save Gaussian state!
+                "is_gaussian": args.mode == "continuous" and args.is_gaussian,
                 "scalar_dim": scalar_dim,
-                "grid_channels": grid_channels,
-            }
-
+                "grid_channels": grid_channels
+                }
+            
             if args.mode == "discrete":
                 ckpt["n_speed"] = n_speed
-                ckpt["n_turn"] = n_turn
+                ckpt["n_turn"] = n_turn    
+                
+                        
+            torch.save(ckpt, best_model_path)
 
-            torch.save(ckpt, save_path)
             print("[saved best model]")
 
         else:
@@ -498,6 +578,10 @@ def main():
             if patience_counter >= args.patience:
                 print("\nEarly stopping triggered.")
                 break
+
+
+    tb_writer.close()
+
 
 
 

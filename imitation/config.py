@@ -39,8 +39,8 @@ PROCESSED_DIR = DATA_DIR / "processed"
 
 
 
-AUTOPILOT_RECORD_DIR = EXPERT_DIR / "test"
-MANUAL_RECORD_DIR =  MANUAL_DIR / "town01_0car"
+AUTOPILOT_RECORD_DIR = EXPERT_DIR / "map1_0car"
+MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_20car"
 
 
 
@@ -50,7 +50,9 @@ DATASET_PATH = PROCESSED_DIR / "dataset_bc.npz"
 # input of build dataset and inspect demo
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
-    MANUAL_DIR / "lab-map_0car"
+    # MANUAL_DIR / "lab-map_0car",
+    # MANUAL_DIR / "test"
+    MANUAL_DIR / "map1_0car"
 ]
 
 
@@ -59,14 +61,11 @@ DEMO_LIST= [
 # =========================================================
 # CHECKPOINT PATHS
 # =========================================================
+# CHECKPOINT_DIR = REPO_ROOT / "checkpoints"
+# IMITATION_CHECKPOINT_DIR = CHECKPOINT_DIR / "imitation"
 
-CHECKPOINT_DIR = REPO_ROOT / "checkpoints"
-IMITATION_CHECKPOINT_DIR = CHECKPOINT_DIR / "imitation"
-
-DISCRETE_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_discrete.pt"
-CONTINUOUS_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_continuous.pt"
-
-
+# DISCRETE_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_discrete.pt"
+# CONTINUOUS_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_continuous.pt"
 # =========================================================
 # ACTION SPACE
 # =========================================================
@@ -138,7 +137,7 @@ OBS_BOUNDS = {
 # =========================================================
 
 DROP_TERMINATED = True
-DROP_LAST_N_BEFORE_TERMINATION = 30
+DROP_LAST_N_BEFORE_TERMINATION = 100
 
 FILTER_IDLE_FRAMES = True
 IDLE_FILTER_MODE = "all"
@@ -147,17 +146,17 @@ IDLE_SPEED_THRESHOLD = 0.3
 IDLE_THROTTLE_THRESHOLD = 0.05
 IDLE_BRAKE_THRESHOLD = 0.05
 
-# JOINT_KEEP_PROBS = {
-#     (4, 3): 0.3,
-#     (4, 0): 0.5,
-#     (4, 1): 0.8,
-# }
-
 JOINT_KEEP_PROBS = {
-    (4, 3): 1,
-    (4, 0): 1,
-    (4, 1): 1,
+    (4, 3): 0.3,
+    (4, 0): 0.5,
+    (4, 1): 0.8,
 }
+
+# JOINT_KEEP_PROBS = {
+#     (4, 3): 1,
+#     (4, 0): 1,
+#     (4, 1): 1,
+# }
 
 # =========================================================
 # IMITATION LEARNING TRAINING
@@ -177,18 +176,18 @@ BC_PATIENCE = 10
 
 
 MANUAL_SLEEP_SECONDS = 0.001
-MANUAL_PRINT_EVERY = 200
+MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = True
 
-MANUAL_RECORD = False
-MANUAL_BASE_NAME = "Town03"
+MANUAL_RECORD = True
+MANUAL_BASE_NAME = "map1"
 
 
 RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
 
 DEFAULT_AUTOPILOT_EPISODES = 1000
 
-AUTOPILOT_DEMO_BASENAME = "autopilot_town03"
+AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
@@ -216,7 +215,7 @@ EVAL_RENDER_LOG_EVERY = 200
 # DEBUG / VISUALIZATION
 # =========================================================
 
-DEBUG_PRINT_STEPS = 50
+DEBUG_PRINT_STEPS = 0
 
 INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000

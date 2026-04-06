@@ -2,44 +2,31 @@ import time
 from collections import Counter
 from pathlib import Path
 import argparse
-
+import json
 import numpy as np
 import torch
-
 from CarlaEnv.env import CarlaEnv
 from .models.imitation_policy import ImitationPolicy
-
 from . import config
+import datetime
+from torch.utils.tensorboard import SummaryWriter 
+
 
 
 ACTION_MODE = config.ACTION_MODE
-SIMPLIFIED_ACTION_SPACE = config.SIMPLIFY_ACTIONS
 DEVICE = config.DEVICE
-
-CONTINUOUS_MODEL = config.CONTINUOUS_MODEL_PATH
-DISCRETE_MODEL = config.DISCRETE_MODEL_PATH
-
+SIMPLIFIED_ACTION_SPACE = config.SIMPLIFY_ACTIONS
 DEBUG_PRINT_STEPS = config.DEBUG_PRINT_STEPS
-
-
-
-debug_counter = 0
 
 
 if SIMPLIFIED_ACTION_SPACE:
     speed_map = config.SIMPLIFY_SPEED_MAP
-
     turn_map = config.SIMPLIFY_TURN_MAP
 else:
     speed_map = config.SPEED_MAP
-
     turn_map = config.TURN_MAP
-    
-    
 def extract_grid_and_scalars(obs):
-
     presence = obs["presence"]
-
     if torch.is_tensor(presence):
         presence = presence.cpu().numpy()
 
@@ -48,17 +35,12 @@ def extract_grid_and_scalars(obs):
     lane_pos = obs["ego_in_lane_position_x"][0] / 2.0
     speed_x = np.clip(obs["ego_speed_x"][0], -1, 15) / 15.0
     speed_y = np.clip(obs["ego_speed_y"][0], -2, 2) / 2.0
-    
+
     grid = presence[None, :, :]
-    
-    scalars = np.array([
-        lane_angle,
-        lane_pos,
-        speed_x,
-        speed_y,
-    ], dtype=np.float32)
+    scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
 
     return grid, scalars
+
 
 def map_action_for_env(action):
     """
@@ -79,14 +61,14 @@ def map_action_for_env(action):
 
 
 prev_steer = 0.0
-
 def process_continuous_output(out):
     """
     model output → [throttle, brake, steer]
     out: np.array of shape (3,)
     """
     global prev_steer
-    throttle = max(float(np.clip(out[0], 0.0, 1.0)),0.13)
+
+    throttle = max(float(np.clip(out[0], 0.0, 1.0)), 0.13)
     brake = float(np.clip(out[1], 0.0, 1.0))
     steer = float(np.clip(out[2], -1.0, 1.0))
 
@@ -94,16 +76,17 @@ def process_continuous_output(out):
     if brake > 0.05:
         throttle = 0.0
     else:
-        brake= 0.0
-    
-    if config.SMOOTH_STEERING:  
+        brake = 0.0
+
+    if config.SMOOTH_STEERING:
         steer = 0.7 * prev_steer + 0.3 * steer
         prev_steer = steer
         steer = np.clip(steer, -1.0, 1.0)
 
-
     return [throttle, brake, steer]
 
+
+debug_counter = 0
 
 def predict_action(policy, obs):
     """
@@ -113,21 +96,17 @@ def predict_action(policy, obs):
         env_action: list usable by env.step(...)
         action_log: (speed, turn) for discrete, or None for continuous
     """
-    
     global debug_counter
 
     grid, scalars = extract_grid_and_scalars(obs)
-
     grid = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).to(DEVICE)
     scalars = torch.tensor(scalars, dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
         if ACTION_MODE == "discrete":
             logits_speed, logits_turn = policy(grid, scalars)
-
             speed = torch.argmax(logits_speed, dim=1).item()
             turn = torch.argmax(logits_turn, dim=1).item()
-
             env_action = map_action_for_env((speed, turn))
             if debug_counter < DEBUG_PRINT_STEPS:
                 print(
@@ -136,13 +115,11 @@ def predict_action(policy, obs):
                     f"vx={obs['ego_speed_x'][0]:.3f}, "
                     f"vy={obs['ego_speed_y'][0]:.3f}"
                 )
-                
-            debug_counter+=1
+            debug_counter += 1
             return env_action, (speed, turn)
 
         else:
             pred = policy(grid, scalars)
-
             if isinstance(pred, tuple):
                 mean, std = pred
                 action = mean.cpu().numpy()[0]
@@ -179,14 +156,10 @@ def predict_action(policy, obs):
             return env_action, None
 
 
-
 def run_episode(env, policy, max_steps=2000, render_log_every=200):
     obs, _ = env.reset()
-
-
-    action_counts = Counter()
     rewards = []
-
+    action_counts = Counter()
     terminated_flag = False
     truncated_flag = False
 
@@ -194,14 +167,12 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200):
 
     for t in range(max_steps):
         env_action, action_log = predict_action(policy, obs)
-
         obs, reward, terminated, truncated, info = env.step(env_action)
 
         if action_log is not None:
             action_counts[action_log] += 1
 
         rewards.append(float(reward))
-
         if (t + 1) % render_log_every == 0:
             elapsed = time.time() - t0
             fps = (t + 1) / elapsed if elapsed > 0 else 0.0
@@ -209,44 +180,69 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200):
                 f"[t={t+1}] mean_reward(last {render_log_every})="
                 f"{np.mean(rewards[-render_log_every:]):.2f} fps={fps:.1f}"
             )
-
         if terminated or truncated:
             terminated_flag = terminated
             truncated_flag = truncated
             break
 
     ep_len = len(rewards)
-    ep_return = float(np.sum(rewards)) if rewards else 0.0
-    ep_mean_reward = float(np.mean(rewards)) if rewards else 0.0
-
-    if terminated_flag:
-        end_reason = "terminated"
-    elif truncated_flag:
-        end_reason = "truncated"
-    else:
-        end_reason = "max_steps"
-
     return {
-        "return": ep_return,
-        "mean_reward": ep_mean_reward,
+        "return": float(np.sum(rewards)),
+        "mean_reward": float(np.mean(rewards)),
         "length": ep_len,
-        "end_reason": end_reason,
+        "end_reason": "terminated" if terminated_flag else ("truncated" if truncated_flag else "max_steps"),
         "action_counts": action_counts,
     }
 
 
 
 
-def load_policy():
-    """
-    Load an ImitationPolicy from a checkpoint file produced by train_bc.py.
-    """
-    ckpt_path = DISCRETE_MODEL if ACTION_MODE == "discrete" else CONTINUOUS_MODEL
+def get_latest_experiment(root):
+    folders = [f for f in Path(root).iterdir() if f.is_dir()]
+    if not folders:
+        raise FileNotFoundError("No experiment folders found.")
+    return sorted(folders)[-1]
 
-    if not ckpt_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
-    ckpt = torch.load(ckpt_path, map_location=DEVICE)
+def get_best_or_last_checkpoint(model_dir):
+    best = model_dir / "best_model.pt"
+    if best.exists():
+        return best
+
+    ckpts = list(model_dir.glob("checkpoint_epoch_*.pt"))
+    if not ckpts:
+        raise FileNotFoundError(f"No checkpoints in {model_dir}")
+
+    ckpts_sorted = sorted(ckpts, key=lambda p: int(p.stem.split("_")[-1]))
+    return ckpts_sorted[-1]
+
+
+def resolve_paths(args):
+    # direct model override
+    if args.model_path:
+        model_path = Path(args.model_path)
+        exp_dir = model_path.parents[1]
+        config_path = exp_dir / "config.json"
+        eval_dir = exp_dir / "eval"
+        eval_dir.mkdir(exist_ok=True)
+        return model_path, config_path, eval_dir
+
+    root = Path(args.experiments_root)
+
+    exp_dir = root / args.exp_id if args.exp_id else get_latest_experiment(root)
+    model_path = get_best_or_last_checkpoint(exp_dir / "models")
+    config_path = exp_dir / "config.json"
+    eval_dir = exp_dir / "eval"
+    eval_dir.mkdir(exist_ok=True)
+
+    return model_path, config_path, eval_dir
+
+
+def load_policy_from_checkpoint(model_path, config_path):
+    ckpt = torch.load(model_path, map_location=DEVICE)
+
+    with open(config_path, "r") as f:
+        cfg = json.load(f)
 
     mode = ckpt["mode"]
     scalar_dim = ckpt["scalar_dim"]
@@ -255,6 +251,7 @@ def load_policy():
     if mode == "discrete":
         n_speed = ckpt["n_speed"]
         n_turn = ckpt["n_turn"]
+        
         policy = ImitationPolicy(
             mode="discrete",
             grid_channels=grid_channels,
@@ -263,16 +260,14 @@ def load_policy():
             n_turn=n_turn,
         ).to(DEVICE)
     else:
-        is_gaussian = config.IS_GAUSSIAN
-
         policy = ImitationPolicy(
             mode="continuous",
-            is_gaussian=is_gaussian,
+            is_gaussian=ckpt.get("is_gaussian", False),
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
         ).to(DEVICE)
 
-    policy.load_state_dict(ckpt["model_state"])
+    policy.load_state_dict(ckpt["model_state_dict"])
     policy.eval()
 
     print("\nLoaded model:")
@@ -282,47 +277,57 @@ def load_policy():
     if mode == "discrete":
         print("  n_speed:", n_speed)
         print("  n_turn:", n_turn)
-
-    return policy
-
+    return policy, cfg
 
 
 
 def main():
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--map", type=str, default=config.CARLA_MAP_PATH)
     parser.add_argument("--episodes", type=int, default=config.EVAL_NUM_EPISODES)
     parser.add_argument("--max-steps", type=int, default=config.EVAL_MAX_STEPS)
-
-    parser.add_argument("--mode", choices=["discrete","continuous"], default=config.ACTION_MODE)
+    parser.add_argument("--mode", choices=["discrete", "continuous"], default=config.ACTION_MODE)
     parser.add_argument("--device", default=config.DEVICE)
 
-    
+    parser.add_argument("--exp_id", type=str, default=None)
+    parser.add_argument("--model_path", type=str, default=None)
+    parser.add_argument("--experiments_root", type=str, default="experiments")
+
     args = parser.parse_args()
-    
-    global ACTION_MODE
-    global DEVICE
+
+    global ACTION_MODE, DEVICE
     ACTION_MODE = args.mode
     DEVICE = args.device
 
-    map_path = args.map
-    num_episodes = args.episodes
-    max_steps = args.max_steps
+    # Load model + config.json
+    model_path, config_path, eval_dir = resolve_paths(args)
+    print("Using model:", model_path)
+    print("Using config:", config_path)
+
+    policy, cfg = load_policy_from_checkpoint(model_path, config_path)
+
+    # create timestamped eval run folder
+    run_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    current_eval_dir = eval_dir / run_stamp
+    current_eval_dir.mkdir(exist_ok=True)
+    print("Saving eval logs to:", current_eval_dir)
+    
+    # TensorBoard writer for this eval run
+    tb_dir = current_eval_dir / "tb"
+    tb_dir.mkdir(exist_ok=True)
+    tb_writer = SummaryWriter(str(tb_dir))
+   
+
 
     env = CarlaEnv(
-        map_path=map_path,
+        map_path=args.map,
         walkers_count=config.CARLA_WALKERS,
         vehicles_count=config.CARLA_VEHICLES,
-        max_steps=max_steps,
+        max_steps=args.max_steps,
         init_speed=config.CARLA_INIT_SPEED,
         action_mode=ACTION_MODE,
     )
-
-
-    policy = load_policy()
-
     print("Action mode:", ACTION_MODE)
     print("Device:", DEVICE)
 
@@ -332,12 +337,22 @@ def main():
     global_action_counts = Counter()
 
     overall_t0 = time.time()
-
+    num_episodes= args.episodes
     try:
         for ep in range(num_episodes):
             print(f"\n=== Episode {ep+1}/{num_episodes} ===")
 
-            result = run_episode(env, policy, max_steps=max_steps)
+            result = run_episode(env, policy, max_steps=args.max_steps)
+
+            # save episode log
+            episode_path = current_eval_dir / f"episode_{ep+1:03d}.json"
+            with open(episode_path, "w") as f:
+                json.dump({
+                    "return": result["return"],
+                    "mean_reward": result["mean_reward"],
+                    "length": result["length"],
+                    "end_reason": result["end_reason"],
+                    "action_counts": { f"{k[0]}_{k[1]}": v for k, v in result["action_counts"].items() } }, f, indent=2)
 
             all_returns.append(result["return"])
             all_lengths.append(result["length"])
@@ -352,6 +367,10 @@ def main():
                 f"length={result['length']}, "
                 f"end={result['end_reason']}"
             )
+            # TensorBoard episode metrics
+            tb_writer.add_scalar("eval/episode_return", result["return"], ep + 1)
+            tb_writer.add_scalar("eval/episode_length", result["length"], ep + 1)
+
 
         total_time = time.time() - overall_t0
 
@@ -369,11 +388,42 @@ def main():
                 turn_name = turn_map.get(turn, f"turn_{turn}")
                 print(f"{speed_name} | {turn_name} : {v}")
 
+
+        summary = {
+            "episodes": num_episodes,
+            "avg_return": float(np.mean(all_returns)),
+            "std_return": float(np.std(all_returns)),
+            "avg_length": float(np.mean(all_lengths)),
+            "std_length": float(np.std(all_lengths)),
+            "end_reasons": dict(end_reasons),
+            "wall_time_sec": total_time,
+            "action_mode": ACTION_MODE,
+        }
+
+        if ACTION_MODE == "discrete":
+            summary["global_action_counts"] = {
+                str(k): v for k, v in global_action_counts.items()
+            }
+
+        summary_path = current_eval_dir / "eval_summary.json"
+        with open(summary_path, "w") as f:
+            json.dump(summary, f, indent=2)
+
+        # TensorBoard summary metrics
+        tb_writer.add_scalar("eval/avg_return", np.mean(all_returns), 0)
+        tb_writer.add_scalar("eval/avg_length", np.mean(all_lengths), 0)
+        tb_writer.flush()
+        tb_writer.close()
+        
+
+        print("Saved summary to:", summary_path)
+    
     finally:
         try:
             env.close()
         except Exception:
             pass
+
 
 
 if __name__ == "__main__":
