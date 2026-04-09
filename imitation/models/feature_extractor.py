@@ -47,11 +47,13 @@ class FeatureExtractor(nn.Module):
 
         # Fusion network
         self.fuse = nn.Sequential(
-            nn.Linear(cnn_dim + 64, 256),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, latent_dim),
-            nn.ReLU(inplace=True),
-        )
+        nn.Linear(cnn_dim + 64, 256),
+        nn.ReLU(inplace=True),
+        nn.Dropout(0.2),
+        nn.Linear(256, latent_dim),
+        nn.ReLU(inplace=True),
+    )
+
 
     def forward(self, grid, scalars):
 

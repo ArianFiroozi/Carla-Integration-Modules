@@ -11,7 +11,7 @@ class ImitationPolicy(nn.Module):
         self,
         mode="discrete",
         is_gaussian=False,
-        grid_channels=1,
+        grid_channels=9,
         scalar_dim=4,
         n_speed=None,
         n_turn=None,

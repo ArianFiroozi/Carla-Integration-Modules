@@ -6,6 +6,8 @@ import argparse
 from . import config
 from .utils.viz import *
 from .utils.stats import *
+import json
+import time
 
 ROOT = Path(__file__).resolve().parents[0]
 
@@ -39,6 +41,10 @@ SIMPLIFY_ACTIONS = config.SIMPLIFY_ACTIONS
 REMOVE_REVERSE = config.REMOVE_REVERSE
 REMOVE_NO_TURN = config.REMOVE_NO_TURN
  
+# Mirror augmentation
+MIRROR_DATASET = config.MIRROR_DATASET
+MIRROR_STEERING_THRESHOLD = config.MIRROR_STEERING_THRESHOLD
+
 
 
 
@@ -55,6 +61,70 @@ def init_stats():
         "sampling_dropped": 0,  # used only in discrete
         "kept": 0,
     }
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+def to_plain(obj):
+    """Recursively convert numpy/scalar types to json-friendly Python types."""
+    if isinstance(obj, dict):
+        return {k: to_plain(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_plain(x) for x in obj]
+    if isinstance(obj, (np.generic,)):
+        return obj.item()
+    if hasattr(obj, "__int__") and not isinstance(obj, bool):
+        return int(obj)
+    return obj
+
+def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode):
+    """
+    Save dataset metadata (.meta.json) next to the .npz file.
+
+    Args:
+        stats: dict of dataset statistics
+        obs_keys: observation keys list
+        obs_shapes: dict of their shapes
+        total_kept: number of kept frames
+        files: list of demo file paths
+        mode: 'continuous' or 'discrete'
+    """
+
+    clean_stats = to_plain(stats)
+
+    pipeline_config = {
+        "mode": mode,
+        "downsample": getattr(config, "DOWN_SAMPLE", None),
+        "simplify_actions": getattr(config, "SIMPLIFY_ACTIONS", None),
+        "remove_reverse": getattr(config, "REMOVE_REVERSE", None),
+        "remove_no_turn": getattr(config, "REMOVE_NO_TURN", None),
+        "idle_speed_threshold": getattr(config, "IDLE_SPEED_THRESHOLD", None),
+        "idle_throttle_threshold": getattr(config, "IDLE_THROTTLE_THRESHOLD", None),
+        "idle_trim_enabled": config.FILTER_IDLE_FRAMES,
+        "mirror_enabled": getattr(config, "MIRROR_DATASET", False),
+        "mirror_steering_threshold": getattr(config, "MIRROR_STEERING_THRESHOLD", None),
+    }
+
+    meta = {
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "dataset_path": str(OUT_PATH.resolve().relative_to(PROJECT_ROOT)),
+        "source_files": [str(Path(f).resolve().relative_to(PROJECT_ROOT)) for f in files],
+        "total_samples": int(total_kept),
+        "observation_keys": list(obs_keys),
+        "observation_shapes": {k: list(v) for k, v in obs_shapes.items()},
+        "stats": clean_stats,
+        "pipeline_config": pipeline_config,
+    }
+
+    meta_path = OUT_PATH.with_suffix(".meta.json")
+
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print(f"[META] saved → {meta_path}")
+
+
+
+
 
 
 def get_idle_trim_mask(d):
@@ -137,6 +207,79 @@ def remap_presence_grid(out_obs, mapping=None, verify=True):
 
     return out_obs
 
+
+
+def apply_mirror_augmentation_continuous(out_obs, threshold=MIRROR_STEERING_THRESHOLD):
+    """
+    Duplicates samples by mirroring lane-relative obs + steering.
+    Assumes steering signal is in obs_steering_angle (pre-rename).
+    Returns a NEW out_obs dict with 2x samples (or close, depending on threshold).
+    """
+    if "obs_steering_angle" not in out_obs:
+        print("[MIRROR] obs_steering_angle not found -> skipping mirror augmentation.")
+        return out_obs
+
+    steer = out_obs["obs_steering_angle"].reshape(len(out_obs["obs_steering_angle"]), -1)
+    steer_abs = np.abs(steer[:, 0])
+    mirror_mask = steer_abs > threshold
+
+    n = len(steer_abs)
+    m = int(mirror_mask.sum())
+    if m == 0:
+        print(f"[MIRROR] No samples above threshold={threshold} -> skipping.")
+        return out_obs
+
+    out = {k: v.copy() for k, v in out_obs.items()}
+
+    # Concatenate mirrored subset
+    for k, v in out_obs.items():
+        v_m = v[mirror_mask].copy()
+
+        # Flip lane-relative signals (only if present)
+        if k in ("obs_steering_angle", "obs_lane_angle", "obs_ego_in_lane_position_x"):
+            v_m = -v_m
+
+        out[k] = np.concatenate([v, v_m], axis=0)
+
+    print(f"[MIRROR] Continuous: added {m} mirrored samples (from {n}) with threshold={threshold}.")
+    return out
+
+
+def apply_mirror_augmentation_discrete(out_obs, out_actions):
+    """
+    Duplicates samples by mirroring left/right turn in discrete actions.
+    Expects out_actions[:,1] is the TURN index and TURN_MAP in config defines indices.
+    """
+    # We need to know indices for left/right. Use TURN_MAP if available.
+    # Fallback: assume 0=left, 1=right, 2=no_turn, 3=... (won't be touched)
+    left_idx = TURN_MAP.get("left", 0) if isinstance(TURN_MAP, dict) else 0
+    right_idx = TURN_MAP.get("right", 1) if isinstance(TURN_MAP, dict) else 1
+
+    turn = out_actions[:, 1]
+    mirror_mask = (turn == left_idx) | (turn == right_idx)
+
+    m = int(mirror_mask.sum())
+    if m == 0:
+        print("[MIRROR] Discrete: no left/right samples -> skipping.")
+        return out_obs, out_actions
+
+    obs_m = {k: v[mirror_mask].copy() for k, v in out_obs.items()}
+    act_m = out_actions[mirror_mask].copy()
+
+    # swap left <-> right
+    act_m[act_m[:, 1] == left_idx, 1] = right_idx
+    act_m[act_m[:, 1] == right_idx, 1] = left_idx
+
+    # Mirror lane-relative obs if present
+    for k in obs_m:
+        if k in ("obs_lane_angle", "obs_ego_in_lane_position_x"):
+            obs_m[k] = -obs_m[k]
+
+    out_obs2 = {k: np.concatenate([out_obs[k], obs_m[k]], axis=0) for k in out_obs}
+    out_actions2 = np.concatenate([out_actions, act_m], axis=0)
+
+    print(f"[MIRROR] Discrete: added {m} mirrored samples.")
+    return out_obs2, out_actions2
 
 
 
@@ -241,31 +384,72 @@ def discrete_pass_1_compute_masks(files, stats, rng):
 
 
 def discrete_pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
-    """PASS 2 for discrete: build obs + discrete actions arrays."""
-    out_obs = {k: np.empty((total_kept, *obs_shapes[k]), dtype=np.float32) for k in obs_keys}
+    """PASS 2 for discrete with temporal stack (t, t-1, t-2)."""
+
+    grid_keys = ["obs_presence", "obs_speed_x", "obs_speed_y"]
+    scalar_keys = [k for k in obs_keys if k not in grid_keys]
+
+    H, W = obs_shapes["obs_presence"]
+
+    out_obs = {}
+
+    # temporal grids
+    for k in grid_keys:
+        out_obs[k] = np.empty((total_kept, 3, H, W), dtype=np.float32)
+
+    # scalars
+    for k in scalar_keys:
+        out_obs[k] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32)
+
     out_actions = np.empty((total_kept, 2), dtype=np.int64)
 
     idx = 0
+
     for f, keep in zip(files, keep_masks):
-        n = int(keep.sum())
-        if n == 0:
-            continue
 
         d = np.load(f, allow_pickle=True)
-        out_actions[idx:idx+n] = d["actions"][keep].astype(np.int64)
 
-        for k in obs_keys:
-            arr = d[k][keep]
-            if arr.dtype != np.float32:
-                arr = arr.astype(np.float32)
-            if arr.ndim == 1:
-                arr = arr[:, None]
-            out_obs[k][idx:idx+n] = arr
+        presence = d["obs_presence"]
+        speed_x = d["obs_speed_x"]
+        speed_y = d["obs_speed_y"]
+        actions = d["actions"]
 
-        idx += n
-        
-    assert idx == total_kept, f"Mismatch in expected records: {idx} vs {total_kept}"
+        valid_idx = np.where(keep)[0]
+
+        for i in valid_idx:
+
+            if i < 2:
+                continue
+
+            out_obs["obs_presence"][idx, 0] = presence[i]
+            out_obs["obs_presence"][idx, 1] = presence[i-1]
+            out_obs["obs_presence"][idx, 2] = presence[i-2]
+
+            out_obs["obs_speed_x"][idx, 0] = speed_x[i]
+            out_obs["obs_speed_x"][idx, 1] = speed_x[i-1]
+            out_obs["obs_speed_x"][idx, 2] = speed_x[i-2]
+
+            out_obs["obs_speed_y"][idx, 0] = speed_y[i]
+            out_obs["obs_speed_y"][idx, 1] = speed_y[i-1]
+            out_obs["obs_speed_y"][idx, 2] = speed_y[i-2]
+
+            for k in scalar_keys:
+                arr = d[k][i]
+                if arr.dtype != np.float32:
+                    arr = arr.astype(np.float32)
+                if arr.ndim == 0:
+                    arr = np.array([arr], dtype=np.float32)
+                out_obs[k][idx] = arr
+
+            out_actions[idx] = actions[i].astype(np.int64)
+
+            idx += 1
+
+    out_obs = {k: v[:idx] for k, v in out_obs.items()}
+    out_actions = out_actions[:idx]
+
     return out_obs, out_actions
+
 
 
 
@@ -365,6 +549,10 @@ def discrete_pipeline(files, visualize=False):
     print_minmax_summary(out_obs)
     out_obs = remap_presence_grid(out_obs)
 
+    if MIRROR_DATASET:
+        out_obs, out_actions = apply_mirror_augmentation_discrete(out_obs, out_actions)
+
+
     print_trim_statistics(stats)
     print_distribution_summary(out_actions, files)
 
@@ -380,6 +568,8 @@ def discrete_pipeline(files, visualize=False):
             remove_no_turn=REMOVE_NO_TURN
         )
 
+    
+
 
     rename_keys = [
         "obs_throttle",
@@ -393,6 +583,7 @@ def discrete_pipeline(files, visualize=False):
 
     save_dict = {**out_obs, "actions": out_actions}
     np.savez_compressed(OUT_PATH, **save_dict)
+    save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode=config.ACTION_MODE)
     print(f"[DISCRETE] ✅ Successfully saved to: {OUT_PATH.resolve()}")
 
 
@@ -459,37 +650,69 @@ def continuous_pass_1_compute_masks(files, stats):
 
 
 def continuous_pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
-    """
-    PASS 2 for continuous:
-    - Build obs arrays
-    - DO NOT build a meaningful actions array (keep placeholders or zeros if you want)
-    """
-    out_obs = {k: np.empty((total_kept, *obs_shapes[k]), dtype=np.float32) for k in obs_keys}
-    # keep actions as placeholder, same shape, but you won't use them
+
+    grid_keys = ["obs_presence", "obs_speed_x", "obs_speed_y"]
+    scalar_keys = [k for k in obs_keys if k not in grid_keys]
+
+    H, W = obs_shapes["obs_presence"]
+
+    out_obs = {}
+
+    for k in grid_keys:
+        out_obs[k] = np.empty((total_kept, 3, H, W), dtype=np.float32)
+
+    for k in scalar_keys:
+        out_obs[k] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32)
+
     out_actions = np.empty((total_kept, 2), dtype=np.int64)
 
     idx = 0
+
     for f, keep in zip(files, keep_masks):
-        n = int(keep.sum())
-        if n == 0:
-            continue
 
         d = np.load(f, allow_pickle=True)
-        # Just copy placeholder actions so structure matches discrete
-        out_actions[idx:idx+n] = d["actions"][keep].astype(np.int64)
 
-        for k in obs_keys:
-            arr = d[k][keep]
-            if arr.dtype != np.float32:
-                arr = arr.astype(np.float32)
-            if arr.ndim == 1:
-                arr = arr[:, None]
-            out_obs[k][idx:idx+n] = arr
+        presence = d["obs_presence"]
+        speed_x = d["obs_speed_x"]
+        speed_y = d["obs_speed_y"]
+        actions = d["actions"]
 
-        idx += n
+        valid_idx = np.where(keep)[0]
 
-    assert idx == total_kept, f"Mismatch in expected records: {idx} vs {total_kept}"
+        for i in valid_idx:
+
+            if i < 2:
+                continue
+
+            out_obs["obs_presence"][idx, 0] = presence[i]
+            out_obs["obs_presence"][idx, 1] = presence[i-1]
+            out_obs["obs_presence"][idx, 2] = presence[i-2]
+
+            out_obs["obs_speed_x"][idx, 0] = speed_x[i]
+            out_obs["obs_speed_x"][idx, 1] = speed_x[i-1]
+            out_obs["obs_speed_x"][idx, 2] = speed_x[i-2]
+
+            out_obs["obs_speed_y"][idx, 0] = speed_y[i]
+            out_obs["obs_speed_y"][idx, 1] = speed_y[i-1]
+            out_obs["obs_speed_y"][idx, 2] = speed_y[i-2]
+
+            for k in scalar_keys:
+                arr = d[k][i]
+                if arr.dtype != np.float32:
+                    arr = arr.astype(np.float32)
+                if arr.ndim == 0:
+                    arr = np.array([arr], dtype=np.float32)
+                out_obs[k][idx] = arr
+
+            out_actions[idx] = actions[i].astype(np.int64)
+
+            idx += 1
+
+    out_obs = {k: v[:idx] for k, v in out_obs.items()}
+    out_actions = out_actions[:idx]
+
     return out_obs, out_actions
+
 
 
 
@@ -526,6 +749,10 @@ def continuous_pipeline(files, visualize=False):
 
     # Remap presence grid (still useful)
     out_obs = remap_presence_grid(out_obs)
+    
+    if MIRROR_DATASET:
+        out_obs = apply_mirror_augmentation_continuous(out_obs, threshold=MIRROR_STEERING_THRESHOLD)
+
 
     print_trim_statistics(stats)
     print_obs_continuous_stats(out_obs)
@@ -548,6 +775,7 @@ def continuous_pipeline(files, visualize=False):
 
     save_dict = {**out_obs, "actions": out_actions}  # actions just placeholder
     np.savez_compressed(OUT_PATH, **save_dict)
+    save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode="continuous")
     print(f"[CONTINUOUS] ✅ Successfully saved to: {OUT_PATH.resolve()}")
 
 

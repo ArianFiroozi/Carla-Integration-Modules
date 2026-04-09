@@ -70,7 +70,7 @@ DEMO_LIST= [
 # ACTION SPACE
 # =========================================================
 
-ACTION_MODE = "discrete"   # "discrete" or "continuous"
+ACTION_MODE = "continuous"   # "discrete" or "continuous"
 
 SPEED_MAP = {
     0: "Accelerate",
@@ -179,7 +179,7 @@ MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = True
 
-MANUAL_RECORD = True
+MANUAL_RECORD = False
 MANUAL_BASE_NAME = "map1"
 
 
@@ -195,7 +195,7 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 20
+CARLA_VEHICLES = 0
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -225,6 +225,13 @@ FEATURE_HIST_MAX_SAMPLES = 100000
 
 
 
+
+# ================================
+# Dataset Augmentation
+# ================================
+
+MIRROR_DATASET = False
+MIRROR_STEERING_THRESHOLD = 0.05
 
 
 

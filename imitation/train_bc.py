@@ -1,5 +1,12 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import argparse
 import time
+import json
 import os
 import numpy as np
 from pathlib import Path
@@ -21,6 +28,20 @@ def get_device(device_arg):
     if device_arg == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device(device_arg)
+
+def validate_dataset_config(dataset_meta, args):
+    if dataset_meta is None:
+        print("No dataset metadata found, skipping validation.")
+        return
+
+    dataset_mode = dataset_meta.get("pipeline_config", {}).get("mode")
+
+    if dataset_mode is not None and dataset_mode != args.mode:
+        raise ValueError(
+            f"Dataset mode ({dataset_mode}) does not match training mode ({args.mode})"
+        )
+
+    print("Dataset configuration validated successfully.")
 
 
 def split_dataset(dataset, val_split, seed):
@@ -253,25 +274,73 @@ def main():
 
 
     args = parser.parse_args()
-    # NEW ---- initialize experiment logger
+
+    dataset_meta = None
+    meta_path = Path(args.data).with_suffix(".meta.json")
+
+    if meta_path.exists():
+        with open(meta_path, "r") as f:
+            dataset_meta = json.load(f)
+        print(f"[INFO] Loaded dataset meta from {meta_path}")
+    else:
+        print(f"[WARN] Dataset meta not found: {meta_path}")
+    validate_dataset_config(dataset_meta, args)
+
     experiment_name = f"bc_{args.mode}"
     logger = ExperimentLogger(experiment_name)
 
-    logger.save_config({
-        "mode": args.mode,
-        "epochs": args.epochs,
-        "batch_size": args.batch,
-        "lr": args.lr,
-        "val_split": args.val_split,
-        "patience": args.patience,
-        "device": args.device,
-        "is_gaussian": args.is_gaussian
-    })
+ 
+    config_dict = {
+    "mode": args.mode,
+    "epochs": args.epochs,
+    "batch_size": args.batch,
+    "lr": args.lr,
+    "val_split": args.val_split,
+    "patience": args.patience,
+    "device": args.device,
+    "is_gaussian": args.is_gaussian
+    }
+    # attach dataset metadata
+    if dataset_meta is not None:
+        config_dict["dataset_meta"] = dataset_meta
+
+    logger.save_config(config_dict)
 
     tb_writer = SummaryWriter(log_dir=f"{logger.logs_dir}/tb")
 
+    # log dataset info to tensorboard
+    # Log dataset distributions
 
-    # NEW ----
+    if dataset_meta is not None:
+
+    # --- Core dataset info ---
+        tb_writer.add_scalar("dataset/total_samples", dataset_meta.get("total_samples", 0), 0)
+        tb_writer.add_text("dataset/created_at", dataset_meta.get("created_at", "unknown"), 0)
+
+        # --- Stats section ---
+        stats = dataset_meta.get("stats", {})
+        if "total_frames" in stats:
+            tb_writer.add_scalar("dataset/total_frames", stats["total_frames"], 0)
+        if "idle_frames_trimmed" in stats:
+            tb_writer.add_scalar("dataset/idle_trimmed", stats["idle_frames_trimmed"], 0)
+
+        # --- Mirror augmentation info ---
+        pipe = dataset_meta.get("pipeline_config", {})
+        tb_writer.add_text("dataset/pipeline_config", json.dumps(pipe, indent=2), 0)
+
+        mirror_enabled = pipe.get("mirror_enabled", False)
+        mirror_thresh = pipe.get("mirror_steering_threshold", None)
+
+        tb_writer.add_scalar("dataset/mirror_enabled", float(bool(mirror_enabled)), 0)
+        if mirror_thresh is not None:
+            tb_writer.add_scalar("dataset/mirror_steering_threshold", mirror_thresh, 0)
+
+        print(f"[TB] ✅ Mirror info logged → enabled={mirror_enabled}, threshold={mirror_thresh}")
+    else:
+        print("[TB] ⚠️ No dataset metadata available to log.")
+
+
+
 
 
 
@@ -287,6 +356,7 @@ def main():
         # Incorporate friend's idea: one_hot_presence=True
         ds = BCDatasetContinuous(args.data)
 
+    print(type(ds))
     
     # Calculate weights based on mode
     if args.mode == "discrete":
@@ -297,60 +367,64 @@ def main():
         
         data_raw = np.load(args.data)
         
-        throttle = data_raw["target_throttle"]
-        brake = data_raw["target_brake"]
-        steer = data_raw["target_steering_angle"]
+        
+        
+        # throttle = data_raw["target_throttle"]
+        # brake = data_raw["target_brake"]
+        # steer = data_raw["target_steering_angle"]
 
-        continuous_weights = np.ones_like(throttle, dtype=np.float32)
-        # emphasize movement
-        continuous_weights[throttle > 0.2] *= 5.0
+        # continuous_weights = np.ones_like(throttle, dtype=np.float32)
+        # # emphasize movement
+        # continuous_weights[throttle > 0.2] *= 5.0
 
-        # emphasize turning
-        continuous_weights[np.abs(steer) > 0.2] *= 3.0
+        # # emphasize turning
+        # continuous_weights[np.abs(steer) > 0.2] *= 3.0
 
-        # emphasize braking
-        continuous_weights[brake > 0.05] *= 3.0
-        continuous_weights = continuous_weights.squeeze()
-        # throttle = data_raw["target_throttle"].astype(np.float32)
-        # steer = data_raw["target_steering_angle"].astype(np.float32)
+        # # emphasize braking
+        # continuous_weights[brake > 0.05] *= 3.0
+        # continuous_weights = continuous_weights.squeeze()
+        
+        
+        throttle = data_raw["target_throttle"].astype(np.float32)
+        steer = data_raw["target_steering_angle"].astype(np.float32)
 
-        # throttle = throttle.squeeze()
-        # steer = steer.squeeze()
+        throttle = throttle.squeeze()
+        steer = steer.squeeze()
 
 
-        # # Bin steering
-        # bin_size = 0.1
-        # steer_bins = np.floor((steer + 1.0) / bin_size).astype(int)
-        # n_bins = int(2.0 / bin_size) + 1
+        # Bin steering
+        bin_size = 0.1
+        steer_bins = np.floor((steer + 1.0) / bin_size).astype(int)
+        n_bins = int(2.0 / bin_size) + 1
 
-        # steer_bins = np.clip(steer_bins, 0, n_bins - 1)
+        steer_bins = np.clip(steer_bins, 0, n_bins - 1)
 
         
         
-        # # Compute bin frequencies
-        # counts = np.bincount(steer_bins, minlength=n_bins).astype(np.float32)
+        # Compute bin frequencies
+        counts = np.bincount(steer_bins, minlength=n_bins).astype(np.float32)
 
-        # freq = counts / counts.sum()
+        freq = counts / counts.sum()
 
-        # # avoid division by zero
-        # freq = np.maximum(freq, 1e-6)
+        # avoid division by zero
+        freq = np.maximum(freq, 1e-6)
 
-        # # 3. Steering weights
-        # steer_weights = 1.0 / freq
-        # steer_weights = steer_weights / steer_weights.mean()
+        # 3. Steering weights
+        steer_weights = 1.0 / freq
+        steer_weights = steer_weights / steer_weights.mean()
 
-        # sample_steer_weight = steer_weights[steer_bins]
+        sample_steer_weight = steer_weights[steer_bins]
 
-        # # Throttle factor
-        # sample_throttle_factor = 1.0 + 0.15 * throttle
+        # Throttle factor
+        sample_throttle_factor = 1.0 + 0.15 * throttle
 
 
-        # # continuous_weights = sample_steer_weight * sample_throttle_factor
+        # continuous_weights = sample_steer_weight * sample_throttle_factor
         
-        # continuous_weights = sample_steer_weight
-        # continuous_weights = continuous_weights.astype(np.float32)
+        continuous_weights = sample_steer_weight
+        continuous_weights = continuous_weights.astype(np.float32)
         
-        # debug_sampler_distribution(steer, continuous_weights)
+        debug_sampler_distribution(steer, continuous_weights)
 
 
     # Split dataset
@@ -406,6 +480,8 @@ def main():
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
         ).to(device)
+    print("Grid channels:", grid_channels)
+    print("Grid shape:", grid0.shape)
 
     opt = optim.AdamW(model.parameters(), lr=args.lr)
 
@@ -430,6 +506,30 @@ def main():
     print("Dataset size:", len(ds))
     print("Train:", len(train_ds), "Val:", len(val_ds))
     print("Device:", device)
+
+
+    # print("DEBUG dataset attributes:", dir(ds))
+    # try:
+    #     print("Actions sample:", ds.actions[:5])
+    # except:
+    #     print("Actions attribute not found")
+    # if hasattr(ds, 'actions'):
+    #     try:
+    #       tb_writer.add_histogram("dataset/actions", ds.actions, 0)
+    #     except:
+    #        pass
+
+
+    # print("DEBUG type(dataset):", type(ds))
+    # # Histogram for continuous actions
+    # if args.mode == "continuous":
+    #     try:
+    #         tb_writer.add_histogram("dataset/targets", ds.targets, 0)
+    #         print("✅ Dataset histogram logged (targets)")
+    #     except Exception as e:
+    #         print("Histogram error:", e)
+
+
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()

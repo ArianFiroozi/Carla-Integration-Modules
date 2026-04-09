@@ -17,8 +17,11 @@ class BaseDataset(Dataset):
         self.include_traffic_signs = include_traffic_signs
         
         
-        # GRID
+        # GRIDS
         self.presence = data["obs_presence"].astype(np.int64)
+        self.speed_x = data["obs_speed_x"].astype(np.float32)
+        self.speed_y = data["obs_speed_y"].astype(np.float32)
+
 
         self.num_classes = max(num_classes, int(self.presence.max()) + 1)
 
@@ -76,6 +79,36 @@ class BaseDataset(Dataset):
 
     def __len__(self):
         return self.presence.shape[0]
+    
+
+    def _stack_temporal_grids(self, idx):
+
+        T = self.presence.shape[1]   # should be 3
+        H = self.presence.shape[2]
+        W = self.presence.shape[3]
+
+        channels = []
+
+        for t in range(T):
+
+            pres = self.presence[idx, t].astype(np.float32)
+            vx = self.speed_x[idx, t]
+            vy = self.speed_y[idx, t]
+
+            vx = np.clip(vx / 30.0, -1, 1)
+            vy = np.clip(vy / 30.0, -1, 1)
+
+            channels.append(pres)
+            channels.append(vx)
+            channels.append(vy)
+
+        stacked = np.stack(channels, axis=0)   # (9, H, W)
+
+        return stacked
+
+
+
+
 
 
 class BCDataset(BaseDataset):
@@ -95,12 +128,16 @@ class BCDataset(BaseDataset):
         )
         self.actions = self.data["actions"].astype(np.int64)
 
+
     def __getitem__(self, idx):
-        grid = self.process_grid(self.presence[idx])
+        grid_np = self._stack_temporal_grids(idx)     # (9, H, W)
+        grid = torch.from_numpy(grid_np).float()
+
         scalars = torch.from_numpy(self.scalars[idx])
         action = torch.from_numpy(self.actions[idx])
 
         return grid, scalars, action
+
 
 
 class BCDatasetContinuous(BaseDataset):
@@ -134,7 +171,9 @@ class BCDatasetContinuous(BaseDataset):
         self.targets = targets.astype(np.float32)
 
     def __getitem__(self, idx):
-        grid = self.process_grid(self.presence[idx])
+        grid_np = self._stack_temporal_grids(idx)   # (9,H,W)
+        grid = torch.from_numpy(grid_np).float()
+
         scalars = torch.from_numpy(self.scalars[idx])
         target = torch.from_numpy(self.targets[idx])
 

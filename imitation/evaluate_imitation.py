@@ -1,5 +1,5 @@
 import time
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 import argparse
 import json
@@ -10,14 +10,12 @@ from .models.imitation_policy import ImitationPolicy
 from . import config
 import datetime
 from torch.utils.tensorboard import SummaryWriter 
-
-
+import carla
 
 ACTION_MODE = config.ACTION_MODE
 DEVICE = config.DEVICE
 SIMPLIFIED_ACTION_SPACE = config.SIMPLIFY_ACTIONS
 DEBUG_PRINT_STEPS = config.DEBUG_PRINT_STEPS
-
 
 if SIMPLIFIED_ACTION_SPACE:
     speed_map = config.SIMPLIFY_SPEED_MAP
@@ -25,18 +23,61 @@ if SIMPLIFIED_ACTION_SPACE:
 else:
     speed_map = config.SPEED_MAP
     turn_map = config.TURN_MAP
-def extract_grid_and_scalars(obs):
-    presence = obs["presence"]
-    if torch.is_tensor(presence):
-        presence = presence.cpu().numpy()
 
-    # TODO: this is  not dynamic
+
+class ObsHistory:
+    """Maintains a rolling window of the last 3 grid observations."""
+    def __init__(self):
+        self.presence = deque(maxlen=3)
+        self.speed_x = deque(maxlen=3)
+        self.speed_y = deque(maxlen=3)
+
+    def reset(self):
+        self.presence.clear()
+        self.speed_x.clear()
+        self.speed_y.clear()
+
+    def update(self, obs):
+        p = obs["presence"]
+        # Fallback to zeros if env doesn't directly return grid speeds yet
+        sx = obs.get("speed_x", np.zeros_like(p)) 
+        sy = obs.get("speed_y", np.zeros_like(p))
+
+        if torch.is_tensor(p): p = p.cpu().numpy()
+        if torch.is_tensor(sx): sx = sx.cpu().numpy()
+        if torch.is_tensor(sy): sy = sy.cpu().numpy()
+
+        self.presence.append(p)
+        self.speed_x.append(sx)
+        self.speed_y.append(sy)
+
+        # Pad with the first frame if we don't have 3 frames yet
+        while len(self.presence) < 3:
+            self.presence.append(p)
+            self.speed_x.append(sx)
+            self.speed_y.append(sy)
+
+    def get_grid(self):
+        # Order: t, t-1, t-2 for presence, then speed_x, then speed_y
+        # deque index 2 is newest (t), 1 is (t-1), 0 is (t-2)
+        grid = np.stack([
+            self.presence[2], self.presence[1], self.presence[0],
+            self.speed_x[2], self.speed_x[1], self.speed_x[0],
+            self.speed_y[2], self.speed_y[1], self.speed_y[0],
+        ], axis=0).astype(np.float32)
+        return grid
+
+
+def extract_grid_and_scalars(obs, history: ObsHistory):
+    history.update(obs)
+    grid = history.get_grid()
+
+    # TODO: this is not dynamic
     lane_angle = obs["lane_angle"][0] / np.pi
     lane_pos = obs["ego_in_lane_position_x"][0] / 2.0
     speed_x = np.clip(obs["ego_speed_x"][0], -1, 15) / 15.0
     speed_y = np.clip(obs["ego_speed_y"][0], -2, 2) / 2.0
 
-    grid = presence[None, :, :]
     scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
 
     return grid, scalars
@@ -47,15 +88,12 @@ def map_action_for_env(action):
     Convert (speed_idx, turn_idx) from the discrete head into
     integer action indices expected by CarlaEnv.
     """
+    
     speed, turn = action
 
     if SIMPLIFIED_ACTION_SPACE:
-        # model only knows [0,1,2,3] but env expects [0,1,2,4] for speed
-        if speed == 3:
-            speed = 4
-        # model only knows [0,1,2] but env expects [0,1,3] for turn
-        if turn == 2:
-            turn = 3
+        if speed == 3: speed = 4
+        if turn == 2: turn = 3
 
     return [speed, turn]
 
@@ -71,7 +109,6 @@ def process_continuous_output(out):
     throttle = max(float(np.clip(out[0], 0.0, 1.0)), 0.13)
     brake = float(np.clip(out[1], 0.0, 1.0))
     steer = float(np.clip(out[2], -1.0, 1.0))
-
     # prevent throttle+brake conflict
     if brake > 0.05:
         throttle = 0.0
@@ -88,7 +125,7 @@ def process_continuous_output(out):
 
 debug_counter = 0
 
-def predict_action(policy, obs):
+def predict_action(policy, obs, history):
     """
     Run one policy step.
     obs is assumed to be (grid, scalars), as returned by CarlaEnv.
@@ -98,7 +135,7 @@ def predict_action(policy, obs):
     """
     global debug_counter
 
-    grid, scalars = extract_grid_and_scalars(obs)
+    grid, scalars = extract_grid_and_scalars(obs, history)
     grid = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).to(DEVICE)
     scalars = torch.tensor(scalars, dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
@@ -156,8 +193,26 @@ def predict_action(policy, obs):
             return env_action, None
 
 
+def update_spectator(env):
+    world = env.world
+    ego_vehicle = env.ego_vehicle
+    if ego_vehicle is None:
+        return
+
+    spectator = world.get_spectator()
+    tr = ego_vehicle.get_transform()
+    forward = tr.get_forward_vector()
+
+    cam_loc = tr.location - forward * 8.0 + carla.Location(z=3.0)
+    cam_rot = carla.Rotation(pitch=-12.0, yaw=tr.rotation.yaw, roll=0.0)
+    spectator.set_transform(carla.Transform(cam_loc, cam_rot))
+    
+
+    
 def run_episode(env, policy, max_steps=2000, render_log_every=200):
     obs, _ = env.reset()
+    history = ObsHistory()
+    
     rewards = []
     action_counts = Counter()
     terminated_flag = False
@@ -166,12 +221,14 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200):
     t0 = time.time()
 
     for t in range(max_steps):
-        env_action, action_log = predict_action(policy, obs)
+        env_action, action_log = predict_action(policy, obs, history)
         obs, reward, terminated, truncated, info = env.step(env_action)
 
         if action_log is not None:
             action_counts[action_log] += 1
-
+            
+        update_spectator(env)
+        
         rewards.append(float(reward))
         if (t + 1) % render_log_every == 0:
             elapsed = time.time() - t0
@@ -195,27 +252,21 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200):
     }
 
 
-
-
 def get_latest_experiment(root):
     folders = [f for f in Path(root).iterdir() if f.is_dir()]
     if not folders:
         raise FileNotFoundError("No experiment folders found.")
     return sorted(folders)[-1]
 
-
 def get_best_or_last_checkpoint(model_dir):
     best = model_dir / "best_model.pt"
     if best.exists():
         return best
-
     ckpts = list(model_dir.glob("checkpoint_epoch_*.pt"))
     if not ckpts:
         raise FileNotFoundError(f"No checkpoints in {model_dir}")
-
     ckpts_sorted = sorted(ckpts, key=lambda p: int(p.stem.split("_")[-1]))
     return ckpts_sorted[-1]
-
 
 def resolve_paths(args):
     # direct model override
@@ -228,19 +279,15 @@ def resolve_paths(args):
         return model_path, config_path, eval_dir
 
     root = Path(args.experiments_root)
-
     exp_dir = root / args.exp_id if args.exp_id else get_latest_experiment(root)
     model_path = get_best_or_last_checkpoint(exp_dir / "models")
     config_path = exp_dir / "config.json"
     eval_dir = exp_dir / "eval"
     eval_dir.mkdir(exist_ok=True)
-
     return model_path, config_path, eval_dir
-
 
 def load_policy_from_checkpoint(model_path, config_path):
     ckpt = torch.load(model_path, map_location=DEVICE)
-
     with open(config_path, "r") as f:
         cfg = json.load(f)
 
@@ -251,7 +298,6 @@ def load_policy_from_checkpoint(model_path, config_path):
     if mode == "discrete":
         n_speed = ckpt["n_speed"]
         n_turn = ckpt["n_turn"]
-        
         policy = ImitationPolicy(
             mode="discrete",
             grid_channels=grid_channels,
@@ -279,17 +325,13 @@ def load_policy_from_checkpoint(model_path, config_path):
         print("  n_turn:", n_turn)
     return policy, cfg
 
-
-
 def main():
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--map", type=str, default=config.CARLA_MAP_PATH)
     parser.add_argument("--episodes", type=int, default=config.EVAL_NUM_EPISODES)
     parser.add_argument("--max-steps", type=int, default=config.EVAL_MAX_STEPS)
     parser.add_argument("--mode", choices=["discrete", "continuous"], default=config.ACTION_MODE)
     parser.add_argument("--device", default=config.DEVICE)
-
     parser.add_argument("--exp_id", type=str, default=None)
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--experiments_root", type=str, default="experiments")
@@ -317,8 +359,6 @@ def main():
     tb_dir = current_eval_dir / "tb"
     tb_dir.mkdir(exist_ok=True)
     tb_writer = SummaryWriter(str(tb_dir))
-   
-
 
     env = CarlaEnv(
         map_path=args.map,
@@ -327,6 +367,8 @@ def main():
         max_steps=args.max_steps,
         init_speed=config.CARLA_INIT_SPEED,
         action_mode=ACTION_MODE,
+        random_ego_spawn= config.RANDOM_EGO_START_POS,
+        random_vehicle_spawn= config.RANDOM_VEHICLE_START_POS
     )
     print("Action mode:", ACTION_MODE)
     print("Device:", DEVICE)
@@ -335,16 +377,13 @@ def main():
     all_lengths = []
     end_reasons = Counter()
     global_action_counts = Counter()
-
     overall_t0 = time.time()
     num_episodes= args.episodes
     try:
         for ep in range(num_episodes):
             print(f"\n=== Episode {ep+1}/{num_episodes} ===")
-
             result = run_episode(env, policy, max_steps=args.max_steps)
 
-            # save episode log
             episode_path = current_eval_dir / f"episode_{ep+1:03d}.json"
             with open(episode_path, "w") as f:
                 json.dump({
@@ -356,7 +395,6 @@ def main():
 
             all_returns.append(result["return"])
             all_lengths.append(result["length"])
-
             end_reasons[result["end_reason"]] += 1
             global_action_counts.update(result["action_counts"])
 
@@ -370,7 +408,6 @@ def main():
             # TensorBoard episode metrics
             tb_writer.add_scalar("eval/episode_return", result["return"], ep + 1)
             tb_writer.add_scalar("eval/episode_length", result["length"], ep + 1)
-
 
         total_time = time.time() - overall_t0
 
@@ -423,8 +460,6 @@ def main():
             env.close()
         except Exception:
             pass
-
-
 
 if __name__ == "__main__":
     main()
