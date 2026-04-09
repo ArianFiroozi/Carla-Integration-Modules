@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+from .. import config
 
 class BaseDataset(Dataset):
     def __init__(
@@ -169,6 +170,24 @@ class BCDatasetContinuous(BaseDataset):
         targets[:, 1] = np.clip(targets[:, 1], 0.0, 1.0)
 
         self.targets = targets.astype(np.float32)
+        # =========================================================
+        # Continuous Undersampling (Feature Flag)
+        # =========================================================
+        if config.USE_CONTINUOUS_UNDERSAMPLING:
+            steer_angles = np.abs(self.targets[:, 2])
+            is_straight = steer_angles < config.UNDERSAMPLING_THRESHOLD
+            random_probs = np.random.rand(len(steer_angles))
+            keep_straight = is_straight & (random_probs > config.UNDERSAMPLING_PROBABILITY)
+            keep_turned = ~is_straight
+            keep_mask = keep_straight | keep_turned
+            self.presence = self.presence[keep_mask]
+            self.speed_x = self.speed_x[keep_mask]
+            self.speed_y = self.speed_y[keep_mask]
+            self.scalars = self.scalars[keep_mask]
+            self.targets = self.targets[keep_mask]
+            dropped_count = len(keep_mask) - keep_mask.sum()
+            print(f"[Dataset] Continuous Undersampling is ON!")
+            print(f"[Dataset] Dropped {dropped_count} straight-driving samples out of {len(keep_mask)}.")
 
     def __getitem__(self, idx):
         grid_np = self._stack_temporal_grids(idx)   # (9,H,W)
@@ -178,3 +197,4 @@ class BCDatasetContinuous(BaseDataset):
         target = torch.from_numpy(self.targets[idx])
 
         return grid, scalars, target
+ 

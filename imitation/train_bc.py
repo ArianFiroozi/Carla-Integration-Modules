@@ -222,7 +222,6 @@ def debug_sampler_distribution(steer, weights, n_samples=200000):
 def train_epoch_continuous(model, loader, opt, criterion, device):
 
     model.train()
-
     total_loss = 0
     seen = 0
 
@@ -233,20 +232,33 @@ def train_epoch_continuous(model, loader, opt, criterion, device):
         target = target.to(device)
 
         pred = model(grid, scalars)
-
-        loss = criterion(pred, target)
-
+        # =========================================================
+        # Weighted Loss Calculation (Feature Flag)
+        # =========================================================
+        if config.USE_WEIGHTED_LOSS:
+            pred_mean = pred[0] if isinstance(pred, tuple) else pred
+            per_element_loss = (pred_mean - target) ** 2
+            throttle_loss = per_element_loss[:, 0] * config.THROTTLE_LOSS_WEIGHT
+            brake_loss = per_element_loss[:, 1] * config.BRAKE_LOSS_WEIGHT
+            steer_diff = torch.abs(target[:, 2])
+            steer_weights = torch.where(
+                steer_diff > config.WEIGHTED_LOSS_THRESHOLD,
+                torch.tensor(config.STEER_LOSS_WEIGHT, device=device),
+                torch.tensor(1.0, device=device)
+            )
+            steer_loss = per_element_loss[:, 2] * steer_weights
+            loss = torch.mean(throttle_loss + brake_loss + steer_loss)
+        else:
+            loss = criterion(pred, target)
+        # =========================================================
         opt.zero_grad(set_to_none=True)
         loss.backward()
-
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
         opt.step()
-
         total_loss += loss.item() * grid.size(0)
         seen += grid.size(0)
-
     return total_loss / seen
+
 
 
 def main():
@@ -275,6 +287,7 @@ def main():
 
     args = parser.parse_args()
 
+
     dataset_meta = None
     meta_path = Path(args.data).with_suffix(".meta.json")
 
@@ -285,6 +298,7 @@ def main():
     else:
         print(f"[WARN] Dataset meta not found: {meta_path}")
     validate_dataset_config(dataset_meta, args)
+
 
     experiment_name = f"bc_{args.mode}"
     logger = ExperimentLogger(experiment_name)
@@ -298,7 +312,15 @@ def main():
     "val_split": args.val_split,
     "patience": args.patience,
     "device": args.device,
-    "is_gaussian": args.is_gaussian
+    "is_gaussian": args.is_gaussian,
+    "use_continuous_undersampling": config.USE_CONTINUOUS_UNDERSAMPLING,
+    "undersampling_threshold": config.UNDERSAMPLING_THRESHOLD,
+    "undersampling_probability": config.UNDERSAMPLING_PROBABILITY,
+    "use_weighted_loss": config.USE_WEIGHTED_LOSS,
+    "steer_loss_weight": config.STEER_LOSS_WEIGHT,
+    "throttle_loss_weight": config.THROTTLE_LOSS_WEIGHT,
+    "brake_loss_weight": config.BRAKE_LOSS_WEIGHT,
+    "weighted_loss_threshold": config.WEIGHTED_LOSS_THRESHOLD,
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -307,6 +329,7 @@ def main():
     logger.save_config(config_dict)
 
     tb_writer = SummaryWriter(log_dir=f"{logger.logs_dir}/tb")
+    
 
     # log dataset info to tensorboard
     # Log dataset distributions
@@ -338,7 +361,6 @@ def main():
         print(f"[TB] ✅ Mirror info logged → enabled={mirror_enabled}, threshold={mirror_thresh}")
     else:
         print("[TB] ⚠️ No dataset metadata available to log.")
-
 
 
 
