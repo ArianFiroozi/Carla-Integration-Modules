@@ -238,6 +238,9 @@ def apply_mirror_augmentation_continuous(out_obs, threshold=MIRROR_STEERING_THRE
         # Flip lane-relative signals (only if present)
         if k in ("obs_steering_angle", "obs_lane_angle", "obs_ego_in_lane_position_x"):
             v_m = -v_m
+        else:
+            if v.ndim == 4:
+                print(k, v.shape)
 
         out[k] = np.concatenate([v, v_m], axis=0)
 
