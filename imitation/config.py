@@ -35,7 +35,7 @@ MANUAL_DIR = DATA_DIR / "demos"
 PROCESSED_DIR = DATA_DIR / "processed"
 
 AUTOPILOT_RECORD_DIR = EXPERT_DIR / "map1_0car"
-MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_20car"
+MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_30car"
 
 DATASET_PATH = PROCESSED_DIR / "dataset_bc.npz"
 
@@ -78,7 +78,7 @@ TURN_MAP = {
 }
 
 IS_GAUSSIAN = True
-SMOOTH_STEERING = True
+SMOOTH_STEERING = False
 
 # =========================================================
 # ACTION SIMPLIFICATION
@@ -187,7 +187,7 @@ MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = True
 
-MANUAL_RECORD = False
+MANUAL_RECORD = True
 MANUAL_BASE_NAME = "map1"
 
 RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
@@ -222,7 +222,7 @@ EVAL_RENDER_LOG_EVERY = 200
 # DEBUG / VISUALIZATION
 # =========================================================
 
-DEBUG_PRINT_STEPS = 0
+DEBUG_PRINT_STEPS = 50
 
 INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000
@@ -234,8 +234,9 @@ FEATURE_HIST_MAX_SAMPLES = 100000
 # Dataset Augmentation
 # ================================
 
-MIRROR_DATASET = False
-MIRROR_STEERING_THRESHOLD = 0.05
+MIRROR_DATASET = True
+MIRROR_STEERING_THRESHOLD = 0.04
+WINDOW_SIZE = 3
 
 
 

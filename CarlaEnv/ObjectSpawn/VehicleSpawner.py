@@ -5,8 +5,12 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
 
     world = client.get_world()
     traffic_manager = client.get_trafficmanager()
-    traffic_manager.set_global_distance_to_leading_vehicle(2.5)
-
+    speed_profiles = [
+            (-40, -20),   # very slow (ideal for overtaking training)
+            (-20, -5),    # slow
+            (-5, 5),      # normal
+            (5, 15),      # slightly fast
+        ]
     blueprint_library = world.get_blueprint_library()
     vehicle_blueprints = blueprint_library.filter("vehicle.*")
 
@@ -31,10 +35,17 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
 
         vehicle.set_autopilot(True, traffic_manager.get_port())
 
-        traffic_manager.vehicle_percentage_speed_difference(
-            vehicle,
-            random.randint(-30, 30)
-        )
+
+
+        speed_min, speed_max = random.choice(speed_profiles)
+        speed_diff = random.randint(speed_min, speed_max)
+
+        traffic_manager.vehicle_percentage_speed_difference(vehicle, speed_diff)
+        # traffic_manager.random_left_lanechange_percentage(vehicle, random.randint(0, 30))
+        # traffic_manager.random_right_lanechange_percentage(vehicle, random.randint(0, 30))
+        traffic_manager.distance_to_leading_vehicle(vehicle, random.uniform(1.0, 5.0))
+
+
 
         vehicles.append(vehicle)
 

@@ -25,11 +25,16 @@ def spawn_ego_vehicle(world,
 
             spawn_point = spawn_points[i]
 
+            lateral_offset = random.uniform(-3.0, 3.0)
+
+            right_vec = spawn_point.get_right_vector()
+            spawn_point.location.x += right_vec.x * lateral_offset
+            spawn_point.location.y += right_vec.y * lateral_offset
+
             vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
 
             if vehicle is not None:
                 break
-
         if vehicle is None:
             raise RuntimeError("Failed to spawn ego vehicle at random spawn points")
         else:

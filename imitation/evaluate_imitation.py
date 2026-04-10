@@ -11,6 +11,7 @@ from . import config
 import datetime
 from torch.utils.tensorboard import SummaryWriter 
 import carla
+import cv2
 
 ACTION_MODE = config.ACTION_MODE
 DEVICE = config.DEVICE
@@ -68,6 +69,45 @@ class ObsHistory:
         return grid
 
 
+def create_video_recorder(env, save_path, width=640, height=360, fps=20):
+    world = env.world
+    ego_vehicle = env.ego_vehicle
+
+    bp_lib = world.get_blueprint_library()
+    cam_bp = bp_lib.find("sensor.camera.rgb")
+
+    cam_bp.set_attribute("image_size_x", str(width))
+    cam_bp.set_attribute("image_size_y", str(height))
+    cam_bp.set_attribute("fov", "90")
+
+    cam_transform = carla.Transform(
+        carla.Location(x=-6, z=3),
+        carla.Rotation(pitch=-15)
+    )
+
+    camera = world.spawn_actor(cam_bp, cam_transform, attach_to=ego_vehicle)
+
+    video = cv2.VideoWriter(
+        str(save_path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height)
+    )
+
+    def callback(image):
+        array = np.frombuffer(image.raw_data, dtype=np.uint8)
+        array = array.reshape((image.height, image.width, 4))
+        frame = array[:, :, :3]   # remove alpha
+        frame = frame[:, :, ::-1] # BGRA → BGR
+        video.write(frame)
+
+    camera.listen(callback)
+
+    return camera, video
+
+    
+    
+    
 def extract_grid_and_scalars(obs, history: ObsHistory):
     history.update(obs)
     grid = history.get_grid()
@@ -209,10 +249,14 @@ def update_spectator(env):
     
 
     
-def run_episode(env, policy, max_steps=2000, render_log_every=200):
+def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=None):
     obs, _ = env.reset()
     history = ObsHistory()
-    
+    camera = None
+    video = None
+
+    if video_path is not None:
+        camera, video = create_video_recorder(env, video_path)  
     rewards = []
     action_counts = Counter()
     terminated_flag = False
@@ -243,6 +287,13 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200):
             break
 
     ep_len = len(rewards)
+    if camera is not None:
+        camera.stop()
+        camera.destroy()
+
+    if video is not None:
+        video.release()
+
     return {
         "return": float(np.sum(rewards)),
         "mean_reward": float(np.mean(rewards)),
@@ -382,7 +433,15 @@ def main():
     try:
         for ep in range(num_episodes):
             print(f"\n=== Episode {ep+1}/{num_episodes} ===")
-            result = run_episode(env, policy, max_steps=args.max_steps)
+            video_path = current_eval_dir / f"episode_{ep+1:03d}.mp4"
+
+            result = run_episode(
+                env,
+                policy,
+                max_steps=args.max_steps,
+                video_path=video_path
+            )
+
 
             episode_path = current_eval_dir / f"episode_{ep+1:03d}.json"
             with open(episode_path, "w") as f:
@@ -435,6 +494,7 @@ def main():
             "end_reasons": dict(end_reasons),
             "wall_time_sec": total_time,
             "action_mode": ACTION_MODE,
+            "smooth_steering": config.SMOOTH_STEERING
         }
 
         if ACTION_MODE == "discrete":
