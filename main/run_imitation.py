@@ -13,19 +13,19 @@ def run(cmd):
 
 def main():
 
-    # # # # 1 Record demonstrations
-    run("python -m imitation.record_demos")
+    # # # # # 1 Record demonstrations
+    # run("python -m imitation.record_demos")
 
     # # # # # # 2 Inspect demos
-    run("python -m imitation.inspect_demo")
+    # run("python -m imitation.inspect_demo")
 
-    # # # # # # 3 Build dataset
-    run("python -m imitation.build_dataset")
+    # # # # # 3 Build dataset
+    # run("python -m imitation.build_dataset")
 
     # # # 4 Train BC
     run("python -m imitation.train_bc")
 
-    # # # # # 5 Evaluate model
+    # # # # # # 5 Evaluate model
     run("python -m imitation.evaluate_imitation")
 
     print("\n✅ Full imitation pipeline finished.")

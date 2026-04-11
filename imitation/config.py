@@ -42,7 +42,7 @@ DATASET_PATH = PROCESSED_DIR / "dataset_bc.npz"
 # input of build dataset and inspect demo
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
-    MANUAL_DIR / "lab-map_0car",
+    # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test"
     MANUAL_DIR / "map1_0car"
 ]
@@ -78,8 +78,9 @@ TURN_MAP = {
 }
 
 IS_GAUSSIAN = True
+MIN_STD=0.05
+MAX_STD=1
 SMOOTH_STEERING = False
-
 # =========================================================
 # ACTION SIMPLIFICATION
 # =========================================================
@@ -140,6 +141,15 @@ STEER_LOSS_WEIGHT = 3.0             # Multiplier for loss when steering error is
 THROTTLE_LOSS_WEIGHT = 1.0
 BRAKE_LOSS_WEIGHT = 1.0
 WEIGHTED_LOSS_THRESHOLD = 0.1       # Threshold above which the weight is applied
+
+
+
+
+
+
+WEIGHTED_SAMPLING = "none" # "inverse" or "none" or "handmade"
+
+
 # ==========================================================================================
 
 # =========================================================
@@ -172,7 +182,7 @@ JOINT_KEEP_PROBS = {
 # IMITATION LEARNING TRAINING
 # =========================================================
 
-BC_EPOCHS = 200
+BC_EPOCHS = 10
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1

@@ -115,6 +115,7 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
     mae_sum = 0.0
     mse_sum = 0.0
     nll_sum = 0.0
+    std_sum = 0.0
     n = 0
 
     for grid, scalars, target in loader:
@@ -127,6 +128,7 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
         # Handle Gaussian vs Standard Continuous
         if is_gaussian:
             mean, std = pred
+            std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD)
             dist = torch.distributions.Normal(mean, std)
             nll_sum += -dist.log_prob(target).sum().item()
             point_pred = mean  # Use the mean for MSE/MAE evaluation
@@ -135,6 +137,7 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
 
         mse_sum += nn.functional.mse_loss(point_pred, target, reduction="sum").item()
         mae_sum += torch.abs(point_pred - target).sum().item()
+        std_sum += std.sum().item()
         n += np.prod(target.shape)
 
     metrics = {
@@ -146,6 +149,8 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
     if is_gaussian:
         metrics["nll"] = nll_sum / n
         metrics["loss"] = metrics["nll"]
+        metrics["avg_std"] = std_sum / n 
+
     else:
         metrics["loss"] = metrics["mse"]
         
@@ -219,44 +224,60 @@ def debug_sampler_distribution(steer, weights, n_samples=200000):
         print(f"{lo:+.1f} to {hi:+.1f} | raw {raw_pct:5.2f}% -> sampled {samp_pct:5.2f}%")
 
 
-def train_epoch_continuous(model, loader, opt, criterion, device):
-
+def train_epoch_continuous(model, loader, opt, device):
     model.train()
     total_loss = 0
     seen = 0
 
     for grid, scalars, target in loader:
-
         grid = grid.to(device)
         scalars = scalars.to(device)
         target = target.to(device)
 
         pred = model(grid, scalars)
-        # =========================================================
-        # Weighted Loss Calculation (Feature Flag)
-        # =========================================================
+
+
+        if config.IS_GAUSSIAN:
+            # GAUSSIAN MODE (NLL)
+            mean, std = pred
+            
+
+            std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD) 
+            
+            dist = torch.distributions.Normal(mean, std)
+            per_element_loss = -dist.log_prob(target)
+        else:
+            # STANDARD MODE (MSE)
+            per_element_loss = (pred - target) ** 2
+
+
         if config.USE_WEIGHTED_LOSS:
-            pred_mean = pred[0] if isinstance(pred, tuple) else pred
-            per_element_loss = (pred_mean - target) ** 2
             throttle_loss = per_element_loss[:, 0] * config.THROTTLE_LOSS_WEIGHT
             brake_loss = per_element_loss[:, 1] * config.BRAKE_LOSS_WEIGHT
+            
             steer_diff = torch.abs(target[:, 2])
             steer_weights = torch.where(
                 steer_diff > config.WEIGHTED_LOSS_THRESHOLD,
-                torch.tensor(config.STEER_LOSS_WEIGHT, device=device),
-                torch.tensor(1.0, device=device)
+                torch.tensor(config.STEER_LOSS_WEIGHT, device=device, dtype=torch.float32),
+                torch.tensor(1.0, device=device, dtype=torch.float32)
             )
             steer_loss = per_element_loss[:, 2] * steer_weights
+            
+            # Combine weighted losses
             loss = torch.mean(throttle_loss + brake_loss + steer_loss)
         else:
-            loss = criterion(pred, target)
-        # =========================================================
+            # If not weighted, just take the mean across the batch and controls
+            loss = torch.mean(per_element_loss)
+
+
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
+        
         total_loss += loss.item() * grid.size(0)
         seen += grid.size(0)
+        
     return total_loss / seen
 
 
@@ -303,7 +324,7 @@ def main():
     experiment_name = f"bc_{args.mode}"
     logger = ExperimentLogger(experiment_name)
 
- 
+    
     config_dict = {
     "mode": args.mode,
     "epochs": args.epochs,
@@ -314,13 +335,17 @@ def main():
     "device": args.device,
     "is_gaussian": args.is_gaussian,
     "use_continuous_undersampling": config.USE_CONTINUOUS_UNDERSAMPLING,
-    "undersampling_threshold": config.UNDERSAMPLING_THRESHOLD,
-    "undersampling_probability": config.UNDERSAMPLING_PROBABILITY,
+    "undersampling_threshold_continuous": config.UNDERSAMPLING_THRESHOLD,
+    "undersampling_probability_continuous": config.UNDERSAMPLING_PROBABILITY,
     "use_weighted_loss": config.USE_WEIGHTED_LOSS,
-    "steer_loss_weight": config.STEER_LOSS_WEIGHT,
-    "throttle_loss_weight": config.THROTTLE_LOSS_WEIGHT,
-    "brake_loss_weight": config.BRAKE_LOSS_WEIGHT,
-    "weighted_loss_threshold": config.WEIGHTED_LOSS_THRESHOLD,
+    "steer_loss_weight_continuous": config.STEER_LOSS_WEIGHT,
+    "throttle_loss_weight_continuous": config.THROTTLE_LOSS_WEIGHT,
+    "brake_loss_weight_continuous": config.BRAKE_LOSS_WEIGHT,
+    "weighted_loss_threshold_continuous": config.WEIGHTED_LOSS_THRESHOLD,
+    "min_std": config.MIN_STD,
+    "max_std": config.MAX_STD,
+    "weight_sampling": config.WEIGHTED_SAMPLING
+    
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -375,85 +400,71 @@ def main():
         n_speed = int(ds.actions[:, 0].max()) + 1
         n_turn  = int(ds.actions[:, 1].max()) + 1
     else:
-        # Incorporate friend's idea: one_hot_presence=True
         ds = BCDatasetContinuous(args.data)
 
     print(type(ds))
     
-    # Calculate weights based on mode
-    if args.mode == "discrete":
+    
+    if args.mode == "discrete" and config.USE_WEIGHTED_LOSS:
         actions = ds.actions
         speed_weights = compute_class_weights(actions[:, 0]).to(device)
         turn_weights = compute_class_weights(actions[:, 1]).to(device)
-    else:
         
+        
+
+
+    if args.mode == "continuous" and config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
+        # Only load the raw dataset into memory if we actually need it for weights
         data_raw = np.load(args.data)
         
+        throttle = data_raw["target_throttle"].astype(np.float32).squeeze()
+        steer = data_raw["target_steering_angle"].astype(np.float32).squeeze()
         
-        
-        # throttle = data_raw["target_throttle"]
-        # brake = data_raw["target_brake"]
-        # steer = data_raw["target_steering_angle"]
+        if config.WEIGHTED_SAMPLING == "handmade":
+            brake = data_raw["target_brake"].astype(np.float32).squeeze()
+            
+            continuous_weights = np.ones_like(throttle, dtype=np.float32)
+            
+            # emphasize movement
+            continuous_weights[throttle > 0.2] *= 5.0
+            # emphasize turning
+            continuous_weights[np.abs(steer) > 0.2] *= 3.0
+            # emphasize braking
+            continuous_weights[brake > 0.05] *= 3.0
+            
+        elif config.WEIGHTED_SAMPLING == "inverse":
+            # Bin steering
+            bin_size = 0.1
+            steer_bins = np.floor((steer + 1.0) / bin_size).astype(int)
+            n_bins = int(2.0 / bin_size) + 1
+            steer_bins = np.clip(steer_bins, 0, n_bins - 1)
+            
+            # Compute bin frequencies
+            counts = np.bincount(steer_bins, minlength=n_bins).astype(np.float32)
+            freq = counts / counts.sum()
+            # avoid division by zero
+            freq = np.maximum(freq, 1e-6)
 
-        # continuous_weights = np.ones_like(throttle, dtype=np.float32)
-        # # emphasize movement
-        # continuous_weights[throttle > 0.2] *= 5.0
+            # Steering weights
+            steer_weights = 1.0 / freq
+            steer_weights = steer_weights / steer_weights.mean()
+            sample_steer_weight = steer_weights[steer_bins]
 
-        # # emphasize turning
-        # continuous_weights[np.abs(steer) > 0.2] *= 3.0
-
-        # # emphasize braking
-        # continuous_weights[brake > 0.05] *= 3.0
-        # continuous_weights = continuous_weights.squeeze()
-        
-        
-        throttle = data_raw["target_throttle"].astype(np.float32)
-        steer = data_raw["target_steering_angle"].astype(np.float32)
-
-        throttle = throttle.squeeze()
-        steer = steer.squeeze()
-
-
-        # Bin steering
-        bin_size = 0.1
-        steer_bins = np.floor((steer + 1.0) / bin_size).astype(int)
-        n_bins = int(2.0 / bin_size) + 1
-
-        steer_bins = np.clip(steer_bins, 0, n_bins - 1)
-
-        
-        
-        # Compute bin frequencies
-        counts = np.bincount(steer_bins, minlength=n_bins).astype(np.float32)
-
-        freq = counts / counts.sum()
-
-        # avoid division by zero
-        freq = np.maximum(freq, 1e-6)
-
-        # 3. Steering weights
-        steer_weights = 1.0 / freq
-        steer_weights = steer_weights / steer_weights.mean()
-
-        sample_steer_weight = steer_weights[steer_bins]
-
-        # Throttle factor
-        sample_throttle_factor = 1.0 + 0.15 * throttle
+            # sample_throttle_factor = 1.0 + 0.15 * throttle
+            # continuous_weights = sample_steer_weight * sample_throttle_factor
+            
+            continuous_weights = sample_steer_weight.astype(np.float32)
+            
+            debug_sampler_distribution(steer, continuous_weights)
 
 
-        # continuous_weights = sample_steer_weight * sample_throttle_factor
-        
-        continuous_weights = sample_steer_weight
-        continuous_weights = continuous_weights.astype(np.float32)
-        
-        debug_sampler_distribution(steer, continuous_weights)
 
-
-    # Split dataset
     train_ds, val_ds = split_dataset(ds, args.val_split, seed=config.BC_SPLIT_SEED)
 
-    # Initialize DataLoaders
-    if args.mode == "continuous":
+
+    
+    # If we are in continuous mode AND we created a sampler
+    if args.mode == "continuous" and config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
         # Get the indices of the data that ended up in the training split
         train_indices = train_ds.indices
         train_weights_subset = continuous_weights[train_indices]
@@ -467,9 +478,13 @@ def main():
         train_loader = DataLoader(
             train_ds,
             batch_size=args.batch,
-            # sampler=sampler,  # shuffle must be False when sampler is provided
+            sampler=sampler, 
         )
+        
     else:
+        # This handles:
+        # 1. args.mode == "discrete"
+        # 2. args.mode == "continuous" but config.WEIGHTED_SAMPLING == "none"
         train_loader = DataLoader(
             train_ds,
             batch_size=args.batch,
@@ -481,6 +496,7 @@ def main():
         batch_size=args.batch,
         shuffle=False
     )
+
 
     grid0, scalars0, _ = ds[0]
     grid_channels = grid0.shape[0]
@@ -498,7 +514,7 @@ def main():
     else:
         model = ImitationPolicy(
             mode="continuous",
-            is_gaussian=args.is_gaussian, # Pass the flag here
+            is_gaussian=args.is_gaussian,
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
         ).to(device)
@@ -514,7 +530,7 @@ def main():
             def criterion(pred, target):
                 mean, std = pred
 
-                std = torch.clamp(std, 1e-3, 2.5)
+                std = torch.clamp(std, config.MIN_STD, config.MAX_STD)
 
                 dist = torch.distributions.Normal(mean, std)
                 return -dist.log_prob(target).mean()
@@ -530,26 +546,7 @@ def main():
     print("Device:", device)
 
 
-    # print("DEBUG dataset attributes:", dir(ds))
-    # try:
-    #     print("Actions sample:", ds.actions[:5])
-    # except:
-    #     print("Actions attribute not found")
-    # if hasattr(ds, 'actions'):
-    #     try:
-    #       tb_writer.add_histogram("dataset/actions", ds.actions, 0)
-    #     except:
-    #        pass
 
-
-    # print("DEBUG type(dataset):", type(ds))
-    # # Histogram for continuous actions
-    # if args.mode == "continuous":
-    #     try:
-    #         tb_writer.add_histogram("dataset/targets", ds.targets, 0)
-    #         print("✅ Dataset histogram logged (targets)")
-    #     except Exception as e:
-    #         print("Histogram error:", e)
 
 
 
@@ -558,9 +555,13 @@ def main():
 
         if args.mode == "discrete":
             
-            ce_speed = nn.CrossEntropyLoss(weight=speed_weights)
-            ce_turn = nn.CrossEntropyLoss(weight=turn_weights)
-
+            if config.USE_WEIGHTED_LOSS:
+                ce_speed = nn.CrossEntropyLoss(weight=speed_weights)
+                ce_turn = nn.CrossEntropyLoss(weight=turn_weights)
+            else:
+                ce_speed = nn.CrossEntropyLoss()
+                ce_turn = nn.CrossEntropyLoss()
+                
             train_loss = train_epoch_discrete(
                 model,
                 train_loader,
@@ -603,7 +604,7 @@ def main():
 
         else:
             train_loss = train_epoch_continuous(
-                model, train_loader, opt, criterion, device
+                model, train_loader, opt, device
             )
 
             val_metrics = evaluate_continuous(
@@ -628,6 +629,7 @@ def main():
 
             if args.is_gaussian:
                 tb_writer.add_scalar("metrics/nll", val_metrics["nll"], epoch)
+                tb_writer.add_scalar("metrics/avg_std", val_metrics["avg_std"], epoch)
 
                 print(
                     f"Epoch {epoch:03d} | "
@@ -709,4 +711,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
