@@ -106,7 +106,7 @@ def evaluate_discrete(model, loader, device):
         "loss": loss_sum / total,
         "f1_speed": f1_score(speed_targets, speed_preds, average="macro"),
         "f1_turn": f1_score(turn_targets, turn_preds, average="macro"),
-    }
+    } 
 
 @torch.no_grad()
 def evaluate_continuous(model, loader, device, is_gaussian=False):
@@ -286,7 +286,7 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data", type=str, default=config.DATASET_PATH)
+    # parser.add_argument("--data", type=str, default=config.DATASET_PATH)
 
     parser.add_argument(
         "--mode",
@@ -308,9 +308,13 @@ def main():
 
     args = parser.parse_args()
 
-
+    DATASET_PATH = None
     dataset_meta = None
-    meta_path = Path(args.data).with_suffix(".meta.json")
+    if args.mode == args.mode == "discrete":
+        DATASET_PATH = config.DISCRETE_DATASET_PATH
+    else: 
+        DATASET_PATH = config.CONTINUOUS_DATASET_PATH
+    meta_path = Path(DATASET_PATH).with_suffix(".meta.json")
 
     if meta_path.exists():
         with open(meta_path, "r") as f:
@@ -344,8 +348,13 @@ def main():
     "weighted_loss_threshold_continuous": config.WEIGHTED_LOSS_THRESHOLD,
     "min_std": config.MIN_STD,
     "max_std": config.MAX_STD,
-    "weight_sampling": config.WEIGHTED_SAMPLING
-    
+    "weight_sampling": config.WEIGHTED_SAMPLING,
+    "cnn_channels": config.CNN_CHANNELS,
+    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": config.LATENT_DIM
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -396,11 +405,11 @@ def main():
 
     # Initialize dataset based on mode
     if args.mode == "discrete":
-        ds = BCDataset(args.data)
+        ds = BCDataset(DATASET_PATH)
         n_speed = int(ds.actions[:, 0].max()) + 1
         n_turn  = int(ds.actions[:, 1].max()) + 1
     else:
-        ds = BCDatasetContinuous(args.data)
+        ds = BCDatasetContinuous(DATASET_PATH)
 
     print(type(ds))
     
@@ -415,7 +424,7 @@ def main():
 
     if args.mode == "continuous" and config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
         # Only load the raw dataset into memory if we actually need it for weights
-        data_raw = np.load(args.data)
+        data_raw = np.load(DATASET_PATH)
         
         throttle = data_raw["target_throttle"].astype(np.float32).squeeze()
         steer = data_raw["target_steering_angle"].astype(np.float32).squeeze()
@@ -503,23 +512,34 @@ def main():
     scalar_dim = scalars0.numel()
 
     # Model Initialization
+    kwargs = {
+    "grid_channels": grid_channels,
+    "scalar_dim": scalar_dim,
+    "cnn_channels": config.CNN_CHANNELS,
+    "kernel_sizes": config.KERNEL_SIZES,
+    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": config.LATENT_DIM,
+    }
+
     if args.mode == "discrete":
         model = ImitationPolicy(
             mode="discrete",
-            grid_channels=grid_channels,
-            scalar_dim=scalar_dim,
             n_speed=n_speed,
             n_turn=n_turn,
+            **kwargs
         ).to(device)
     else:
         model = ImitationPolicy(
             mode="continuous",
             is_gaussian=args.is_gaussian,
-            grid_channels=grid_channels,
-            scalar_dim=scalar_dim,
+            **kwargs
         ).to(device)
-    print("Grid channels:", grid_channels)
-    print("Grid shape:", grid0.shape)
+        
+        print("Grid channels:", grid_channels)
+        print("Grid shape:", grid0.shape)
 
     opt = optim.AdamW(model.parameters(), lr=args.lr)
 

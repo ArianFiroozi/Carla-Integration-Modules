@@ -11,7 +11,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # =========================================================
-# RANDOM SEEDS
+# RANDOM SEEDS 
 # =========================================================
 
 BUILD_RNG_SEED = 42
@@ -37,8 +37,8 @@ PROCESSED_DIR = DATA_DIR / "processed"
 AUTOPILOT_RECORD_DIR = EXPERT_DIR / "map1_0car"
 MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_30car"
 
-DATASET_PATH = PROCESSED_DIR / "dataset_bc.npz"
-
+DISCRETE_DATASET_PATH = PROCESSED_DIR / "dataset_bc_discrete.npz"
+CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 # input of build dataset and inspect demo
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
@@ -85,7 +85,7 @@ SMOOTH_STEERING = False
 # ACTION SIMPLIFICATION
 # =========================================================
 
-SIMPLIFY_ACTIONS = False
+SIMPLIFY_ACTIONS = True
 REMOVE_REVERSE = True
 REMOVE_NO_TURN = True
 
@@ -124,9 +124,6 @@ OBS_BOUNDS = {
 }
 
 
-# ==========================================================================================
-# FEATURE FLAGS & PARAMETERS (Covariate Shift Mitigation)
-# ==========================================================================================
 
 # Feature: Continuous Undersampling
 # Drops samples with low steering to focus the model on turning behavior.
@@ -182,7 +179,7 @@ JOINT_KEEP_PROBS = {
 # IMITATION LEARNING TRAINING
 # =========================================================
 
-BC_EPOCHS = 10
+BC_EPOCHS = 100
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -232,9 +229,9 @@ EVAL_RENDER_LOG_EVERY = 200
 # DEBUG / VISUALIZATION
 # =========================================================
 
-DEBUG_PRINT_STEPS = 50
+DEBUG_PRINT_STEPS = 500
 
-INSPECT_VISUALIZE = False
+INSPECT_VISUALIZE = True
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
 BUILD_VISUALIZE = False
@@ -251,6 +248,20 @@ WINDOW_SIZE = 3
 
 
 
+# =========================================================
+# MODEL ARCHITECTURE HYPERPARAMETERS
+# =========================================================
+# CNN setting
+CNN_CHANNELS = [16, 32, 64]
+KERNEL_SIZES = [3, 3, 3]
+
+# Fully Connected settings
+HEAD_N_MLP_LAYERS = 2
+HEAD_MLP_HIDDEN_SIZE = 64
+SCALAR_N_MLP_LAYERS = 2
+SCALAR_MLP_HIDDEN_SIZE = 64
+
+LATENT_DIM = 128
 
 
 

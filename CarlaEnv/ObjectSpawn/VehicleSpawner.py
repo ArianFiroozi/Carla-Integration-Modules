@@ -6,11 +6,14 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
     world = client.get_world()
     traffic_manager = client.get_trafficmanager()
     speed_profiles = [
-            (-40, -20),   # very slow (ideal for overtaking training)
-            (-20, -5),    # slow
-            (-5, 5),      # normal
-            (5, 15),      # slightly fast
-        ]
+
+    (25, 45), # very slow traffic (55–75% of speed limit)
+
+    (10, 25), # slow/near-limit traffic (75–90% of speed limit)
+
+    (-15, -5), # slightly fast (105–115% of speed limit)
+
+    ]
     blueprint_library = world.get_blueprint_library()
     vehicle_blueprints = blueprint_library.filter("vehicle.*")
 
@@ -39,8 +42,9 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
 
         speed_min, speed_max = random.choice(speed_profiles)
         speed_diff = random.randint(speed_min, speed_max)
-
         traffic_manager.vehicle_percentage_speed_difference(vehicle, speed_diff)
+        
+        
         # traffic_manager.random_left_lanechange_percentage(vehicle, random.randint(0, 30))
         # traffic_manager.random_right_lanechange_percentage(vehicle, random.randint(0, 30))
         traffic_manager.distance_to_leading_vehicle(vehicle, random.uniform(1.0, 5.0))

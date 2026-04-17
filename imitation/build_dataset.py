@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[0]
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 DEMO_DIRS = config.DEMO_LIST
-OUT_PATH = config.DATASET_PATH
+if config.ACTION_MODE == "discrete":
+    OUT_PATH = config.DISCRETE_DATASET_PATH
+else:
+    OUT_PATH = config.CONTINUOUS_DATASET_PATH
 RNG_SEED = config.BUILD_RNG_SEED
 
 # Window Size configuration 
@@ -341,46 +344,54 @@ def pass_1_compute_masks(files, stats, mode, rng):
     return keep_masks, total_kept, obs_keys, obs_shapes
 
 def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
-    """Fills pre-allocated temporal arrays seamlessly directly from raw history."""
     out_obs = {}
-    
-    # Pre-allocate
+
+    # Pre-allocate arrays
     for k in obs_keys:
         if k in GRID_KEYS:
             H, W = obs_shapes[k]
             out_obs[k] = np.empty((total_kept, WINDOW_SIZE, H, W), dtype=np.float32)
         else:
             out_obs[k] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32)
-            
+
     out_actions = np.empty((total_kept, 2), dtype=np.int64)
 
     idx = 0
+
     for f, mask in zip(files, keep_masks):
         d = np.load(f, allow_pickle=True)
-        
-        # Find valid targets that have enough history
+
         valid_indices = np.where(mask)[0]
         valid_indices = valid_indices[valid_indices >= (WINDOW_SIZE - 1)]
+        n = len(valid_indices)
 
-        for i in valid_indices:
-            # 1. Fill Temporal Grids
-            for k in GRID_KEYS:
-                # Want chronological order: (t-2, t-1, t)
-                out_obs[k][idx] = d[k][i-WINDOW_SIZE+1:i+1]
+        if n == 0:
+            continue
 
+        # WINDOW STARTS → shape (n,)
+        window_starts = valid_indices - (WINDOW_SIZE - 1)
 
-            # 2. Fill Scalars (Target frame t only)
-            for k in obs_keys:
-                if k not in GRID_KEYS:
-                    arr = d[k][i]
-                    if arr.ndim == 0:
-                        arr = np.array([arr], dtype=np.float32)
-                    out_obs[k][idx] = arr.astype(np.float32)
+        # Build (n, WINDOW_SIZE) table of indices
+        # Example for W=3: [[0,1,2], [1,2,3], [2,3,4], ...]
+        index_table = window_starts[:, None] + np.arange(WINDOW_SIZE)
 
-            out_actions[idx] = d["actions"][i].astype(np.int64)
-            idx += 1
+        # 1. Batch copy GRID KEYS
+        for k in GRID_KEYS:
+            out_obs[k][idx:idx+n] = d[k][index_table]
+
+        # 2. Batch copy scalars
+        scalar_src = valid_indices
+        for k in obs_keys:
+            if k not in GRID_KEYS:
+                out_obs[k][idx:idx+n] = d[k][scalar_src]
+
+        # 3. Actions
+        out_actions[idx:idx+n] = d["actions"][scalar_src]
+
+        idx += n
 
     return out_obs, out_actions
+
 
 # ==============================================================================
 # 4. MAIN ORCHESTRATOR

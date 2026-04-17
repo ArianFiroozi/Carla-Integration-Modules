@@ -150,7 +150,7 @@ def process_continuous_output(out):
     brake = float(np.clip(out[1], 0.0, 1.0))
     steer = float(np.clip(out[2], -1.0, 1.0))
     # prevent throttle+brake conflict
-    if brake > 0.05:
+    if brake > 0.1:
         throttle = 0.0
     else:
         brake = 0.0
@@ -159,6 +159,7 @@ def process_continuous_output(out):
         steer = 0.7 * prev_steer + 0.3 * steer
         prev_steer = steer
         steer = np.clip(steer, -1.0, 1.0)
+        
 
     return [throttle, brake, steer]
 
@@ -254,7 +255,7 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=No
     history = ObsHistory()
     camera = None
     video = None
-
+    video_path = None
     if video_path is not None:
         camera, video = create_video_recorder(env, video_path)  
     rewards = []
@@ -345,23 +346,32 @@ def load_policy_from_checkpoint(model_path, config_path):
     mode = ckpt["mode"]
     scalar_dim = ckpt["scalar_dim"]
     grid_channels = ckpt["grid_channels"]
+    kwargs = {
+    "grid_channels": grid_channels,
+    "scalar_dim": scalar_dim,
+    "cnn_channels": config.CNN_CHANNELS,
+    "kernel_sizes": config.KERNEL_SIZES,
+    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": config.LATENT_DIM,
+    }
 
     if mode == "discrete":
         n_speed = ckpt["n_speed"]
         n_turn = ckpt["n_turn"]
         policy = ImitationPolicy(
             mode="discrete",
-            grid_channels=grid_channels,
-            scalar_dim=scalar_dim,
             n_speed=n_speed,
             n_turn=n_turn,
+            **kwargs
         ).to(DEVICE)
     else:
         policy = ImitationPolicy(
             mode="continuous",
-            is_gaussian=ckpt.get("is_gaussian", False),
-            grid_channels=grid_channels,
-            scalar_dim=scalar_dim,
+            is_gaussian=config.IS_GAUSSIAN,
+            **kwargs
         ).to(DEVICE)
 
     policy.load_state_dict(ckpt["model_state_dict"])

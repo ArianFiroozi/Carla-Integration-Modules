@@ -6,7 +6,6 @@ from collections import Counter
 ROOT = Path(__file__).resolve().parents[0]
 
 DEMO_DIRS = config.DEMO_LIST
-OUT_PATH = config.DATASET_PATH
 RNG_SEED = config.BUILD_RNG_SEED
 
 # Termination Filtering

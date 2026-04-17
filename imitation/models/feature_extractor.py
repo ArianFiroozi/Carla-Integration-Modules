@@ -2,64 +2,47 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-
 class FeatureExtractor(nn.Module):
-    """
-    Shared encoder used by BC and PPO.
-    Processes:
-        - occupancy grid via CNN
-        - scalar features via MLP
-    Produces a fused latent vector.
-    """
-
-    def __init__(self, grid_channels=1, scalar_dim=4, latent_dim=128):
+    def __init__(self, grid_channels=1, scalar_dim=4, latent_dim=128, 
+                 cnn_channels=[16, 32, 64], kernel_sizes=[3, 3, 3], 
+                 n_mlp_layers=2, mlp_hidden_size=64):
         super().__init__()
 
-        # CNN for spatial grid
-        self.cnn = nn.Sequential(
-            nn.Conv2d(grid_channels, 16, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
+        cnn_layers = []
+        in_channels = grid_channels
+        for out_channels, k_size in zip(cnn_channels, kernel_sizes):
+            cnn_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=k_size, padding=k_size//2))
+            cnn_layers.append(nn.ReLU(inplace=True))
+            if out_channels != cnn_channels[0]: 
+                cnn_layers.append(nn.MaxPool2d(2))
+            in_channels = out_channels
+        
+        self.cnn = nn.Sequential(*cnn_layers)
 
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-
-            nn.MaxPool2d(2),
-
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-
-            nn.MaxPool2d(2),
-        )
-
-        # Dynamically determine CNN output size
         with torch.no_grad():
             dummy = torch.zeros(1, grid_channels, 25, 11)
             out = self.cnn(dummy)
             cnn_dim = int(np.prod(out.shape[1:]))
 
-        # Scalar encoder
-        self.scalar_mlp = nn.Sequential(
-            nn.Linear(scalar_dim, 64),
+        scalar_layers = []
+        in_dim = scalar_dim
+        for _ in range(n_mlp_layers):
+            scalar_layers.append(nn.Linear(in_dim, mlp_hidden_size))
+            scalar_layers.append(nn.ReLU(inplace=True))
+            in_dim = mlp_hidden_size
+            
+        self.scalar_mlp = nn.Sequential(*scalar_layers)
+
+        self.fuse = nn.Sequential(
+            nn.Linear(cnn_dim + mlp_hidden_size, 256),
             nn.ReLU(inplace=True),
-            nn.Linear(64, 64),
+            nn.Dropout(0.2),
+            nn.Linear(256, latent_dim),
             nn.ReLU(inplace=True),
         )
 
-        # Fusion network
-        self.fuse = nn.Sequential(
-        nn.Linear(cnn_dim + 64, 256),
-        nn.ReLU(inplace=True),
-        nn.Dropout(0.2),
-        nn.Linear(256, latent_dim),
-        nn.ReLU(inplace=True),
-    )
-
-
     def forward(self, grid, scalars):
-
         grid_feat = self.cnn(grid).flatten(1)
         scalar_feat = self.scalar_mlp(scalars)
-
         fused = torch.cat([grid_feat, scalar_feat], dim=1)
-
         return self.fuse(fused)
