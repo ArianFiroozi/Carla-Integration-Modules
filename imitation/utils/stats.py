@@ -175,23 +175,25 @@ def print_continuous_stats(stats):
         print(f"Avg Ep Length:     {np.mean(stats['episode_lengths']):.2f} steps")
 
 
-# def print_throttle_steer_bins(out_obs, num_bins=10):
-#     """Example binning stats for throttle and steering."""
-#     if "obs_throttle" not in out_obs or "obs_steering_angle" not in out_obs:
-#         return
 
-#     throttle = out_obs["obs_throttle"].reshape(-1)
-#     steer = out_obs["obs_steering_angle"].reshape(-1)
+def extract_dataset_sources(source_files):
+    """
+    Convert a list of file paths into a set of summarized dataset sources.
+    Example:
+    data\\demos\\map1_0car\\file.npz -> demos\\map1_0car
+    """
+    sources = set()
 
-#     print("\nThrottle histogram (counts per bin):")
-#     hist_t, edges_t = np.histogram(throttle, bins=num_bins, range=(0, 1))
-#     print("  edges:", edges_t)
-#     print("  counts:", hist_t)
+    for p in source_files:
+        parts = Path(p).parts
+        # find "demos" and keep the next directory
+        if "demos" in parts:
+            i = parts.index("demos")
+            if i + 1 < len(parts):
+                sources.add(f"{parts[i]}\\{parts[i+1]}")
 
-#     print("\nSteering histogram (counts per bin):")
-#     hist_s, edges_s = np.histogram(steer, bins=num_bins)
-#     print("  edges:", edges_s)
-#     print("  counts:", hist_s)
+    return sorted(list(sources))
+
 
 
 

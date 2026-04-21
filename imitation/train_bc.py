@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from sklearn.metrics import f1_score
-
+from.utils.stats import extract_dataset_sources
 from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
 from .models.imitation_policy import ImitationPolicy
 
@@ -142,7 +142,8 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
 
         mse_sum += nn.functional.mse_loss(point_pred, target, reduction="sum").item()
         mae_sum += torch.abs(point_pred - target).sum().item()
-        std_sum += std.sum().item()
+        if is_gaussian:
+            std_sum += std.sum().item()
         n += np.prod(target.shape)
 
     metrics = {
@@ -301,8 +302,16 @@ def log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta):
     # Removing dataset_meta from config_dict temporarily for cleaner printing if it was attached
     clean_config = {k: v for k, v in config_dict.items() if k != "dataset_meta"}
     config_str = json.dumps(clean_config, indent=2, default=str)
+    
     tb_writer.add_text("Config/Hyperparameters", f"```json\n{config_str}\n```", 0)
-
+    
+    for k, v in clean_config.items():
+        if isinstance(v, (int, float, bool)):
+            tb_writer.add_scalar(f"Config/{k}", float(v), 0)
+        else:
+            # Non-numeric parameters (like 'device' or 'mode') go into text
+            tb_writer.add_text(f"Config/{k}", str(v), 0)
+            
     if dataset_meta is None:
         print("[TB] ⚠️ No dataset metadata available to log.")
         return
@@ -311,9 +320,23 @@ def log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta):
     tb_writer.add_scalar("Dataset_Info/total_samples", dataset_meta.get("total_samples", 0), 0)
     tb_writer.add_text("Dataset_Info/created_at", dataset_meta.get("created_at", "unknown"), 0)
     
-    # Log number of demonstration files used
+    # Log summary of demonstration files used
     source_files = dataset_meta.get("source_files", [])
-    tb_writer.add_scalar("Dataset_Info/num_source_files", len(source_files), 0)
+
+    dataset_sources = extract_dataset_sources(source_files)
+
+    tb_writer.add_text(
+        "Dataset_Info/source_roots",
+        "\n".join(dataset_sources),
+        0
+    )
+
+    tb_writer.add_scalar(
+        "Dataset_Info/num_source_groups",
+        len(dataset_sources),
+        0
+    )
+
 
     # 3. Stats section (Frames kept, dropped, trimmed)
     stats = dataset_meta.get("stats", {})

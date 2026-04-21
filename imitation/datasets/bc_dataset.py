@@ -286,35 +286,31 @@ class BaseDataset(Dataset):
         return np.clip(v / MAX_SPEED, -1.0, 1.0)
         
     def _get_processed_grid(self, idx):
-    
-        # Data has already been windowed in build_dataset and has shape (3, 25, 11)
-        vx = torch.from_numpy(self._normalize_speed(self.speed_x[idx])).float()
-        vy = torch.from_numpy(self._normalize_speed(self.speed_y[idx])).float()
+        # Shapes:
+        # presence = (WINDOW_SIZE, H, W)
+        # speed_x  = (WINDOW_SIZE, H, W)
+        # speed_y  = (WINDOW_SIZE, H, W)
+
+        pres = torch.from_numpy(self.presence[idx]).long()              # (W,H,W)
+        vx   = torch.from_numpy(self._normalize_speed(self.speed_x[idx])).float()
+        vy   = torch.from_numpy(self._normalize_speed(self.speed_y[idx])).float()
 
         if self.one_hot_presence:
-            presence = torch.from_numpy(self.presence[idx]).long()
-            
-            mask_v = (presence == 1).float()
-            mask_w = (presence == 2).float()
-            
-            # Important: in the build_dataset script the ego vehicle is remapped from 9 to 3
-            mask_e = (presence == 3).float()
-            # Important: in the build_dataset script the ego vehicle was remapped from 9 to 3
+            mask_v = (pres == 1).float()
+            mask_w = (pres == 2).float()
+            mask_e = (pres == 3).float()  # because build_dataset remaps 9 -> 3
+
+            # (WINDOW_SIZE, 3+2, H, W)
             stacked = torch.stack([mask_v, mask_w, mask_e, vx, vy], dim=1)
         else:
-            
-            # Important: in the build_dataset script the ego vehicle was remapped from 9 to 3
-            
-            presence_norm = torch.from_numpy(self.presence[idx]).float()
-            
-           # Stack along channel dimension -> (3 frames, 3 channels, 25, 11)
+            presence_norm = pres.float()
             stacked = torch.stack([presence_norm, vx, vy], dim=1)
-            
-        # Flatten frames and channels together to produce a single CNN input tensor
-        # Output: (15, 25, 11) for one-hot mode or (9, 25, 11) for normal mode
-        
-        channels = stacked.shape[1]
-        return stacked.view(3 * channels, stacked.shape[2], stacked.shape[3])
+
+        # Merge window & channel dims:
+        # final shape = (WINDOW_SIZE * channels_per_frame, H, W)
+        W, C, H, Wd = stacked.shape
+        return stacked.view(W * C, H, Wd)
+
 
 class BCDataset(BaseDataset):
     """Dataset for Discrete High-Level Actions"""

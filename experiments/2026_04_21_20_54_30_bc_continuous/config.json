@@ -1,0 +1,213 @@
+{
+    "mode": "continuous",
+    "epochs": 30,
+    "batch_size": 512,
+    "lr": 0.0003,
+    "val_split": 0.1,
+    "patience": 10,
+    "device": "cuda",
+    "is_gaussian": false,
+    "use_continuous_undersampling": false,
+    "undersampling_threshold_continuous": 0.05,
+    "undersampling_probability_continuous": 0.6,
+    "use_weighted_loss": false,
+    "steer_loss_weight_continuous": 3.0,
+    "throttle_loss_weight_continuous": 1.0,
+    "brake_loss_weight_continuous": 1.0,
+    "weighted_loss_threshold_continuous": 0.1,
+    "min_std": 0.05,
+    "max_std": 1,
+    "weight_sampling": "none",
+    "cnn_channels": [
+        16,
+        32,
+        64
+    ],
+    "head_n_mlp_layers": 2,
+    "head_mlp_hidden_size": 64,
+    "scalar_n_mlp_layers": 2,
+    "scalar_mlp_hidden_size": 32,
+    "latent_dim": 128,
+    "use_one_hot_grid": true,
+    "dataset_meta": {
+        "created_at": "2026-04-21 20:54:28",
+        "dataset_path": "data\\processed\\dataset_bc_continuous.npz",
+        "source_files": [
+            "data\\demos\\map1_30car\\map1_20260412_161736_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260412_161758_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260412_161902_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162006_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162110_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162213_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162303_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162407_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162510_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162614_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162700_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162754_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260412_162858_ep0012.npz",
+            "data\\demos\\map1_30car\\map1_20260414_231618_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260414_231744_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260414_231841_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260414_231918_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232028_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232215_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232309_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232416_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232608_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260414_232842_ep0016.npz",
+            "data\\demos\\map1_30car\\map1_20260414_233444_ep0019.npz",
+            "data\\demos\\map1_30car\\map1_20260414_233548_ep0020.npz",
+            "data\\demos\\map1_30car\\map1_20260414_233652_ep0021.npz",
+            "data\\demos\\map1_30car\\map1_20260414_233756_ep0022.npz",
+            "data\\demos\\map1_30car\\map1_20260414_233903_ep0023.npz",
+            "data\\demos\\map1_30car\\map1_20260414_234008_ep0024.npz",
+            "data\\demos\\map1_30car\\map1_20260414_234057_ep0025.npz",
+            "data\\demos\\map1_30car\\map1_20260414_234127_ep0026.npz",
+            "data\\demos\\map1_30car\\map1_20260414_234233_ep0027.npz",
+            "data\\demos\\map1_30car\\map1_20260414_234902_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235007_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235111_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235222_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235308_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235346_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235451_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235534_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235638_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235756_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235902_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260414_235934_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000038_ep0012.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000142_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000159_ep0014.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000303_ep0015.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000320_ep0016.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000425_ep0017.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000557_ep0018.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000705_ep0019.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000806_ep0020.npz",
+            "data\\demos\\map1_30car\\map1_20260415_000913_ep0021.npz",
+            "data\\demos\\map1_30car\\map1_20260417_223809_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260417_223914_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260417_224018_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260417_224234_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260417_224254_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260417_224349_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260417_224453_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225112_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225216_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225255_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225347_ep0012.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225404_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225442_ep0014.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225609_ep0015.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225740_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225844_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260417_225948_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_154936_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155047_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155151_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155218_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155235_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155311_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155415_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155509_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155608_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155713_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155759_ep0012.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_155837_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_160311_ep0017.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_160415_ep0018.npz",
+            "data\\demos\\map1_30car\\map1_cars_20260412_160520_ep0019.npz"
+        ],
+        "total_samples": 133982,
+        "observation_keys": [
+            "obs_speed_x",
+            "obs_speed_y",
+            "obs_presence",
+            "obs_lane_angle",
+            "obs_traffic_signs",
+            "obs_max_speed",
+            "obs_ego_speed_x",
+            "obs_ego_speed_y",
+            "obs_ego_in_lane_position_x",
+            "obs_throttle",
+            "obs_brake",
+            "obs_steering_angle",
+            "obs_reverse"
+        ],
+        "observation_shapes": {
+            "obs_speed_x": [
+                25,
+                11
+            ],
+            "obs_speed_y": [
+                25,
+                11
+            ],
+            "obs_presence": [
+                25,
+                11
+            ],
+            "obs_lane_angle": [
+                1
+            ],
+            "obs_traffic_signs": [
+                5
+            ],
+            "obs_max_speed": [
+                1
+            ],
+            "obs_ego_speed_x": [
+                1
+            ],
+            "obs_ego_speed_y": [
+                1
+            ],
+            "obs_ego_in_lane_position_x": [
+                1
+            ],
+            "obs_throttle": [
+                1
+            ],
+            "obs_brake": [
+                1
+            ],
+            "obs_steering_angle": [
+                1
+            ],
+            "obs_reverse": [
+                1
+            ]
+        },
+        "stats": {
+            "total_frames": 143105,
+            "obs_violations": {
+                "obs_lane_angle": 5659
+            },
+            "obs_violation_frames": 5659,
+            "idle_frames_trimmed": 0,
+            "terminated_dropped": 35,
+            "truncated_dropped": 51,
+            "pre_termination_dropped": 3380,
+            "sampling_dropped": 0,
+            "kept": 133982
+        },
+        "pipeline_config": {
+            "mode": "continuous",
+            "window_size": 1,
+            "simplify_actions": true,
+            "remove_reverse": true,
+            "remove_no_turn": true,
+            "idle_trim_enabled": false,
+            "idle_speed_threshold": 0.3,
+            "idle_throttle_threshold": 0.05,
+            "mirror_enabled": false,
+            "mirror_steering_threshold": 0.04
+        }
+    },
+    "metadata": {
+        "timestamp": "2026-04-21T20:54:30.644149",
+        "git_commit": "1ae61521e60bf77d925550e820033434a5fab6bd"
+    }
+}

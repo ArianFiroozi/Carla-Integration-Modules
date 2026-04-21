@@ -38,34 +38,61 @@ DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test"
-    MANUAL_DIR / "map1_0car"
-    # MANUAL_DIR / "map1_30car"
+    MANUAL_DIR / "map1_0car",
+    MANUAL_DIR / "map1_30car"
 ]
 
 # =========================================================
 # MODEL ARCHITECTURE HYPERPARAMETERS
 # =========================================================
 # CNN settings
-# CNN_CHANNELS = [32, 64, 128]
-CNN_CHANNELS = [16, 32, 64]
-KERNEL_SIZES = [3, 3, 3]
 
+# # ---BASELINE---
+# CNN_CHANNELS = [16, 32, 64]
+# KERNEL_SIZES = [3, 3, 3]
+# # Fully Connected settings (Scalars)
+# SCALAR_N_MLP_LAYERS = 2
+# SCALAR_MLP_HIDDEN_SIZE = 32
+# # Fusion & Latent
+# LATENT_DIM = 128
+# # Actor Head settings (Gaussian)
+# HEAD_N_MLP_LAYERS = 2
+# HEAD_MLP_HIDDEN_SIZE = 64
+
+# ---BALANCED---
+CNN_CHANNELS = [32, 64, 128]
+KERNEL_SIZES = [3, 3, 3]
 # Fully Connected settings (Scalars)
 SCALAR_N_MLP_LAYERS = 2
-SCALAR_MLP_HIDDEN_SIZE = 32
-
+SCALAR_MLP_HIDDEN_SIZE = 64
 # Fusion & Latent
-LATENT_DIM = 128
-
+LATENT_DIM = 256
 # Actor Head settings (Gaussian)
 HEAD_N_MLP_LAYERS = 2
 HEAD_MLP_HIDDEN_SIZE = 128
+
+
+# # ---BIG---
+# CNN_CHANNELS = [32, 64, 128]
+# KERNEL_SIZES = [5, 3, 3]
+# # Fully Connected settings (Scalars)
+# SCALAR_N_MLP_LAYERS = 2
+# SCALAR_MLP_HIDDEN_SIZE = 64
+# # Fusion & Latent
+# LATENT_DIM = 256
+# # Actor Head settings (Gaussian)
+# HEAD_N_MLP_LAYERS = 2
+# HEAD_MLP_HIDDEN_SIZE = 256
+
+
+
+
 
 # =========================================================
 # ACTION SPACE
 # =========================================================
 ACTION_MODE = "continuous"   # "discrete" or "continuous"
-IS_GAUSSIAN = True
+IS_GAUSSIAN = False
 MIN_STD=0.05
 MAX_STD=1
 SMOOTH_STEERING = False
@@ -130,7 +157,7 @@ OBS_BOUNDS = {
 DROP_TERMINATED = True
 DROP_LAST_N_BEFORE_TERMINATION = 100
 
-FILTER_IDLE_FRAMES = True
+FILTER_IDLE_FRAMES = False
 IDLE_FILTER_MODE = "all"
 
 IDLE_SPEED_THRESHOLD = 0.3
@@ -152,12 +179,12 @@ JOINT_KEEP_PROBS = {
 
 
 
-USE_CONTINUOUS_UNDERSAMPLING = True
+USE_CONTINUOUS_UNDERSAMPLING = False
 UNDERSAMPLING_THRESHOLD = 0.05      # Absolute steering value below which is "straight"
 UNDERSAMPLING_PROBABILITY = 0.6     # 60% chance to drop straight samples if flag is True
 
 
-USE_WEIGHTED_LOSS = True
+USE_WEIGHTED_LOSS = False
 STEER_LOSS_WEIGHT = 3.0             # Multiplier for loss when steering error is large
 THROTTLE_LOSS_WEIGHT = 1.0
 BRAKE_LOSS_WEIGHT = 1.0
@@ -171,9 +198,9 @@ WEIGHTED_SAMPLING = "none" # "inverse" or "none" or "handmade"
 # ================================
 # Dataset Augmentation
 # ================================
-MIRROR_DATASET = True
+MIRROR_DATASET = False
 MIRROR_STEERING_THRESHOLD = 0.04
-WINDOW_SIZE = 3
+WINDOW_SIZE = 1
 USE_ONE_HOT_GRID = True
 
 
@@ -207,7 +234,7 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 # =========================================================
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 0
+CARLA_VEHICLES = 30
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 

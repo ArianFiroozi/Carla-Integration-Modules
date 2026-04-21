@@ -25,14 +25,16 @@ else:
     speed_map = config.SPEED_MAP
     turn_map = config.TURN_MAP
 
-
 class ObsHistory:
-    """Maintains a rolling window of the last 3 grid observations to match the 15-channel output."""
-    def __init__(self, one_hot=True):
+    """Maintains a rolling window of grid observations."""
+
+    def __init__(self, window_size=3, one_hot=True):
+        self.window_size = window_size
         self.one_hot = one_hot
-        self.presence = deque(maxlen=3)
-        self.speed_x = deque(maxlen=3)
-        self.speed_y = deque(maxlen=3)
+
+        self.presence = deque(maxlen=window_size)
+        self.speed_x = deque(maxlen=window_size)
+        self.speed_y = deque(maxlen=window_size)
 
     def reset(self):
         self.presence.clear()
@@ -40,21 +42,21 @@ class ObsHistory:
         self.speed_y.clear()
 
     def _normalize_speed(self, v):
-        MAX_SPEED = 30.0  # m/s
+        MAX_SPEED = 30.0
         return np.clip(v / MAX_SPEED, -1.0, 1.0)
 
     def update(self, obs):
         p = obs["presence"]
-        sx = obs.get("speed_x", np.zeros_like(p)) 
+        sx = obs.get("speed_x", np.zeros_like(p))
         sy = obs.get("speed_y", np.zeros_like(p))
 
         if torch.is_tensor(p): p = p.cpu().numpy()
         if torch.is_tensor(sx): sx = sx.cpu().numpy()
         if torch.is_tensor(sy): sy = sy.cpu().numpy()
 
-        # Fill history with the first frame if empty
+        # If history empty, fill with first frame
         if len(self.presence) == 0:
-            for _ in range(3):
+            for _ in range(self.window_size):
                 self.presence.append(p)
                 self.speed_x.append(sx)
                 self.speed_y.append(sy)
@@ -65,8 +67,8 @@ class ObsHistory:
 
     def get_grid(self):
         frames = []
-        # Loop oldest to newest (t-2, t-1, t)
-        for i in range(3):
+
+        for i in range(self.window_size):
             p = self.presence[i]
             sx = self._normalize_speed(self.speed_x[i])
             sy = self._normalize_speed(self.speed_y[i])
@@ -74,20 +76,21 @@ class ObsHistory:
             if self.one_hot:
                 mask_v = (p == 1).astype(np.float32)
                 mask_w = (p == 2).astype(np.float32)
-                mask_e = (p == 9).astype(np.float32) # BE CAREFUL HERE ,  in build dataset we changed ego from 9 to 3 but here we still need 9
-                
-                # Stack to (5, H, W)
+                mask_e = (p == 9).astype(np.float32)
+
                 frame_stack = np.stack([mask_v, mask_w, mask_e, sx, sy], axis=0)
             else:
                 p_norm = p.astype(np.float32)
-                # Stack to (3, H, W)
                 frame_stack = np.stack([p_norm, sx, sy], axis=0)
-                
+
             frames.append(frame_stack)
-            
-        # Concat along channel dimension: 3 * 5 = 15 channels (or 9 if not one-hot)
+
         grid = np.concatenate(frames, axis=0).astype(np.float32)
         return grid
+
+
+
+
 
 
 def create_video_recorder(env, save_path, width=640, height=360, fps=20):
@@ -273,10 +276,9 @@ def update_spectator(env):
     
 def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=None):
     obs, _ = env.reset()
-    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID)
+    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID, window_size= config.WINDOW_SIZE)
     camera = None
     video = None
-    video_path = None
     if video_path is not None:
         camera, video = create_video_recorder(env, video_path)  
     rewards = []
@@ -394,6 +396,11 @@ def load_policy_from_checkpoint(model_path, config_path):
             is_gaussian=config.IS_GAUSSIAN,
             **kwargs
         ).to(DEVICE)
+
+    expected_channels = config.WINDOW_SIZE * (5 if config.USE_ONE_HOT_GRID else 3)
+
+    assert expected_channels == grid_channels, \
+        f"Grid channel mismatch! model={grid_channels}, expected={expected_channels}"
 
     policy.load_state_dict(ckpt["model_state_dict"])
     policy.eval()
