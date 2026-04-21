@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, grid_channels=1, scalar_dim=4, latent_dim=128, 
-                 cnn_channels=[16, 32, 64], kernel_sizes=[3, 3, 3], 
+    def __init__(self, grid_channels=15, scalar_dim=4, latent_dim=128, 
+                 cnn_channels=[32, 64, 128], kernel_sizes=[3, 3, 3], 
                  n_mlp_layers=2, mlp_hidden_size=64):
         super().__init__()
 
@@ -20,6 +20,7 @@ class FeatureExtractor(nn.Module):
         self.cnn = nn.Sequential(*cnn_layers)
 
         with torch.no_grad():
+            
             dummy = torch.zeros(1, grid_channels, 25, 11)
             out = self.cnn(dummy)
             cnn_dim = int(np.prod(out.shape[1:]))

@@ -421,7 +421,8 @@ def main():
     "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
     "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
     "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
-    "latent_dim": config.LATENT_DIM
+    "latent_dim": config.LATENT_DIM,
+    "use_one_hot_grid": config.USE_ONE_HOT_GRID
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -440,11 +441,11 @@ def main():
 
     # Initialize dataset based on mode
     if args.mode == "discrete":
-        ds = BCDataset(DATASET_PATH)
+        ds = BCDataset(DATASET_PATH, one_hot_presence=config.USE_ONE_HOT_GRID)
         n_speed = int(ds.actions[:, 0].max()) + 1
         n_turn  = int(ds.actions[:, 1].max()) + 1
     else:
-        ds = BCDatasetContinuous(DATASET_PATH)
+        ds = BCDatasetContinuous(DATASET_PATH, one_hot_presence=config.USE_ONE_HOT_GRID)
 
     print(type(ds))
     

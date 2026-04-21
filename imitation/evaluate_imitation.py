@@ -27,8 +27,9 @@ else:
 
 
 class ObsHistory:
-    """Maintains a rolling window of the last 3 grid observations."""
-    def __init__(self):
+    """Maintains a rolling window of the last 3 grid observations to match the 15-channel output."""
+    def __init__(self, one_hot=True):
+        self.one_hot = one_hot
         self.presence = deque(maxlen=3)
         self.speed_x = deque(maxlen=3)
         self.speed_y = deque(maxlen=3)
@@ -38,9 +39,12 @@ class ObsHistory:
         self.speed_x.clear()
         self.speed_y.clear()
 
+    def _normalize_speed(self, v):
+        MAX_SPEED = 30.0  # m/s
+        return np.clip(v / MAX_SPEED, -1.0, 1.0)
+
     def update(self, obs):
         p = obs["presence"]
-        # Fallback to zeros if env doesn't directly return grid speeds yet
         sx = obs.get("speed_x", np.zeros_like(p)) 
         sy = obs.get("speed_y", np.zeros_like(p))
 
@@ -48,24 +52,41 @@ class ObsHistory:
         if torch.is_tensor(sx): sx = sx.cpu().numpy()
         if torch.is_tensor(sy): sy = sy.cpu().numpy()
 
-        self.presence.append(p)
-        self.speed_x.append(sx)
-        self.speed_y.append(sy)
-
-        # Pad with the first frame if we don't have 3 frames yet
-        while len(self.presence) < 3:
+        # Fill history with the first frame if empty
+        if len(self.presence) == 0:
+            for _ in range(3):
+                self.presence.append(p)
+                self.speed_x.append(sx)
+                self.speed_y.append(sy)
+        else:
             self.presence.append(p)
             self.speed_x.append(sx)
             self.speed_y.append(sy)
 
     def get_grid(self):
-        # Order: t, t-1, t-2 for presence, then speed_x, then speed_y
-        # deque index 2 is newest (t), 1 is (t-1), 0 is (t-2)
-        grid = np.stack([
-            self.presence[2], self.presence[1], self.presence[0],
-            self.speed_x[2], self.speed_x[1], self.speed_x[0],
-            self.speed_y[2], self.speed_y[1], self.speed_y[0],
-        ], axis=0).astype(np.float32)
+        frames = []
+        # Loop oldest to newest (t-2, t-1, t)
+        for i in range(3):
+            p = self.presence[i]
+            sx = self._normalize_speed(self.speed_x[i])
+            sy = self._normalize_speed(self.speed_y[i])
+
+            if self.one_hot:
+                mask_v = (p == 1).astype(np.float32)
+                mask_w = (p == 2).astype(np.float32)
+                mask_e = (p == 9).astype(np.float32) # BE CAREFUL HERE ,  in build dataset we changed ego from 9 to 3 but here we still need 9
+                
+                # Stack to (5, H, W)
+                frame_stack = np.stack([mask_v, mask_w, mask_e, sx, sy], axis=0)
+            else:
+                p_norm = p.astype(np.float32)
+                # Stack to (3, H, W)
+                frame_stack = np.stack([p_norm, sx, sy], axis=0)
+                
+            frames.append(frame_stack)
+            
+        # Concat along channel dimension: 3 * 5 = 15 channels (or 9 if not one-hot)
+        grid = np.concatenate(frames, axis=0).astype(np.float32)
         return grid
 
 
@@ -252,7 +273,7 @@ def update_spectator(env):
     
 def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=None):
     obs, _ = env.reset()
-    history = ObsHistory()
+    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID)
     camera = None
     video = None
     video_path = None
