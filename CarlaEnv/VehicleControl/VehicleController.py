@@ -35,7 +35,7 @@ BRAKE_FULL = 1.00           # STOP brake
 REVERSE_THROTTLE = 0.30     # was 0.5 (reverse was too strong)
 
 STEER_STEP = 0.05           # was 0.2 (too jerky)
-MAX_STEER = 1            # cap steering magnitude
+MAX_STEER = 1         # cap steering magnitude
 
 class VehicleController():
     def __init__(self, world, vehicle=None):
@@ -51,7 +51,7 @@ class VehicleController():
 
     def __init_control(self):
         self.control = carla.VehicleControl()
-        self.control.throttle = 0.0
+        self.control.throttle = 0.5
         self.control.steer = 0.0
         self.control.brake = 0.0
 

@@ -13,13 +13,13 @@ def run(cmd):
 
 def main():
 
-    # # # # # # 1 Record demonstrations
+    # # # # # # # 1 Record demonstrations
     # run("python -m imitation.record_demos")
 
-    # # # # # # 2 Inspect demos
+    # # # # # # # 2 Inspect demos
     # run("python -m imitation.inspect_demo")
 
-    # # # # # 3 Build dataset
+    # # # # # # 3 Build dataset
     # run("python -m imitation.build_dataset")
 
     # # # # # 4 Train BC

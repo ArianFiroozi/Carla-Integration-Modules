@@ -18,6 +18,9 @@ BUILD_RNG_SEED = 42
 BC_SPLIT_SEED = 42
 
 
+GLOBAL_SEED = 42
+
+
 # =========================================================
 # ROOT PATHS
 # =========================================================
@@ -44,17 +47,10 @@ DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test"
-    MANUAL_DIR / "map1_0car"
+    # MANUAL_DIR / "map1_0car"
+    MANUAL_DIR / "map1_30car"
 ]
 
-# =========================================================
-# CHECKPOINT PATHS
-# =========================================================
-# CHECKPOINT_DIR = REPO_ROOT / "checkpoints"
-# IMITATION_CHECKPOINT_DIR = CHECKPOINT_DIR / "imitation"
-
-# DISCRETE_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_discrete.pt"
-# CONTINUOUS_MODEL_PATH = IMITATION_CHECKPOINT_DIR / "bc_cnn_continuous.pt"
 
 # =========================================================
 # ACTION SPACE
@@ -124,6 +120,9 @@ OBS_BOUNDS = {
 }
 
 
+# ==========================================================================================
+# FEATURE FLAGS & PARAMETERS (Covariate Shift Mitigation)
+# ==========================================================================================
 
 # Feature: Continuous Undersampling
 # Drops samples with low steering to focus the model on turning behavior.
@@ -179,7 +178,7 @@ JOINT_KEEP_PROBS = {
 # IMITATION LEARNING TRAINING
 # =========================================================
 
-BC_EPOCHS = 100
+BC_EPOCHS = 1000
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -209,7 +208,7 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 0
+CARLA_VEHICLES = 100
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -248,23 +247,25 @@ WINDOW_SIZE = 3
 
 
 
+
 # =========================================================
 # MODEL ARCHITECTURE HYPERPARAMETERS
 # =========================================================
-# CNN setting
+
+# CNN settings
 CNN_CHANNELS = [16, 32, 64]
 KERNEL_SIZES = [3, 3, 3]
 
-# Fully Connected settings
-HEAD_N_MLP_LAYERS = 2
-HEAD_MLP_HIDDEN_SIZE = 64
+# Fully Connected settings (Scalars)
 SCALAR_N_MLP_LAYERS = 2
-SCALAR_MLP_HIDDEN_SIZE = 64
+SCALAR_MLP_HIDDEN_SIZE = 32
 
+# Fusion & Latent
 LATENT_DIM = 128
 
-
-
+# Actor Head settings (Gaussian)
+HEAD_N_MLP_LAYERS = 2
+HEAD_MLP_HIDDEN_SIZE = 128
 
 
 

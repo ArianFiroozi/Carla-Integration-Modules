@@ -8,6 +8,9 @@ import time
 from . import config
 from .utils.viz import *
 from .utils.stats import *
+from .seed_utils import seed_everything
+
+seed_everything(config.GLOBAL_SEED)
 
 ROOT = Path(__file__).resolve().parents[0]
 PROJECT_ROOT = Path(__file__).resolve().parent

@@ -24,6 +24,11 @@ from utils.experiment_logger import ExperimentLogger
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
+from .seed_utils import seed_everything, seed_worker
+seed_everything(config.GLOBAL_SEED)
+g = torch.Generator()
+g.manual_seed(config.GLOBAL_SEED)
+
 def get_device(device_arg):
     if device_arg == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -282,6 +287,68 @@ def train_epoch_continuous(model, loader, opt, device):
 
 
 
+
+
+
+
+
+
+def log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta):
+    """
+    Logs configuration hyperparameters and dataset metadata to TensorBoard.
+    """
+    # 1. Log the entire config as a Markdown formatted JSON block
+    # Removing dataset_meta from config_dict temporarily for cleaner printing if it was attached
+    clean_config = {k: v for k, v in config_dict.items() if k != "dataset_meta"}
+    config_str = json.dumps(clean_config, indent=2, default=str)
+    tb_writer.add_text("Config/Hyperparameters", f"```json\n{config_str}\n```", 0)
+
+    if dataset_meta is None:
+        print("[TB] ⚠️ No dataset metadata available to log.")
+        return
+
+    # 2. Core dataset info
+    tb_writer.add_scalar("Dataset_Info/total_samples", dataset_meta.get("total_samples", 0), 0)
+    tb_writer.add_text("Dataset_Info/created_at", dataset_meta.get("created_at", "unknown"), 0)
+    
+    # Log number of demonstration files used
+    source_files = dataset_meta.get("source_files", [])
+    tb_writer.add_scalar("Dataset_Info/num_source_files", len(source_files), 0)
+
+    # 3. Stats section (Frames kept, dropped, trimmed)
+    stats = dataset_meta.get("stats", {})
+    if "total_frames" in stats:
+        tb_writer.add_scalar("Dataset_Stats/1_total_frames", stats["total_frames"], 0)
+    if "kept" in stats:
+        tb_writer.add_scalar("Dataset_Stats/2_kept_frames", stats["kept"], 0)
+    if "idle_frames_trimmed" in stats:
+        tb_writer.add_scalar("Dataset_Stats/dropped_idle_trimmed", stats["idle_frames_trimmed"], 0)
+    if "pre_termination_dropped" in stats:
+        tb_writer.add_scalar("Dataset_Stats/dropped_pre_termination", stats["pre_termination_dropped"], 0)
+    if "obs_violation_frames" in stats:
+        tb_writer.add_scalar("Dataset_Stats/dropped_obs_violations", stats["obs_violation_frames"], 0)
+
+    # 4. Pipeline Config details
+    pipe = dataset_meta.get("pipeline_config", {})
+    tb_writer.add_text("Dataset_Pipeline", f" ```json\n{json.dumps(pipe, indent=2)}\n```", 0)
+
+    # Extract specific pipeline hyperparameters to scalars for easy tracking
+    if "window_size" in pipe:
+        tb_writer.add_scalar("Dataset_Pipeline/window_size", pipe["window_size"], 0)
+
+    mirror_enabled = pipe.get("mirror_enabled", False)
+    mirror_thresh = pipe.get("mirror_steering_threshold", 0.0)
+    tb_writer.add_scalar("Dataset_Pipeline/mirror_enabled", float(bool(mirror_enabled)), 0)
+    
+    if mirror_thresh is not None:
+        tb_writer.add_scalar("Dataset_Pipeline/mirror_steering_threshold", float(mirror_thresh), 0)
+
+    print(f"[TB] ✅ Metadata and Config successfully logged. (Mirror: {mirror_enabled}, Window: {pipe.get('window_size')})")
+
+
+
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -364,39 +431,7 @@ def main():
 
     tb_writer = SummaryWriter(log_dir=f"{logger.logs_dir}/tb")
     
-
-    # log dataset info to tensorboard
-    # Log dataset distributions
-
-    if dataset_meta is not None:
-
-    # --- Core dataset info ---
-        tb_writer.add_scalar("dataset/total_samples", dataset_meta.get("total_samples", 0), 0)
-        tb_writer.add_text("dataset/created_at", dataset_meta.get("created_at", "unknown"), 0)
-
-        # --- Stats section ---
-        stats = dataset_meta.get("stats", {})
-        if "total_frames" in stats:
-            tb_writer.add_scalar("dataset/total_frames", stats["total_frames"], 0)
-        if "idle_frames_trimmed" in stats:
-            tb_writer.add_scalar("dataset/idle_trimmed", stats["idle_frames_trimmed"], 0)
-
-        # --- Mirror augmentation info ---
-        pipe = dataset_meta.get("pipeline_config", {})
-        tb_writer.add_text("dataset/pipeline_config", json.dumps(pipe, indent=2), 0)
-
-        mirror_enabled = pipe.get("mirror_enabled", False)
-        mirror_thresh = pipe.get("mirror_steering_threshold", None)
-
-        tb_writer.add_scalar("dataset/mirror_enabled", float(bool(mirror_enabled)), 0)
-        if mirror_thresh is not None:
-            tb_writer.add_scalar("dataset/mirror_steering_threshold", mirror_thresh, 0)
-
-        print(f"[TB] ✅ Mirror info logged → enabled={mirror_enabled}, threshold={mirror_thresh}")
-    else:
-        print("[TB] ⚠️ No dataset metadata available to log.")
-
-
+    log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta)
 
 
 
@@ -482,12 +517,15 @@ def main():
             weights=torch.from_numpy(train_weights_subset),
             num_samples=len(train_weights_subset),
             replacement=True,
+            generator=g 
         )
 
         train_loader = DataLoader(
             train_ds,
             batch_size=args.batch,
             sampler=sampler, 
+            worker_init_fn=seed_worker,  
+            generator=g                  
         )
         
     else:
@@ -497,13 +535,17 @@ def main():
         train_loader = DataLoader(
             train_ds,
             batch_size=args.batch,
-            shuffle=True
+            shuffle=True,
+            worker_init_fn=seed_worker,  
+            generator=g                  
         )
 
     val_loader = DataLoader(
         val_ds,
         batch_size=args.batch,
-        shuffle=False
+        shuffle=False,
+        worker_init_fn=seed_worker,      
+        generator=g                      
     )
 
 
@@ -537,7 +579,6 @@ def main():
             is_gaussian=args.is_gaussian,
             **kwargs
         ).to(device)
-        
         print("Grid channels:", grid_channels)
         print("Grid shape:", grid0.shape)
 

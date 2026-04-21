@@ -32,9 +32,9 @@ class FeatureExtractor(nn.Module):
             in_dim = mlp_hidden_size
             
         self.scalar_mlp = nn.Sequential(*scalar_layers)
-
+        scalar_out_dim = mlp_hidden_size if n_mlp_layers > 0 else scalar_dim
         self.fuse = nn.Sequential(
-            nn.Linear(cnn_dim + mlp_hidden_size, 256),
+            nn.Linear(cnn_dim + scalar_out_dim, 256),
             nn.ReLU(inplace=True),
             nn.Dropout(0.2),
             nn.Linear(256, latent_dim),
