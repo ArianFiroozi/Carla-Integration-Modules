@@ -218,6 +218,11 @@ import json
 from pathlib import Path
 from .. import config
 
+
+
+
+
+
 class BaseDataset(Dataset):
     def __init__(
         self,
@@ -271,15 +276,9 @@ class BaseDataset(Dataset):
             self.scalars = np.zeros((self.presence.shape[0], 1), dtype=np.float32)
         else:
             self.scalars = np.concatenate(scalars, axis=1)
-            
+            # Apply normalization to the concatenated scalar array
             for i, key in enumerate(scalar_keys_in_order):
-                if key in self.norm_stats:
-                    s_min = self.norm_stats[key]["min"]
-                    s_max = self.norm_stats[key]["max"]
-                    if s_max - s_min > 1e-6: # جلوگیری از تقسیم بر صفر
-                        self.scalars[:, i] = 2.0 * (self.scalars[:, i] - s_min) / (s_max - s_min) - 1.0
-                    else:
-                        self.scalars[:, i] = 0.0
+                self.scalars[:, i] = self._normalize(self.scalars[:, i], key)
 
         if not self.one_hot_presence:
             maxv = float(np.max(self.presence))
@@ -293,26 +292,46 @@ class BaseDataset(Dataset):
     def __len__(self):
         return self.presence.shape[0]
     
-    def _normalize_speed(self, v, key):
-        if key in self.norm_stats:
-            s_min = self.norm_stats[key]["min"]
-            s_max = self.norm_stats[key]["max"]
-            if s_max - s_min > 1e-6:
-                norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
-                return np.clip(norm_v, -1.0, 1.0)
-        return np.zeros_like(v)
+    def _normalize(self, v, key):
+        """Unified normalization function based on config.SCALING_METHOD."""
+        if config.SCALING_METHOD == "min_max":
+            if key in self.norm_stats:
+                s_min = self.norm_stats[key]["min"]
+                s_max = self.norm_stats[key]["max"]
+                if s_max - s_min > 1e-6:
+                    norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
+                    return np.clip(norm_v, -1.0, 1.0)
+            return np.zeros_like(v) # Fallback if stats are missing
+
+        elif config.SCALING_METHOD == "z_score":
+            if key in self.norm_stats:
+                mean = self.norm_stats[key]["mean"]
+                std = self.norm_stats[key]["std"]
+                if std > 1e-6:
+                    return (v - mean) / std
+            return np.zeros_like(v) # Fallback if stats are missing
+            
+        elif config.SCALING_METHOD == "fixed" and "speed" in key:
+            return v / config.MAX_SPEED
+
+        # Default: return unnormalized value or zero for scalars in 'fixed' mode
+        return v if "speed" in key else np.zeros_like(v)
         
     def _get_processed_grid(self, idx):
         pres = torch.from_numpy(self.presence[idx]).long()
         
-        vx = torch.from_numpy(self._normalize_speed(self.speed_x[idx], "obs_speed_x")).float()
-        vy = torch.from_numpy(self._normalize_speed(self.speed_y[idx], "obs_speed_y")).float()
+        # Normalize speed grids using the unified method
+        vx_np = self._normalize(self.speed_x[idx], "obs_speed_x")
+        vy_np = self._normalize(self.speed_y[idx], "obs_speed_y")
+        
+        vx = torch.from_numpy(vx_np).float()
+        vy = torch.from_numpy(vy_np).float()
 
         if self.one_hot_presence:
+            # Note: build_dataset remaps ego from 9 to 3. This is correct.
             mask_v = (pres == 1).float()
             mask_w = (pres == 2).float()
             mask_e = (pres == 3).float()
-
             stacked = torch.stack([mask_v, mask_w, mask_e, vx, vy], dim=1)
         else:
             presence_norm = pres.float()
@@ -320,7 +339,6 @@ class BaseDataset(Dataset):
 
         W, C, H, Wd = stacked.shape
         return stacked.view(W * C, H, Wd)
-
 
 class BCDataset(BaseDataset):
     """Dataset for Discrete High-Level Actions"""

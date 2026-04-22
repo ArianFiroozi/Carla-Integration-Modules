@@ -445,7 +445,8 @@ def main():
     "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
     "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
     "latent_dim": config.LATENT_DIM,
-    "use_one_hot_grid": config.USE_ONE_HOT_GRID
+    "use_one_hot_grid": config.USE_ONE_HOT_GRID,
+    "scaling": config.SCALING_METHOD
     }
     # attach dataset metadata
     if dataset_meta is not None:

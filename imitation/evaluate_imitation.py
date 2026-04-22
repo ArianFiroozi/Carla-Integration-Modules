@@ -25,6 +25,38 @@ else:
     speed_map = config.SPEED_MAP
     turn_map = config.TURN_MAP
 
+
+def _normalize_value(v, key, norm_stats):
+    """
+    Unified normalization function that mirrors the dataset's logic.
+    This is now used for both grid speeds and scalars.
+    """
+    # This check ensures the function can handle both single float values and numpy arrays
+    v = np.asarray(v)
+
+    if config.SCALING_METHOD == "min_max":
+        if key in norm_stats:
+            s_min = norm_stats[key]["min"]
+            s_max = norm_stats[key]["max"]
+            if s_max - s_min > 1e-6:
+                norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
+                return np.clip(norm_v, -1.0, 1.0)
+        return np.zeros_like(v)
+
+    elif config.SCALING_METHOD == "z_score":
+        if key in norm_stats:
+            mean = norm_stats[key]["mean"]
+            std = norm_stats[key]["std"]
+            if std > 1e-6:
+                return (v - mean) / std
+        return np.zeros_like(v)
+
+    elif config.SCALING_METHOD == "fixed" and "speed" in key:
+        return v / config.MAX_SPEED
+    
+    # Default for 'fixed' mode scalars, or if stats are missing
+    return v if "speed" in key else np.zeros_like(v)
+
 class ObsHistory:
     """Maintains a rolling window of grid observations."""
 
@@ -42,14 +74,6 @@ class ObsHistory:
         self.speed_x.clear()
         self.speed_y.clear()
 
-    def _normalize_speed(self, v, key):
-        if key in self.norm_stats:
-            s_min = self.norm_stats[key]["min"]
-            s_max = self.norm_stats[key]["max"]
-            if s_max - s_min > 1e-6:
-                norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
-                return np.clip(norm_v, -1.0, 1.0)
-        return np.zeros_like(v)
 
     def update(self, obs):
         p = obs["presence"]
@@ -59,7 +83,7 @@ class ObsHistory:
         if torch.is_tensor(p): p = p.cpu().numpy()
         if torch.is_tensor(sx): sx = sx.cpu().numpy()
         if torch.is_tensor(sy): sy = sy.cpu().numpy()
-
+        # If history empty, fill with first frame
         if len(self.presence) == 0:
             for _ in range(self.window_size):
                 self.presence.append(p)
@@ -74,13 +98,16 @@ class ObsHistory:
         frames = []
         for i in range(self.window_size):
             p = self.presence[i]
-            sx = self._normalize_speed(self.speed_x[i], "obs_speed_x")
-            sy = self._normalize_speed(self.speed_y[i], "obs_speed_y")
+            
+            sx = _normalize_value(self.speed_x[i], "obs_speed_x", self.norm_stats)
+            sy = _normalize_value(self.speed_y[i], "obs_speed_y", self.norm_stats)
 
             if self.one_hot:
                 mask_v = (p == 1).astype(np.float32)
                 mask_w = (p == 2).astype(np.float32)
-                mask_e = (p == 9).astype(np.float32) # CARLA sends 9 for ego
+                
+                mask_e = (p == 3).astype(np.float32)
+                
                 frame_stack = np.stack([mask_v, mask_w, mask_e, sx, sy], axis=0)
             else:
                 p_norm = p.astype(np.float32)
@@ -90,10 +117,6 @@ class ObsHistory:
 
         grid = np.concatenate(frames, axis=0).astype(np.float32)
         return grid
-
-
-
-
 
 
 def create_video_recorder(env, save_path, width=640, height=360, fps=20):
@@ -132,27 +155,21 @@ def create_video_recorder(env, save_path, width=640, height=360, fps=20):
 
     return camera, video
 
-    
-    
-    
 def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
+    # This ensures the input to the model during evaluation exactly matches the training data format.
+    obs["presence"][obs["presence"] == 9] = 3
+    
     history.update(obs)
     grid = history.get_grid()
 
-    def norm_scalar(val, key):
-        if key in norm_stats:
-            s_min = norm_stats[key]["min"]
-            s_max = norm_stats[key]["max"]
-            if s_max - s_min > 1e-6:
-                return 2.0 * (val - s_min) / (s_max - s_min) - 1.0
-        return 0.0
-
-    lane_angle = norm_scalar(obs["lane_angle"][0], "obs_lane_angle")
-    lane_pos = norm_scalar(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x")
-    speed_x = norm_scalar(obs["ego_speed_x"][0], "obs_ego_speed_x")
-    speed_y = norm_scalar(obs["ego_speed_y"][0], "obs_ego_speed_y")
-
+    lane_angle = _normalize_value(obs["lane_angle"][0], "obs_lane_angle", norm_stats)
+    lane_pos = _normalize_value(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x", norm_stats)
+    speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
+    speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
+    
+    
     scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
+    # print("scalars: ",scalars)
     return grid, scalars
 
 
@@ -193,7 +210,6 @@ def process_continuous_output(out):
         prev_steer = steer
         steer = np.clip(steer, -1.0, 1.0)
         
-
     return [throttle, brake, steer]
 
 
@@ -545,7 +561,8 @@ def main():
             "end_reasons": dict(end_reasons),
             "wall_time_sec": total_time,
             "action_mode": ACTION_MODE,
-            "smooth_steering": config.SMOOTH_STEERING
+            "smooth_steering": config.SMOOTH_STEERING,
+            "number of cars": config.CARLA_VEHICLES,
         }
 
         if ACTION_MODE == "discrete":
@@ -560,6 +577,8 @@ def main():
         # TensorBoard summary metrics
         tb_writer.add_scalar("eval/avg_return", np.mean(all_returns), 0)
         tb_writer.add_scalar("eval/avg_length", np.mean(all_lengths), 0)
+        tb_writer.add_scalar("eval/carla_vehicles", config.CARLA_VEHICLES, 0)
+        tb_writer.add_scalar("smooth_steering", float(config.SMOOTH_STEERING),0)
         tb_writer.flush()
         tb_writer.close()
         

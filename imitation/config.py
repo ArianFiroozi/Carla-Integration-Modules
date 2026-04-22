@@ -38,7 +38,7 @@ DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test"
-    MANUAL_DIR / "map1_0car",
+    # MANUAL_DIR / "map1_0car",
     MANUAL_DIR / "map1_30car"
 ]
 
@@ -47,29 +47,33 @@ DEMO_LIST= [
 # =========================================================
 # CNN settings
 
-# # ---BASELINE---
-# CNN_CHANNELS = [16, 32, 64]
-# KERNEL_SIZES = [3, 3, 3]
-# # Fully Connected settings (Scalars)
-# SCALAR_N_MLP_LAYERS = 2
-# SCALAR_MLP_HIDDEN_SIZE = 32
-# # Fusion & Latent
-# LATENT_DIM = 128
-# # Actor Head settings (Gaussian)
-# HEAD_N_MLP_LAYERS = 2
-# HEAD_MLP_HIDDEN_SIZE = 64
-
-# ---BALANCED---
-CNN_CHANNELS = [32, 64, 128]
+# ---BASELINE---
+CNN_CHANNELS = [16, 32, 64]
 KERNEL_SIZES = [3, 3, 3]
 # Fully Connected settings (Scalars)
 SCALAR_N_MLP_LAYERS = 2
-SCALAR_MLP_HIDDEN_SIZE = 64
+SCALAR_MLP_HIDDEN_SIZE = 32
 # Fusion & Latent
-LATENT_DIM = 256
+LATENT_DIM = 128
 # Actor Head settings (Gaussian)
 HEAD_N_MLP_LAYERS = 2
-HEAD_MLP_HIDDEN_SIZE = 128
+HEAD_MLP_HIDDEN_SIZE = 64
+
+
+
+# # ---BALANCED---
+# CNN_CHANNELS = [32, 64, 128]
+# KERNEL_SIZES = [3, 3, 3]
+# # Fully Connected settings (Scalars)
+# SCALAR_N_MLP_LAYERS = 2
+# SCALAR_MLP_HIDDEN_SIZE = 64
+# # Fusion & Latent
+# LATENT_DIM = 256
+# # Actor Head settings (Gaussian)
+# HEAD_N_MLP_LAYERS = 2
+# HEAD_MLP_HIDDEN_SIZE = 128
+
+
 
 
 # # ---BIG---
@@ -177,6 +181,11 @@ JOINT_KEEP_PROBS = {
 # }
 
 
+# 'min_max': Scale features to [-1, 1] based on dataset-wide min/max.
+# 'z_score': Standardize features using dataset-wide mean/std.
+# 'fixed':   Divide speed grids by MAX_SPEED. Scalars are not normalized. (Less recommended)
+SCALING_METHOD = "z_score"
+MAX_SPEED = 30.0
 
 
 USE_CONTINUOUS_UNDERSAMPLING = False
@@ -208,7 +217,7 @@ USE_ONE_HOT_GRID = True
 # =========================================================
 # IMITATION LEARNING TRAINING
 # =========================================================
-BC_EPOCHS = 1000
+BC_EPOCHS = 30
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -234,7 +243,7 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 # =========================================================
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 30
+CARLA_VEHICLES = 50
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -244,7 +253,7 @@ RANDOM_EGO_START_POS = True
 # =========================================================
 # POLICY EVALUATION / ROLLOUT
 # =========================================================
-EVAL_NUM_EPISODES = 10
+EVAL_NUM_EPISODES = 20
 EVAL_MAX_STEPS = 2000
 EVAL_RENDER_LOG_EVERY = 200
 

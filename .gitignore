@@ -183,6 +183,6 @@ explaination.md
 # Ignore datasets and logs
 *.npz
 imitation/data/
-experiments/
-eval/
+*.pt
 __pycache__/
+experiments_archive

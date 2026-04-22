@@ -403,20 +403,58 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
 # ==============================================================================
 
 def compute_normalization_stats(out_obs):
-    """Computes min, max, mean, and std for dataset features."""
+    """
+    Computes min, max, mean, and std for dataset features.
+    - For scalar features, stats are computed across all samples.
+    - For grid features (speed_x, speed_y), stats are computed ONLY from
+      cells where a car is present (i.e., where obs_presence == 1).
+    """
     norm_stats = {}
+    
+    # Define which keys represent sparse grids that need special handling
+    sparse_grid_keys = ["obs_speed_x", "obs_speed_y"]
+    presence_grid = out_obs.get("obs_presence")
+    if presence_grid is None:
+        print("[WARN] 'obs_presence' not found. Cannot compute masked stats for speed grids.")
+        car_mask = None
+    else:
+
+        car_mask = (presence_grid == 1)
+
     for k, arr in out_obs.items():
+    
         if k == "obs_presence":
             continue
+
+        values_to_process = None
+
+        if k in sparse_grid_keys and car_mask is not None:
+  
+            if arr.shape == car_mask.shape:
+                values_to_process = arr[car_mask]
+                print(f"[STATS] For '{k}', using {values_to_process.size} non-zero values for stats.")
+            else:
+                print(f"[WARN] Shape mismatch for '{k}' and 'obs_presence'. Falling back to global stats.")
+                values_to_process = arr.flatten()
+        else:
+            # This is a scalar or other non-masked feature. Flatten and compute global stats.
+            values_to_process = arr.flatten()
+
+        # --- Compute and Store Statistics ---
+        if values_to_process is not None and values_to_process.size > 0:
+            norm_stats[k] = {
+                "min": float(values_to_process.min()),
+                "max": float(values_to_process.max()),
+                "mean": float(values_to_process.mean()),
+                "std": float(values_to_process.std())
+            }
+        else:
+            # Handle cases where there might be no data (e.g., a dataset with no cars)
+            print(f"[WARN] No data points found for '{k}' after masking. Using zero for stats.")
+            norm_stats[k] = {"min": 0.0, "max": 0.0, "mean": 0.0, "std": 0.0}
             
-        arr_flat = arr.reshape(-1)
-        norm_stats[k] = {
-            "min": float(arr_flat.min()),
-            "max": float(arr_flat.max()),
-            "mean": float(arr_flat.mean()),
-            "std": float(arr_flat.std())
-        }
     return norm_stats
+
 
 def run_pipeline(mode, visualize=False):
     print(f"[{mode.upper()}] Starting dataset pipeline with Window Size {WINDOW_SIZE}...")

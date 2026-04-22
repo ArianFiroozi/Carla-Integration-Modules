@@ -1,0 +1,83 @@
+ok so first i tunred off every kind of flag that might effecct  the performance BTW all eval lengths which imma tell you is avg of 10-20(experminet after fiftth i think are 20 eval run) eval run with random spawn points therefore bad luch can exist,
+also every expermient ill report on only i state the change compared to prevoius experminet , if a new kind of config was used ill mentiond the whole config,  this was the config for first experminet:
+{
+  "mode": "continuous",
+  "epochs": 30,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "val_split": 0.1,
+  "patience": 10,
+  "device": "cuda",
+  "is_gaussian": false,
+  "use_continuous_undersampling": false,
+  "undersampling_threshold_continuous": 0.05,
+  "undersampling_probability_continuous": 0.6,
+  "use_weighted_loss": false,
+  "steer_loss_weight_continuous": 3.0,
+  "throttle_loss_weight_continuous": 1.0,
+  "brake_loss_weight_continuous": 1.0,
+  "weighted_loss_threshold_continuous": 0.1,
+  "min_std": 0.05,
+  "max_std": 1,
+  "weight_sampling": "none",
+  "cnn_channels": [
+    16,
+    32,
+    64
+  ],
+  "head_n_mlp_layers": 2,
+  "head_mlp_hidden_size": 64,
+  "scalar_n_mlp_layers": 2,
+  "scalar_mlp_hidden_size": 32,
+  "latent_dim": 128,
+  "use_one_hot_grid": true,
+  "metadata": {
+    "timestamp": "2026-04-21T20:46:31.365238",
+    "git_commit": "1ae61521e60bf77d925550e820033434a5fab6bd"
+  }
+}
+
+
+
+it did surprisingly well ,  i am mostly sure it is bc that single flag called use one hot grid did the trick which turns presnec grid into wall grid car grid and echo grid
+also the data was map 1 no cars(avg 528) and tested in same env 
+
+second expermint:
+switched over to map 1 with cars , it did pretty bad idk why but it seems it did have a senese of other cars exitence , it wasnt good at turning tho , unlike others 
+which were better at turning , i mostly suspect the reason is the dataset is more like focused on exitence of other cars (avg 300-400 ish)
+
+third experminet:
+made the network a bit bigger   "cnn_channels": [
+    32,
+    64,
+    128
+  ],
+  "head_n_mlp_layers": 2,
+  "head_mlp_hidden_size": 128,
+  "scalar_n_mlp_layers": 2,
+  "scalar_mlp_hidden_size": 64,
+  "latent_dim": 256,
+
+  very close performance to second experiment around 3 (avg 300-400 ish)
+
+
+fourth experminet:
+i mixed with and without car dataset fully and then tested on with car env  same results around (avg 300-400 ish)
+
+fifth and sixth experiment:
+i went back to  baseline config. no car in train nor eval
+so far nomarlization was like only division by max nothing much
+i added two methods for scaling z score and min max , the driving became way more stable with z score going up to 1k avg and min max 1.3k 
+
+seventh and eighted experiment:
+i used with car for training this time. tested on no car eval , z score did a better job this time compared to min max (700 vs 300-400)
+it is instering when i use the data that has cars in for example z score we went from 1k to 700 , it seems the car leared to drive faster(because generally the with car dataset)
+was mostly like drive to overtake vehiles or at least have a simliar speed to them which vaused the dataset to have a higher avg speed , and the car turns the wheel a lot
+like it goes near left wall , then goes to right wall (that happened quit a few time, other than that it seems the model does have a sense of turns and it sometimes can turn nicely)
+min max which went from 1.3k to barely 400 was mostly simliar to z score version with the only diff being min max was less drunk and more lazy in turning.
+
+nineth and tenth experiment:
+i used the models i trained in experiment 7 and 8 , but this time the eval was with cars, min max had a very crazy left bias , it like mostly spawned the immeditly turned left 
+and got very bad results(169 avg) , z score did better even tho it crahsed a lot and couldnt turn properly near cars and hit walls , it did have a sense of other cars being around and it 
+avoided them pretty nicely a few times and even once did a pretty clean(relatively) overtake.
+
