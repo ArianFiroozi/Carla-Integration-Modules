@@ -85,7 +85,7 @@ def to_plain(obj):
         return int(obj)
     return obj
 
-def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode):
+def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode, norm_stats=None):
     """Save dataset metadata (.meta.json) next to the .npz file."""
     clean_stats = to_plain(stats)
     pipeline_config = {
@@ -101,7 +101,6 @@ def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode):
         "mirror_steering_threshold": MIRROR_STEERING_THRESHOLD,
     }
 
-
     meta = {
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "dataset_path": str(OUT_PATH.resolve().relative_to(PROJECT_ROOT)),
@@ -112,6 +111,9 @@ def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode):
         "stats": clean_stats,
         "pipeline_config": pipeline_config,
     }
+    
+    if norm_stats is not None:
+        meta["normalization_stats"] = norm_stats
 
     meta_path = OUT_PATH.with_suffix(".meta.json")
     with open(meta_path, "w") as f:
@@ -400,6 +402,22 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
 # 4. MAIN ORCHESTRATOR
 # ==============================================================================
 
+def compute_normalization_stats(out_obs):
+    """Computes min, max, mean, and std for dataset features."""
+    norm_stats = {}
+    for k, arr in out_obs.items():
+        if k == "obs_presence":
+            continue
+            
+        arr_flat = arr.reshape(-1)
+        norm_stats[k] = {
+            "min": float(arr_flat.min()),
+            "max": float(arr_flat.max()),
+            "mean": float(arr_flat.mean()),
+            "std": float(arr_flat.std())
+        }
+    return norm_stats
+
 def run_pipeline(mode, visualize=False):
     print(f"[{mode.upper()}] Starting dataset pipeline with Window Size {WINDOW_SIZE}...")
     rng = np.random.default_rng(RNG_SEED)
@@ -438,6 +456,9 @@ def run_pipeline(mode, visualize=False):
             visualize_continuous(out_obs)
             pass
 
+    # --- Compute Normalization Stats ---
+    norm_stats = compute_normalization_stats(out_obs)
+
     # --- Rename targets & Save ---
     for k in TARGET_RENAME_KEYS:
         if k in out_obs:
@@ -445,7 +466,8 @@ def run_pipeline(mode, visualize=False):
 
     save_dict = {**out_obs, "actions": out_actions}
     np.savez_compressed(OUT_PATH, **save_dict)
-    save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode=mode)
+    
+    save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode=mode, norm_stats=norm_stats)
     print(f"[{mode.upper()}] ✅ Successfully saved to: {OUT_PATH.resolve()}")
 
 

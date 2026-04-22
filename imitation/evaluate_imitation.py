@@ -28,9 +28,10 @@ else:
 class ObsHistory:
     """Maintains a rolling window of grid observations."""
 
-    def __init__(self, window_size=3, one_hot=True):
+    def __init__(self, window_size=3, one_hot=True, norm_stats=None):
         self.window_size = window_size
         self.one_hot = one_hot
+        self.norm_stats = norm_stats or {}
 
         self.presence = deque(maxlen=window_size)
         self.speed_x = deque(maxlen=window_size)
@@ -41,9 +42,14 @@ class ObsHistory:
         self.speed_x.clear()
         self.speed_y.clear()
 
-    def _normalize_speed(self, v):
-        MAX_SPEED = 30.0
-        return np.clip(v / MAX_SPEED, -1.0, 1.0)
+    def _normalize_speed(self, v, key):
+        if key in self.norm_stats:
+            s_min = self.norm_stats[key]["min"]
+            s_max = self.norm_stats[key]["max"]
+            if s_max - s_min > 1e-6:
+                norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
+                return np.clip(norm_v, -1.0, 1.0)
+        return np.zeros_like(v)
 
     def update(self, obs):
         p = obs["presence"]
@@ -54,7 +60,6 @@ class ObsHistory:
         if torch.is_tensor(sx): sx = sx.cpu().numpy()
         if torch.is_tensor(sy): sy = sy.cpu().numpy()
 
-        # If history empty, fill with first frame
         if len(self.presence) == 0:
             for _ in range(self.window_size):
                 self.presence.append(p)
@@ -67,17 +72,15 @@ class ObsHistory:
 
     def get_grid(self):
         frames = []
-
         for i in range(self.window_size):
             p = self.presence[i]
-            sx = self._normalize_speed(self.speed_x[i])
-            sy = self._normalize_speed(self.speed_y[i])
+            sx = self._normalize_speed(self.speed_x[i], "obs_speed_x")
+            sy = self._normalize_speed(self.speed_y[i], "obs_speed_y")
 
             if self.one_hot:
                 mask_v = (p == 1).astype(np.float32)
                 mask_w = (p == 2).astype(np.float32)
-                mask_e = (p == 9).astype(np.float32)
-
+                mask_e = (p == 9).astype(np.float32) # CARLA sends 9 for ego
                 frame_stack = np.stack([mask_v, mask_w, mask_e, sx, sy], axis=0)
             else:
                 p_norm = p.astype(np.float32)
@@ -132,18 +135,24 @@ def create_video_recorder(env, save_path, width=640, height=360, fps=20):
     
     
     
-def extract_grid_and_scalars(obs, history: ObsHistory):
+def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
     history.update(obs)
     grid = history.get_grid()
 
-    # TODO: this is not dynamic
-    lane_angle = obs["lane_angle"][0] / np.pi
-    lane_pos = obs["ego_in_lane_position_x"][0] / 2.0
-    speed_x = np.clip(obs["ego_speed_x"][0], -1, 15) / 15.0
-    speed_y = np.clip(obs["ego_speed_y"][0], -2, 2) / 2.0
+    def norm_scalar(val, key):
+        if key in norm_stats:
+            s_min = norm_stats[key]["min"]
+            s_max = norm_stats[key]["max"]
+            if s_max - s_min > 1e-6:
+                return 2.0 * (val - s_min) / (s_max - s_min) - 1.0
+        return 0.0
+
+    lane_angle = norm_scalar(obs["lane_angle"][0], "obs_lane_angle")
+    lane_pos = norm_scalar(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x")
+    speed_x = norm_scalar(obs["ego_speed_x"][0], "obs_ego_speed_x")
+    speed_y = norm_scalar(obs["ego_speed_y"][0], "obs_ego_speed_y")
 
     scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
-
     return grid, scalars
 
 
@@ -190,7 +199,7 @@ def process_continuous_output(out):
 
 debug_counter = 0
 
-def predict_action(policy, obs, history):
+def predict_action(policy, obs, history, norm_stats):
     """
     Run one policy step.
     obs is assumed to be (grid, scalars), as returned by CarlaEnv.
@@ -200,7 +209,7 @@ def predict_action(policy, obs, history):
     """
     global debug_counter
 
-    grid, scalars = extract_grid_and_scalars(obs, history)
+    grid, scalars = extract_grid_and_scalars(obs, history, norm_stats)
     grid = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).to(DEVICE)
     scalars = torch.tensor(scalars, dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
@@ -274,9 +283,9 @@ def update_spectator(env):
     
 
     
-def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=None):
+def run_episode(env, policy, norm_stats, max_steps=2000, render_log_every=200, video_path=None):
     obs, _ = env.reset()
-    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID, window_size= config.WINDOW_SIZE)
+    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID, window_size= config.WINDOW_SIZE, norm_stats=norm_stats)
     camera = None
     video = None
     if video_path is not None:
@@ -289,7 +298,7 @@ def run_episode(env, policy, max_steps=2000, render_log_every=200, video_path=No
     t0 = time.time()
 
     for t in range(max_steps):
-        env_action, action_log = predict_action(policy, obs, history)
+        env_action, action_log = predict_action(policy, obs, history, norm_stats)
         obs, reward, terminated, truncated, info = env.step(env_action)
 
         if action_log is not None:
@@ -438,6 +447,9 @@ def main():
 
     policy, cfg = load_policy_from_checkpoint(model_path, config_path)
 
+    norm_stats = cfg.get("dataset_meta", {}).get("normalization_stats", {})
+    if not norm_stats:
+        print("\n[WARN] No normalization stats found in config.json! Evaluation might fail or behave poorly.\n")
     # create timestamped eval run folder
     run_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     current_eval_dir = eval_dir / run_stamp
@@ -476,6 +488,7 @@ def main():
             result = run_episode(
                 env,
                 policy,
+                norm_stats=norm_stats,
                 max_steps=args.max_steps,
                 video_path=video_path
             )

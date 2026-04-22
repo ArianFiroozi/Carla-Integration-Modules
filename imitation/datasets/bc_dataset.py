@@ -214,6 +214,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+import json
+from pathlib import Path
 from .. import config
 
 class BaseDataset(Dataset):
@@ -229,6 +231,15 @@ class BaseDataset(Dataset):
         self.one_hot_presence = one_hot_presence
         self.include_traffic_signs = include_traffic_signs
         
+        meta_path = Path(npz_path).with_suffix(".meta.json")
+        self.norm_stats = {}
+        if meta_path.exists():
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+                self.norm_stats = meta.get("normalization_stats", {})
+        else:
+            print(f"[WARN] Meta file not found at {meta_path}. Dynamic normalization might fail!")
+
         # GRID
         self.presence = data["obs_presence"].astype(np.int64)
         self.speed_x = data["obs_speed_x"].astype(np.float32)
@@ -238,14 +249,15 @@ class BaseDataset(Dataset):
 
         # SCALARS
         scalars = []
+        scalar_keys_in_order = []
 
         def add_scalar(key):
             if key in data.files:
                 arr = data[key].astype(np.float32)
-                # Ensure it's a 2D column vector (N, 1)
                 if arr.ndim == 1:
                     arr = arr[:, None]
                 scalars.append(arr)
+                scalar_keys_in_order.append(key)
 
         add_scalar("obs_lane_angle")
         add_scalar("obs_ego_in_lane_position_x")
@@ -259,14 +271,16 @@ class BaseDataset(Dataset):
             self.scalars = np.zeros((self.presence.shape[0], 1), dtype=np.float32)
         else:
             self.scalars = np.concatenate(scalars, axis=1)
-            if self.scalars.shape[1] >= 4:
-                # TODO: THIS NORMALIZATION IS NOT DYNAMIC
-                self.scalars[:, 0] = self.scalars[:, 0] / np.pi   # lane_angle -> [-1,1]
-                self.scalars[:, 1] = self.scalars[:, 1] / 2.0     # lane_pos -> [-1,1]
-                self.scalars[:, 2] = np.clip(self.scalars[:, 2],-1,15) / 15    # speed_x -> [0,1]
-                self.scalars[:, 3] = np.clip(self.scalars[:, 3], -2,2) / 2    # speed_y -> ~[-1,1]
+            
+            for i, key in enumerate(scalar_keys_in_order):
+                if key in self.norm_stats:
+                    s_min = self.norm_stats[key]["min"]
+                    s_max = self.norm_stats[key]["max"]
+                    if s_max - s_min > 1e-6: # جلوگیری از تقسیم بر صفر
+                        self.scalars[:, i] = 2.0 * (self.scalars[:, i] - s_min) / (s_max - s_min) - 1.0
+                    else:
+                        self.scalars[:, i] = 0.0
 
-        # Normalize only if NOT using one-hot
         if not self.one_hot_presence:
             maxv = float(np.max(self.presence))
             if maxv > 0:
@@ -279,35 +293,31 @@ class BaseDataset(Dataset):
     def __len__(self):
         return self.presence.shape[0]
     
-    def _normalize_speed(self, v):
-        # TODO: THIS NORMALIZATION IS NOT DYNAMIC
-        # RAW speed to [-1, 1]
-        MAX_SPEED = 30.0  # m/s
-        return np.clip(v / MAX_SPEED, -1.0, 1.0)
+    def _normalize_speed(self, v, key):
+        if key in self.norm_stats:
+            s_min = self.norm_stats[key]["min"]
+            s_max = self.norm_stats[key]["max"]
+            if s_max - s_min > 1e-6:
+                norm_v = 2.0 * (v - s_min) / (s_max - s_min) - 1.0
+                return np.clip(norm_v, -1.0, 1.0)
+        return np.zeros_like(v)
         
     def _get_processed_grid(self, idx):
-        # Shapes:
-        # presence = (WINDOW_SIZE, H, W)
-        # speed_x  = (WINDOW_SIZE, H, W)
-        # speed_y  = (WINDOW_SIZE, H, W)
-
-        pres = torch.from_numpy(self.presence[idx]).long()              # (W,H,W)
-        vx   = torch.from_numpy(self._normalize_speed(self.speed_x[idx])).float()
-        vy   = torch.from_numpy(self._normalize_speed(self.speed_y[idx])).float()
+        pres = torch.from_numpy(self.presence[idx]).long()
+        
+        vx = torch.from_numpy(self._normalize_speed(self.speed_x[idx], "obs_speed_x")).float()
+        vy = torch.from_numpy(self._normalize_speed(self.speed_y[idx], "obs_speed_y")).float()
 
         if self.one_hot_presence:
             mask_v = (pres == 1).float()
             mask_w = (pres == 2).float()
-            mask_e = (pres == 3).float()  # because build_dataset remaps 9 -> 3
+            mask_e = (pres == 3).float()
 
-            # (WINDOW_SIZE, 3+2, H, W)
             stacked = torch.stack([mask_v, mask_w, mask_e, vx, vy], dim=1)
         else:
             presence_norm = pres.float()
             stacked = torch.stack([presence_norm, vx, vy], dim=1)
 
-        # Merge window & channel dims:
-        # final shape = (WINDOW_SIZE * channels_per_frame, H, W)
         W, C, H, Wd = stacked.shape
         return stacked.view(W * C, H, Wd)
 
