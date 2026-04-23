@@ -267,3 +267,10 @@ MAX_INSPECT_FEATURE_SAMPLES = 200000
 
 BUILD_VISUALIZE = False
 FEATURE_HIST_MAX_SAMPLES = 100000
+
+# =========================================================
+# Action Collapse Thresholds
+# =========================================================
+MIN_STEER_VAR = 0.005
+MIN_THROTTLE_VAR = 0.001 
+MIN_BRAKE_VAR = 0.001

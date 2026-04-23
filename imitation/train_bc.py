@@ -114,53 +114,58 @@ def evaluate_discrete(model, loader, device):
     } 
 
 @torch.no_grad()
-def evaluate_continuous(model, loader, device, is_gaussian=False):
+@torch.no_grad()
+def evaluate_continuous(model, data_loader, device, is_gaussian=False):
     model.eval()
-
-    mae_sum = 0.0
-    mse_sum = 0.0
-    nll_sum = 0.0
-    std_sum = 0.0
-    n = 0
-
-    for grid, scalars, target in loader:
-        grid = grid.to(device)
-        scalars = scalars.to(device)
-        target = target.to(device)
-
-        pred = model(grid, scalars)
-
-        # Handle Gaussian vs Standard Continuous
-        if is_gaussian:
-            mean, std = pred
-            std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD)
-            dist = torch.distributions.Normal(mean, std)
-            nll_sum += -dist.log_prob(target).sum().item()
-            point_pred = mean  # Use the mean for MSE/MAE evaluation
-        else:
-            point_pred = pred
-
-        mse_sum += nn.functional.mse_loss(point_pred, target, reduction="sum").item()
-        mae_sum += torch.abs(point_pred - target).sum().item()
-        if is_gaussian:
-            std_sum += std.sum().item()
-        n += np.prod(target.shape)
-
-    metrics = {
-        "mse": mse_sum / n,
-        "mae": mae_sum / n,
-    }
+    total_loss = 0.0
+    total_mae = 0.0  
     
-    # We use NLL as the primary validation loss for early-stopping if Gaussian
-    if is_gaussian:
-        metrics["nll"] = nll_sum / n
-        metrics["loss"] = metrics["nll"]
-        metrics["avg_std"] = std_sum / n 
+    all_pred_steer = []
+    all_pred_throttle = []
+    all_pred_brake = []
 
-    else:
-        metrics["loss"] = metrics["mse"]
-        
-    return metrics
+    with torch.no_grad():
+        for batch in data_loader:
+            grid, scalars, actions = batch
+            grid, scalars, actions = grid.to(device), scalars.to(device), actions.to(device)
+
+            if is_gaussian:
+                mu, log_std = model(grid, scalars)
+                predictions = mu
+            else:
+                predictions = model(grid, scalars)
+
+            loss = F.mse_loss(predictions, actions, reduction='sum')
+            mae_loss = F.l1_loss(predictions, actions, reduction='sum') 
+            
+            total_loss += loss.item()
+            total_mae += mae_loss.item() 
+            
+            all_pred_steer.append(predictions[:, 0])
+            all_pred_throttle.append(predictions[:, 1])
+            all_pred_brake.append(predictions[:, 2])
+
+    avg_loss = total_loss / len(data_loader.dataset)
+    avg_mae = total_mae / len(data_loader.dataset) 
+    
+    all_pred_steer = torch.cat(all_pred_steer).cpu().numpy()
+    all_pred_throttle = torch.cat(all_pred_throttle).cpu().numpy()
+    all_pred_brake = torch.cat(all_pred_brake).cpu().numpy()
+    
+    var_steer = np.var(all_pred_steer)
+    var_throttle = np.var(all_pred_throttle)
+    var_brake = np.var(all_pred_brake)
+    
+    return {
+        "loss": avg_loss,
+        "mse": avg_loss, 
+        "mae": avg_mae,   
+        "var_steer": float(var_steer),      
+        "var_throttle": float(var_throttle),
+        "var_brake": float(var_brake)       
+    }
+
+
 
 
 
@@ -638,33 +643,25 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
-
+        
+        # ----------------------------------
+        # DISCRETE ACTION SPACE
+        # ----------------------------------
         if args.mode == "discrete":
-            
+            # Loss function setup
             if config.USE_WEIGHTED_LOSS:
                 ce_speed = nn.CrossEntropyLoss(weight=speed_weights)
                 ce_turn = nn.CrossEntropyLoss(weight=turn_weights)
             else:
-                ce_speed = nn.CrossEntropyLoss()
-                ce_turn = nn.CrossEntropyLoss()
+                ce_speed = nn.CrossentropyLoss()
+                ce_turn = nn.CrossentropyLoss()
                 
-            train_loss = train_epoch_discrete(
-                model,
-                train_loader,
-                opt,
-                ce_speed,
-                ce_turn,
-                device,
-            )
-
-            val_metrics = evaluate_discrete(
-                model,
-                val_loader,
-                device,
-            )
-
+            # Train and evaluate
+            train_loss = train_epoch_discrete(model, train_loader, opt, ce_speed, ce_turn, device)
+            val_metrics = evaluate_discrete(model, val_loader, device)
             val_loss = val_metrics["loss"]
 
+            # --- Logging ---
             # JSON logger
             logger.log_training(epoch, {
                 "train_loss": train_loss,
@@ -672,13 +669,12 @@ def main():
                 "f1_speed": val_metrics["f1_speed"],
                 "f1_turn": val_metrics["f1_turn"]
             })
-
-            # TensorBoard logs
+            # TensorBoard
             tb_writer.add_scalar("loss/train", train_loss, epoch)
             tb_writer.add_scalar("loss/val", val_loss, epoch)
             tb_writer.add_scalar("metrics/f1_speed", val_metrics["f1_speed"], epoch)
             tb_writer.add_scalar("metrics/f1_turn", val_metrics["f1_turn"], epoch)
-
+            # Console
             print(
                 f"Epoch {epoch:03d} | "
                 f"train={train_loss:.4f} | "
@@ -687,52 +683,65 @@ def main():
                 f"turn_f1={val_metrics['f1_turn']:.3f} | "
                 f"time={time.time()-t0:.1f}s"
             )
+        
+        # ----------------------------------
+        # CONTINUOUS ACTION SPACE
+        # ----------------------------------
+        else: # CONTINUOUS MODE
+            train_loss = train_epoch_continuous(model, train_loader, opt, device)
+            val_metrics = evaluate_continuous(model, val_loader, device, is_gaussian=args.is_gaussian)
+            
+            val_loss = val_metrics["loss"] 
 
-        else:
-            train_loss = train_epoch_continuous(
-                model, train_loader, opt, device
-            )
-
-            val_metrics = evaluate_continuous(
-                model, val_loader, device, is_gaussian=args.is_gaussian
-            )
-
-            val_loss = val_metrics["loss"]
-
-            # JSON logger
-            logger.log_training(epoch, {
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "mse": val_metrics["mse"],
-                "mae": val_metrics["mae"]
-            })
-
-            # TensorBoard logs
-            tb_writer.add_scalar("loss/train", train_loss, epoch)
-            tb_writer.add_scalar("loss/val", val_loss, epoch)
-            tb_writer.add_scalar("metrics/mse", val_metrics["mse"], epoch)
-            tb_writer.add_scalar("metrics/mae", val_metrics["mae"], epoch)
+            tb_writer.add_scalar("metrics/var_steer", val_metrics.get("var_steer", 0.0), epoch)
+            tb_writer.add_scalar("metrics/var_throttle", val_metrics.get("var_throttle", 0.0), epoch)
+            tb_writer.add_scalar("metrics/var_brake", val_metrics.get("var_brake", 0.0), epoch)
 
             if args.is_gaussian:
-                tb_writer.add_scalar("metrics/nll", val_metrics["nll"], epoch)
+                logger.log_training(epoch, {
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                    "nll": val_metrics["nll"],
+                    "avg_std": val_metrics["avg_std"]
+                })
+                tb_writer.add_scalar("loss/train_nll", train_loss, epoch)
+                tb_writer.add_scalar("loss/val_nll", val_loss, epoch) # val_loss is nll
                 tb_writer.add_scalar("metrics/avg_std", val_metrics["avg_std"], epoch)
 
                 print(
                     f"Epoch {epoch:03d} | "
                     f"train_nll={train_loss:.5f} | "
                     f"val_nll={val_metrics['nll']:.5f} | "
-                    f"val_mse={val_metrics['mse']:.5f} | "
-                    f"val_mae={val_metrics['mae']:.4f} | "
+                    f"avg_std={val_metrics['avg_std']:.4f} | "
                     f"time={time.time()-t0:.1f}s"
                 )
             else:
+                logger.log_training(epoch, {
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                    "mse": val_metrics["mse"],
+                    "mae": val_metrics["mae"],
+                    "var_steer": val_metrics["var_steer"],
+                    "var_throttle": val_metrics["var_throttle"],
+                    "var_brake": val_metrics["var_brake"]
+                })
+                
+                tb_writer.add_scalar("loss/train_mse", train_loss, epoch)
+                tb_writer.add_scalar("loss/val_mse", val_metrics["mse"], epoch)
+                tb_writer.add_scalar("loss/val_mae", val_metrics["mae"], epoch)
+                tb_writer.add_scalar("variance/steer", val_metrics["var_steer"], epoch)
+                tb_writer.add_scalar("variance/throttle", val_metrics["var_throttle"], epoch)
+                tb_writer.add_scalar("variance/brake", val_metrics["var_brake"], epoch)
+
                 print(
                     f"Epoch {epoch:03d} | "
                     f"train_mse={train_loss:.5f} | "
                     f"val_mse={val_metrics['mse']:.5f} | "
-                    f"val_mae={val_metrics['mae']:.4f} | "
+                    f"val_mae={val_metrics['mae']:.5f} | "
                     f"time={time.time()-t0:.1f}s"
                 )
+
+
 
 
 
@@ -753,17 +762,20 @@ def main():
         #     "grid_channels": grid_channels
         # }, checkpoint_path)
 
-        # -------- Best model + Early stopping --------
-        if val_loss < best_val:
+        # -------- Best model + Early stopping --------        
+            is_variance_ok = True # Default to True for discrete mode
+        if args.mode == "continuous":
+            steer_var = val_metrics.get("var_steer", 1.0) 
+            min_steer_th = getattr(config, 'MIN_STEER_VAR', 0.005)
+            is_variance_ok = steer_var >= min_steer_th
+
+        if val_loss < best_val and is_variance_ok:
             best_val = val_loss
             patience_counter = 0
 
-            best_model_path = os.path.join(
-                logger.model_dir,
-                "best_model.pt"
-            )
+            best_model_path = os.path.join(logger.model_dir, "best_model.pt")
             
-            ckpt= {
+            ckpt = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
@@ -772,22 +784,29 @@ def main():
                 "is_gaussian": args.mode == "continuous" and args.is_gaussian,
                 "scalar_dim": scalar_dim,
                 "grid_channels": grid_channels
-                }
+            }
             
             if args.mode == "discrete":
                 ckpt["n_speed"] = n_speed
                 ckpt["n_turn"] = n_turn    
                 
-                        
             torch.save(ckpt, best_model_path)
+            
+            if args.mode == "continuous":
+                print(f"[saved best model] - Steer Var: {steer_var:.4f} | Throttle Var: {val_metrics.get('var_throttle', 0):.4f} | Brake Var: {val_metrics.get('var_brake', 0):.4f}")
+            else:
+                print(f"[saved best model] - Val Loss: {val_loss:.4f}")
 
-            print("[saved best model]")
 
         else:
             patience_counter += 1
+            if args.mode == "continuous" and not is_variance_ok:
+                print(f"⚠️  [Warning] Action Collapse Detected! Steer var ({steer_var:.5f}) is below threshold ({min_steer_th})")
+                
             if patience_counter >= args.patience:
                 print("\nEarly stopping triggered.")
                 break
+
 
 
     tb_writer.close()
