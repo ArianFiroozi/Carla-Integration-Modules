@@ -37,9 +37,9 @@ CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
-    MANUAL_DIR / "test"
+    MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
-    # MANUAL_DIR / "map1_30car"
+    MANUAL_DIR / "map1_30car"
 ]
 
 # =========================================================
@@ -217,7 +217,7 @@ USE_ONE_HOT_GRID = True
 # =========================================================
 # IMITATION LEARNING TRAINING
 # =========================================================
-BC_EPOCHS = 30
+BC_EPOCHS = 1000
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
