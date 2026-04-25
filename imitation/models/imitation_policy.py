@@ -35,7 +35,7 @@ class ImitationPolicy(nn.Module):
             kernel_sizes=kernel_sizes,
             n_mlp_layers=scalar_n_mlp_layers,
             mlp_hidden_size=scalar_mlp_hidden_size
-        )
+        ) 
 
         if mode == "discrete":
             self.actor = DiscreteActorHead(
@@ -49,7 +49,7 @@ class ImitationPolicy(nn.Module):
                     n_mlp_layers=head_n_mlp_layers, mlp_hidden_size=head_mlp_hidden_size
                 )
             else:
-                self.actor = BCContinuousHead(
+                self.actor = BCDecoupledContinuousHead(
                     latent_dim=latent_dim,
                     n_mlp_layers=head_n_mlp_layers, 
                     mlp_hidden_size=head_mlp_hidden_size 
@@ -60,3 +60,4 @@ class ImitationPolicy(nn.Module):
         if self.mode == "continuous" and self.is_gaussian:
             return self.actor(latent, mode="bc")
         return self.actor(latent)
+       

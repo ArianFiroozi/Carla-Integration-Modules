@@ -87,3 +87,30 @@ class BCGaussianContinuousHead(nn.Module):
 
         return mean, std
 
+
+
+class BCDecoupledContinuousHead(nn.Module):
+    """
+    Decoupled head for Behavioral Cloning.
+    Separates the MLP for Speed (Throttle/Brake) and Steering 
+    to prevent action collapse and gradient dominance.
+    """
+    def __init__(self, latent_dim=128, action_dim=3, n_mlp_layers=2, mlp_hidden_size=64):
+        super().__init__()
+        self.speed_net, speed_out_dim = build_mlp(latent_dim, mlp_hidden_size, n_mlp_layers)
+        self.speed_head = nn.Linear(speed_out_dim, 2) # Throttle, Brake
+        
+        self.steer_net, steer_out_dim = build_mlp(latent_dim, mlp_hidden_size, n_mlp_layers)
+        self.steer_head = nn.Linear(steer_out_dim, 1) # Steer
+
+    def forward(self, latent):
+        speed_feat = self.speed_net(latent)
+        speed_raw = self.speed_head(speed_feat)
+        throttle = torch.sigmoid(speed_raw[:, 0:1])
+        brake = torch.sigmoid(speed_raw[:, 1:2])
+        
+        steer_feat = self.steer_net(latent)
+        steer_raw = self.steer_head(steer_feat)
+        steer = torch.tanh(steer_raw[:, 0:1])
+        
+        return torch.cat([throttle, brake, steer], dim=1)

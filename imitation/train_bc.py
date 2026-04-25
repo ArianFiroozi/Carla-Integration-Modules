@@ -268,15 +268,13 @@ def train_epoch_continuous(model, loader, opt, device):
         if config.IS_GAUSSIAN:
             # GAUSSIAN MODE (NLL)
             mean, std = pred
-            
-
             std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD) 
-            
             dist = torch.distributions.Normal(mean, std)
             per_element_loss = -dist.log_prob(target)
         else:
-            # STANDARD MODE (MSE)
-            per_element_loss = (pred - target) ** 2
+            # STANDARD MODE (Smooth L1 Loss)
+            # استفاده از Smooth L1 (Huber) به جای MSE برای جلوگیری از فرار به سمت میانگین (صفر)
+            per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
 
 
         if config.USE_WEIGHTED_LOSS:
