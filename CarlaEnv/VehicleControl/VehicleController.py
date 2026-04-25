@@ -51,7 +51,7 @@ class VehicleController():
 
     def __init_control(self):
         self.control = carla.VehicleControl()
-        self.control.throttle = 0.5
+        self.control.throttle = 0.0
         self.control.steer = 0.0
         self.control.brake = 0.0
 

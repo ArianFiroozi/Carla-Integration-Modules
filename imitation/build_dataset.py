@@ -8,7 +8,7 @@ import time
 from . import config
 from .utils.viz import *
 from .utils.stats import *
-from .seed_utils import seed_everything
+from .utils.seed_utils import seed_everything
 
 seed_everything(config.GLOBAL_SEED)
 
@@ -173,11 +173,16 @@ def validate_observations(d, stats):
     T = next(iter(d.values())).shape[0]
     valid_mask = np.ones(T, dtype=bool)
     for obs_key, bounds in OBS_BOUNDS.items():
-        if obs_key not in d: continue
+        
+        if obs_key not in d: 
+            continue
+        
         x_flat = d[obs_key].reshape(T, -1)
+        
         violated_any = ((x_flat < bounds["low"]) | (x_flat > bounds["high"])).any(axis=1)
         if violated_any.sum() > 0:
             stats["obs_violations"][obs_key] += int(violated_any.sum())
+            
             valid_mask &= ~violated_any
     stats["obs_violation_frames"] += int((~valid_mask).sum())
     return valid_mask
@@ -224,6 +229,12 @@ def compute_episode_mask(d, stats, mode, rng):
 # ==============================================================================
 # 2. DATASET AUGMENTATION & FORMATTING
 # ==============================================================================
+def wrap_lane_angle(d):
+    """Normalize lane angle to [-pi, pi]."""
+    if "obs_lane_angle" in d:
+        lane = d["obs_lane_angle"].astype(np.float32)
+        lane = (lane + np.pi) % (2 * np.pi) - np.pi
+        d["obs_lane_angle"] = lane
 
 def remap_presence_grid(out_obs, mapping=None, verify=True):
     """Remaps presence IDs across ALL time steps seamlessly."""
@@ -331,9 +342,12 @@ def pass_1_compute_masks(files, stats, mode, rng):
     obs_shapes = {}
 
     for f in files:
-        d = np.load(f, allow_pickle=True)
+        d_raw = np.load(f, allow_pickle=True)
+        d = {k: v for k, v in d_raw.items()}
+        wrap_lane_angle(d)
+
         if obs_keys is None:
-            obs_keys = [k for k in d.files if k.startswith("obs_")]
+            obs_keys = [k for k in d.keys() if k.startswith("obs_")]
             for k in obs_keys:
                 obs_shapes[k] = (1,) if d[k].ndim == 1 else d[k].shape[1:]
 
@@ -364,7 +378,10 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
     idx = 0
 
     for f, mask in zip(files, keep_masks):
-        d = np.load(f, allow_pickle=True)
+        d_raw = np.load(f, allow_pickle=True)
+        d = {k: v for k, v in d_raw.items()}   # make it mutable
+        wrap_lane_angle(d)
+
 
         valid_indices = np.where(mask)[0]
         valid_indices = valid_indices[valid_indices >= (WINDOW_SIZE - 1)]

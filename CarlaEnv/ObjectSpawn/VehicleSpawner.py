@@ -7,11 +7,17 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
     traffic_manager = client.get_trafficmanager()
     speed_profiles = [
 
-    (25, 45), # very slow traffic (55–75% of speed limit)
+    ## -- FOR FAST PACED DATASET
+    # (25, 45), # very slow traffic (55–75% of speed limit)
+    # (10, 25), # slow/near-limit traffic (75–90% of speed limit)
+    # (-15, -5), # slightly fast (105–115% of speed limit)
+    
+    
+    (30, 50),   # extremely slow traffic
+    (40, 60),   # ultra slow 
+    (50, 70),   # crawling traffic 
 
-    (10, 25), # slow/near-limit traffic (75–90% of speed limit)
-
-    (-15, -5), # slightly fast (105–115% of speed limit)
+    
 
     ]
     blueprint_library = world.get_blueprint_library()
@@ -47,7 +53,7 @@ def spawn_vehicles(client, num_vehicles=0, random_spawn=True):
         
         # traffic_manager.random_left_lanechange_percentage(vehicle, random.randint(0, 30))
         # traffic_manager.random_right_lanechange_percentage(vehicle, random.randint(0, 30))
-        traffic_manager.distance_to_leading_vehicle(vehicle, random.uniform(1.0, 5.0))
+        traffic_manager.distance_to_leading_vehicle(vehicle, random.uniform(2.0, 6.0))
 
 
 

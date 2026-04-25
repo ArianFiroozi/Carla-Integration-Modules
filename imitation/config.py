@@ -37,9 +37,9 @@ CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
-    # MANUAL_DIR / "test"
+    MANUAL_DIR / "test"
     # MANUAL_DIR / "map1_0car",
-    MANUAL_DIR / "map1_30car"
+    # MANUAL_DIR / "map1_30car"
 ]
 
 # =========================================================
@@ -228,7 +228,7 @@ BC_PATIENCE = 10
 # =========================================================
 MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
-MANUAL_DEBUG_GRIDS = True
+MANUAL_DEBUG_GRIDS = False
 
 MANUAL_RECORD = True
 MANUAL_BASE_NAME = "map1"

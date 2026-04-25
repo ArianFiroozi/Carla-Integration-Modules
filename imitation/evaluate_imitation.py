@@ -57,6 +57,13 @@ def _normalize_value(v, key, norm_stats):
     # Default for 'fixed' mode scalars, or if stats are missing
     return v if "speed" in key else np.zeros_like(v)
 
+def wrap_angle_pi(angle):
+    """Wrap angle to [-pi, pi]. Works for scalar or numpy array."""
+    angle = np.asarray(angle)
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
+
+
 class ObsHistory:
     """Maintains a rolling window of grid observations."""
 
@@ -161,8 +168,13 @@ def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
     
     history.update(obs)
     grid = history.get_grid()
+    
+    
+    
+    # wrap lane angle before normalization
+    raw_lane_angle = wrap_angle_pi(obs["lane_angle"][0])
+    lane_angle = _normalize_value(raw_lane_angle, "obs_lane_angle", norm_stats)
 
-    lane_angle = _normalize_value(obs["lane_angle"][0], "obs_lane_angle", norm_stats)
     lane_pos = _normalize_value(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x", norm_stats)
     speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
     speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
@@ -578,7 +590,7 @@ def main():
         tb_writer.add_scalar("eval/avg_return", np.mean(all_returns), 0)
         tb_writer.add_scalar("eval/avg_length", np.mean(all_lengths), 0)
         tb_writer.add_scalar("eval/carla_vehicles", config.CARLA_VEHICLES, 0)
-        tb_writer.add_scalar("smooth_steering", float(config.SMOOTH_STEERING),0)
+        tb_writer.add_scalar("eval/smooth_steering", float(config.SMOOTH_STEERING),0)
         tb_writer.flush()
         tb_writer.close()
         

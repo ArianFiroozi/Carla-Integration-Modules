@@ -1,0 +1,263 @@
+{
+    "mode": "continuous",
+    "epochs": 30,
+    "batch_size": 512,
+    "lr": 0.0003,
+    "val_split": 0.1,
+    "patience": 10,
+    "device": "cuda",
+    "is_gaussian": false,
+    "use_continuous_undersampling": false,
+    "undersampling_threshold_continuous": 0.05,
+    "undersampling_probability_continuous": 0.6,
+    "use_weighted_loss": false,
+    "steer_loss_weight_continuous": 3.0,
+    "throttle_loss_weight_continuous": 1.0,
+    "brake_loss_weight_continuous": 1.0,
+    "weighted_loss_threshold_continuous": 0.1,
+    "min_std": 0.05,
+    "max_std": 1,
+    "weight_sampling": "none",
+    "cnn_channels": [
+        16,
+        32,
+        64
+    ],
+    "head_n_mlp_layers": 2,
+    "head_mlp_hidden_size": 64,
+    "scalar_n_mlp_layers": 2,
+    "scalar_mlp_hidden_size": 32,
+    "latent_dim": 128,
+    "use_one_hot_grid": true,
+    "scaling": "z_score",
+    "dataset_meta": {
+        "created_at": "2026-04-23 16:46:32",
+        "dataset_path": "data\\processed\\dataset_bc_continuous.npz",
+        "source_files": [
+            "data\\demos\\map1_0car\\map1_20260328_222953_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223052_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223150_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223249_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223347_ep0004.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223457_ep0005.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223610_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223712_ep0007.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223822_ep0008.npz",
+            "data\\demos\\map1_0car\\map1_20260328_223925_ep0009.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224123_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224211_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224316_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224334_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224520_ep0005.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224615_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224702_ep0007.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224723_ep0008.npz",
+            "data\\demos\\map1_0car\\map1_20260328_224812_ep0009.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230114_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230205_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230246_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230419_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230522_ep0004.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230607_ep0005.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230657_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230740_ep0007.npz",
+            "data\\demos\\map1_0car\\map1_20260328_230839_ep0008.npz",
+            "data\\demos\\map1_0car\\map1_20260328_231008_ep0009.npz",
+            "data\\demos\\map1_0car\\map1_20260330_212137_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260330_212246_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260330_212348_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260330_212934_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260330_213029_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260330_213047_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260330_213138_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260330_213307_ep0005.npz",
+            "data\\demos\\map1_0car\\map1_20260330_213404_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260401_221857_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260401_221941_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222046_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222156_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222307_ep0004.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222432_ep0005.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222538_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222653_ep0007.npz",
+            "data\\demos\\map1_0car\\map1_20260401_222814_ep0008.npz",
+            "data\\demos\\map1_0car\\map1_20260401_223009_ep0009.npz",
+            "data\\demos\\map1_0car\\map1_20260401_223557_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260404_215421_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260404_215525_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260404_215556_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260404_215728_ep0004.npz",
+            "data\\demos\\map1_0car\\map1_20260404_215853_ep0006.npz",
+            "data\\demos\\map1_0car\\map1_20260404_220005_ep0007.npz",
+            "data\\demos\\map1_0car\\map1_20260404_220237_ep0008.npz",
+            "data\\demos\\map1_0car\\map1_20260404_220615_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222349_ep0000.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222452_ep0001.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222603_ep0002.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222710_ep0003.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222838_ep0004.npz",
+            "data\\demos\\map1_0car\\map1_20260404_222941_ep0005.npz"
+        ],
+        "total_samples": 110348,
+        "observation_keys": [
+            "obs_speed_x",
+            "obs_speed_y",
+            "obs_presence",
+            "obs_lane_angle",
+            "obs_traffic_signs",
+            "obs_max_speed",
+            "obs_ego_speed_x",
+            "obs_ego_speed_y",
+            "obs_ego_in_lane_position_x",
+            "obs_throttle",
+            "obs_brake",
+            "obs_steering_angle",
+            "obs_reverse"
+        ],
+        "observation_shapes": {
+            "obs_speed_x": [
+                25,
+                11
+            ],
+            "obs_speed_y": [
+                25,
+                11
+            ],
+            "obs_presence": [
+                25,
+                11
+            ],
+            "obs_lane_angle": [
+                1
+            ],
+            "obs_traffic_signs": [
+                5
+            ],
+            "obs_max_speed": [
+                1
+            ],
+            "obs_ego_speed_x": [
+                1
+            ],
+            "obs_ego_speed_y": [
+                1
+            ],
+            "obs_ego_in_lane_position_x": [
+                1
+            ],
+            "obs_throttle": [
+                1
+            ],
+            "obs_brake": [
+                1
+            ],
+            "obs_steering_angle": [
+                1
+            ],
+            "obs_reverse": [
+                1
+            ]
+        },
+        "stats": {
+            "total_frames": 111711,
+            "obs_violations": {},
+            "obs_violation_frames": 0,
+            "idle_frames_trimmed": 0,
+            "terminated_dropped": 13,
+            "truncated_dropped": 50,
+            "pre_termination_dropped": 1300,
+            "sampling_dropped": 0,
+            "kept": 110348
+        },
+        "pipeline_config": {
+            "mode": "continuous",
+            "window_size": 1,
+            "simplify_actions": true,
+            "remove_reverse": true,
+            "remove_no_turn": true,
+            "idle_trim_enabled": false,
+            "idle_speed_threshold": 0.3,
+            "idle_throttle_threshold": 0.05,
+            "mirror_enabled": false,
+            "mirror_steering_threshold": 0.04
+        },
+        "normalization_stats": {
+            "obs_speed_x": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "obs_speed_y": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "obs_lane_angle": {
+                "min": -0.814051628112793,
+                "max": 1.0675952434539795,
+                "mean": -0.006048555951565504,
+                "std": 0.1213308721780777
+            },
+            "obs_traffic_signs": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "obs_max_speed": {
+                "min": 100.0,
+                "max": 100.0,
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "obs_ego_speed_x": {
+                "min": -0.0017633958486840129,
+                "max": 23.7612361907959,
+                "mean": 6.445374011993408,
+                "std": 3.385202646255493
+            },
+            "obs_ego_speed_y": {
+                "min": -3.6058828830718994,
+                "max": 2.3588507175445557,
+                "mean": 0.05300222709774971,
+                "std": 0.31489643454551697
+            },
+            "obs_ego_in_lane_position_x": {
+                "min": -2.1568477153778076,
+                "max": 1.620895504951477,
+                "mean": 0.00892593339085579,
+                "std": 0.49477753043174744
+            },
+            "obs_throttle": {
+                "min": 0.0,
+                "max": 1.0,
+                "mean": 0.33823221921920776,
+                "std": 0.1501784771680832
+            },
+            "obs_brake": {
+                "min": 0.0,
+                "max": 0.10000000149011612,
+                "mean": 0.0016882950440049171,
+                "std": 0.012883292511105537
+            },
+            "obs_steering_angle": {
+                "min": -1.0,
+                "max": 1.0,
+                "mean": 0.02090885117650032,
+                "std": 0.15474547445774078
+            },
+            "obs_reverse": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            }
+        }
+    },
+    "metadata": {
+        "timestamp": "2026-04-23T16:46:40.000039",
+        "git_commit": "0e7adfc5519973d932a6912d6f2a622851fb7dda"
+    }
+}

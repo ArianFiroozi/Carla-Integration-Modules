@@ -67,7 +67,7 @@ i mixed with and without car dataset fully and then tested on with car env  same
 fifth and sixth experiment:
 i went back to  baseline config. no car in train nor eval
 so far nomarlization was like only division by max nothing much
-i added two methods for scaling z score and min max , the driving became way more stable with z score going up to 1k avg and min max 1.3k 
+i added two methods for scaling z score and min max , the driving became way more stable with z score going up to 1k avg and min max 1.3k ()
 
 seventh and eighted experiment:
 i used with car for training this time. tested on no car eval , z score did a better job this time compared to min max (700 vs 300-400)
@@ -79,5 +79,81 @@ min max which went from 1.3k to barely 400 was mostly simliar to z score version
 nineth and tenth experiment:
 i used the models i trained in experiment 7 and 8 , but this time the eval was with cars, min max had a very crazy left bias , it like mostly spawned the immeditly turned left 
 and got very bad results(169 avg) , z score did better even tho it crahsed a lot and couldnt turn properly near cars and hit walls , it did have a sense of other cars being around and it 
-avoided them pretty nicely a few times and even once did a pretty clean(relatively) overtake.
+avoided them pretty nicely a few times and even once did a pretty clean(relatively) overtake. one reason i think that caused that left bias , is the data i recorded with other cars around , was a 
+bit more fast paced and well i overtook other cars by going left of them then speeding.
 
+
+
+eleventh experiment:
+
+went back to baseline  experiment , just with z score and the bigger model from exp 3.
+it did pretty bad compared to smaller model(600 vs 1k)
+
+
+twelveth experiment:
+did a little experiment here , used 1k baseline added dataset mirroring , it did worse around 650 but it is werid, it did mostly a simliar job but it very specific two scenarios(like two
+specific places in the map) it did like a super crazy random behavoir and that i think was mostly the reason it did worse by quite a lot (also there is always some luck involed)
+
+
+thirteenth experiment:
+went back to small model , train on with car data (120k data)
+tested on no car env , did kinda decent (almost 900 compared to 1k-1.2k )
+tested on with car got 600 , it kinda acts weird around cars but does have a sense of them being around.(weird, i trained this for like another 70 epoch got it up to 100 epoch, i used patience 
+for 10 epoch to make sure we dont overfit , but the car forgot how to turn mostly )
+(update: trained model again with wrap around bug fixed , got simliar results)
+
+
+
+
+
+
+fourtheenth experiment:
+
+fixed a little wrap around bug in lange angle, did the baseline+z score test again on no car data and no car env , got around 1k(tho bad luck kinda happened)
+imma call this the baseline from now on
+
+C:\carla\Carla-Integration-Modules\experiments\2026_04_23_16_46_39_bc_continuous
+
+{
+  "mode": "continuous",
+  "epochs": 30,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "val_split": 0.1,
+  "patience": 10,
+  "device": "cuda",
+  "is_gaussian": false,
+  "use_continuous_undersampling": false,
+  "undersampling_threshold_continuous": 0.05,
+  "undersampling_probability_continuous": 0.6,
+  "use_weighted_loss": false,
+  "steer_loss_weight_continuous": 3.0,
+  "throttle_loss_weight_continuous": 1.0,
+  "brake_loss_weight_continuous": 1.0,
+  "weighted_loss_threshold_continuous": 0.1,
+  "min_std": 0.05,
+  "max_std": 1,
+  "weight_sampling": "none",
+  "cnn_channels": [
+    16,
+    32,
+    64
+  ],
+  "head_n_mlp_layers": 2,
+  "head_mlp_hidden_size": 64,
+  "scalar_n_mlp_layers": 2,
+  "scalar_mlp_hidden_size": 32,
+  "latent_dim": 128,
+  "use_one_hot_grid": true,
+  "scaling": "z_score",
+  "metadata": {
+    "timestamp": "2026-04-23T16:46:40.000039",
+    "git_commit": "0e7adfc5519973d932a6912d6f2a622851fb7dda"
+  }
+}
+
+
+
+fifteenth experiment:
+  same experiment as thirteenth but drove some more , got worse results , 500 on no car env pretty bad driving compared to smaller data test ,  338 on with car env, really bad 
+  like it lowkey reacts no car , but doenst really drive well. weird , i mixed newer data(60k) with a portion of older data (40k) it resulted in a performance simliar to performance before i added extra 60k
