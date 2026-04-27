@@ -269,6 +269,11 @@ class BaseDataset(Dataset):
         add_scalar("obs_ego_speed_x")
         add_scalar("obs_ego_speed_y")
 
+        if getattr(config, "USE_SPATIAL_FEATURES", False):
+            add_scalar("obs_dist_front")
+            add_scalar("obs_dist_left")
+            add_scalar("obs_dist_right")
+
         if include_traffic_signs:
             add_scalar("obs_traffic_signs")
 

@@ -141,6 +141,59 @@ def gather_demo_files(dirs):
 
 
 
+def compute_spatial_distances(grid_2d):
+    max_dist = 25.0
+    dist_front, dist_left, dist_right = max_dist, max_dist, max_dist
+    
+    ego_positions = np.argwhere(grid_2d == 9)
+    if len(ego_positions) == 0:
+        return np.array([dist_front, dist_left, dist_right], dtype=np.float32)
+    
+    ego_y, ego_x = ego_positions[0]
+    
+    column_ahead = grid_2d[:ego_y, ego_x]
+    obstacles_ahead = np.argwhere(column_ahead == 1)
+    if len(obstacles_ahead) > 0:
+        closest_obs_y = obstacles_ahead[-1][0]
+        dist_front = float(ego_y - closest_obs_y)
+        
+    row_left = grid_2d[ego_y, :ego_x]
+    obstacles_left = np.argwhere((row_left == 1) | (row_left == 2))
+    if len(obstacles_left) > 0:
+        closest_obs_x = obstacles_left[-1][0]
+        dist_left = float(ego_x - closest_obs_x)
+        
+    row_right = grid_2d[ego_y, ego_x+1:]
+    obstacles_right = np.argwhere((row_right == 1) | (row_right == 2))
+    if len(obstacles_right) > 0:
+        closest_obs_x = obstacles_right[0][0]
+        dist_right = float(closest_obs_x + 1)
+        
+    return np.array([dist_front, dist_left, dist_right], dtype=np.float32)
+
+
+def add_spatial_features(d):
+    if getattr(config, "USE_SPATIAL_FEATURES", False):
+        if "obs_presence" not in d:
+            return
+            
+        presence = d["obs_presence"]
+        T = presence.shape[0]
+        
+        dist_front = np.zeros((T, 1), dtype=np.float32)
+        dist_left = np.zeros((T, 1), dtype=np.float32)
+        dist_right = np.zeros((T, 1), dtype=np.float32)
+        
+        for t in range(T):
+            dists = compute_spatial_distances(presence[t])
+            dist_front[t, 0] = dists[0]
+            dist_left[t, 0] = dists[1]
+            dist_right[t, 0] = dists[2]
+            
+        d["obs_dist_front"] = dist_front
+        d["obs_dist_left"] = dist_left
+        d["obs_dist_right"] = dist_right
+
 
 # ==============================================================================
 # 1. FILTERING LOGIC
@@ -346,6 +399,8 @@ def pass_1_compute_masks(files, stats, mode, rng):
         d = {k: v for k, v in d_raw.items()}
         wrap_lane_angle(d)
 
+        add_spatial_features(d)
+
         if obs_keys is None:
             obs_keys = [k for k in d.keys() if k.startswith("obs_")]
             for k in obs_keys:
@@ -382,6 +437,7 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         d = {k: v for k, v in d_raw.items()}   # make it mutable
         wrap_lane_angle(d)
 
+        add_spatial_features(d)
 
         valid_indices = np.where(mask)[0]
         valid_indices = valid_indices[valid_indices >= (WINDOW_SIZE - 1)]

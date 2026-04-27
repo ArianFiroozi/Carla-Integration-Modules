@@ -162,26 +162,62 @@ def create_video_recorder(env, save_path, width=640, height=360, fps=20):
 
     return camera, video
 
+def compute_spatial_distances(grid_2d):
+    max_dist = 25.0
+    dist_front, dist_left, dist_right = max_dist, max_dist, max_dist
+    
+    ego_positions = np.argwhere(grid_2d == 9)
+    if len(ego_positions) == 0:
+        return dist_front, dist_left, dist_right
+    
+    ego_y, ego_x = ego_positions[0]
+    
+    column_ahead = grid_2d[:ego_y, ego_x]
+    obstacles_ahead = np.argwhere(column_ahead == 1)
+    if len(obstacles_ahead) > 0:
+        closest_obs_y = obstacles_ahead[-1][0]
+        dist_front = float(ego_y - closest_obs_y)
+        
+    row_left = grid_2d[ego_y, :ego_x]
+    obstacles_left = np.argwhere((row_left == 1) | (row_left == 2))
+    if len(obstacles_left) > 0:
+        closest_obs_x = obstacles_left[-1][0]
+        dist_left = float(ego_x - closest_obs_x)
+        
+    row_right = grid_2d[ego_y, ego_x+1:]
+    obstacles_right = np.argwhere((row_right == 1) | (row_right == 2))
+    if len(obstacles_right) > 0:
+        closest_obs_x = obstacles_right[0][0]
+        dist_right = float(closest_obs_x + 1)
+        
+    return dist_front, dist_left, dist_right
+
+
 def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
-    # This ensures the input to the model during evaluation exactly matches the training data format.
+    dist_front, dist_left, dist_right = 25.0, 25.0, 25.0
+    if getattr(config, "USE_SPATIAL_FEATURES", False):
+        dist_front, dist_left, dist_right = compute_spatial_distances(obs["presence"])
+        
+        dist_front = _normalize_value(dist_front, "obs_dist_front", norm_stats)
+        dist_left = _normalize_value(dist_left, "obs_dist_left", norm_stats)
+        dist_right = _normalize_value(dist_right, "obs_dist_right", norm_stats)
+
     obs["presence"][obs["presence"] == 9] = 3
     
     history.update(obs)
     grid = history.get_grid()
     
-    
-    
-    # wrap lane angle before normalization
     raw_lane_angle = wrap_angle_pi(obs["lane_angle"][0])
     lane_angle = _normalize_value(raw_lane_angle, "obs_lane_angle", norm_stats)
-
     lane_pos = _normalize_value(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x", norm_stats)
     speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
     speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
     
-    
-    scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
-    # print("scalars: ",scalars)
+    if getattr(config, "USE_SPATIAL_FEATURES", False):
+        scalars = np.array([lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_left, dist_right], dtype=np.float32)
+    else:
+        scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
+        
     return grid, scalars
 
 

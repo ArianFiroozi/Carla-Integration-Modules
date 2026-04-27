@@ -38,8 +38,8 @@ DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
     MANUAL_DIR / "test",
-    # MANUAL_DIR / "map1_0car",
-    MANUAL_DIR / "map1_30car"
+    MANUAL_DIR / "map1_0car",
+    # MANUAL_DIR / "map1_30car"
 ]
 
 # =========================================================
@@ -274,3 +274,13 @@ FEATURE_HIST_MAX_SAMPLES = 100000
 MIN_STEER_VAR = 0.005
 MIN_THROTTLE_VAR = 0.001 
 MIN_BRAKE_VAR = 0.001
+
+# =========================================================
+# FEATURE ENGINEERING (SPATIAL DISTANCES)
+# =========================================================
+USE_SPATIAL_FEATURES = True
+
+if USE_SPATIAL_FEATURES:
+    EXTRA_SCALARS_DIM = 3
+else:
+    EXTRA_SCALARS_DIM = 0
