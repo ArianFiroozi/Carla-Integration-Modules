@@ -163,7 +163,6 @@ def create_video_recorder(env, save_path, width=640, height=360, fps=20):
     return camera, video
 
 
-
 def compute_spatial_distances(grid_2d):
     """
     Computes the distance to the nearest obstacle in 4 directions (front, back, left, right).
@@ -177,8 +176,9 @@ def compute_spatial_distances(grid_2d):
     dist_right = MAX_SIDE
     dist_left  = MAX_SIDE
 
-    # Find the ego vehicle's position
-    ego_positions = np.argwhere(grid_2d == 9)
+    # Find the ego vehicle's position (looking for 3, as we converted 9 to 3)
+    ego_positions = np.argwhere(grid_2d == 3)
+    
     if len(ego_positions) == 0:
         # Return default max distances if ego is not found
         return np.array([dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
@@ -217,10 +217,21 @@ def compute_spatial_distances(grid_2d):
 
 
 def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
-    # Initialize with default values (matching the MAX constants)
+    # Fix the shape of the presence grid if the env flattens it
+    presence = np.array(obs["presence"])
+    if presence.ndim == 1:
+        presence = presence.reshape(25, 11)
+    elif presence.ndim == 3:
+        presence = presence.squeeze()
+        
+    # Fix the ego vehicle encoding (Env outputs 9, model expects 3)
+    presence[presence == 9] = 3
+    obs["presence"] = presence # Update the dict so history buffer gets the correct grid
+
+    # Initialize with default values
     dist_front, dist_back, dist_left, dist_right = 10.0, 10.0, 5.0, 5.0
-    
-    if config.USE_SPATIAL_FEATURES:
+
+    if getattr(config, "USE_SPATIAL_FEATURES", False):
         dists = compute_spatial_distances(obs["presence"])
         dist_front = dists[0]
         dist_back  = dists[1]
@@ -231,25 +242,24 @@ def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
         dist_back  = _normalize_value(dist_back, "obs_dist_back", norm_stats)
         dist_left  = _normalize_value(dist_left, "obs_dist_left", norm_stats)
         dist_right = _normalize_value(dist_right, "obs_dist_right", norm_stats)
-
-    obs["presence"][obs["presence"] == 9] = 3
     
+    # Update history and get stacked grid
     history.update(obs)
     grid = history.get_grid()
     
+    # Process scalars
     raw_lane_angle = wrap_angle_pi(obs["lane_angle"][0])
     lane_angle = _normalize_value(raw_lane_angle, "obs_lane_angle", norm_stats)
     lane_pos = _normalize_value(obs["ego_in_lane_position_x"][0], "obs_ego_in_lane_position_x", norm_stats)
     speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
     speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
     
-    if config.USE_SPATIAL_FEATURES:
+    if getattr(config, "USE_SPATIAL_FEATURES", False):
         scalars = np.array([lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
     else:
         scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
         
     return grid, scalars
-
 
 
 def map_action_for_env(action):
@@ -483,6 +493,7 @@ def load_policy_from_checkpoint(model_path, config_path):
     "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
     "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
     "latent_dim": config.LATENT_DIM,
+    "decoupled": config.IS_DECOUPLED 
     }
 
     if mode == "discrete":

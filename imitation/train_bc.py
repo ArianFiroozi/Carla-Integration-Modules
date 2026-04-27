@@ -273,10 +273,10 @@ def train_epoch_continuous(model, loader, opt, device):
             per_element_loss = -dist.log_prob(target)
         else:
             # STANDARD MODE (Smooth L1 Loss)
-          
+            # per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
             ## STANDARD MODE (MSE)
             per_element_loss = (pred - target) ** 2
-            # per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
+            
 
 
         if config.USE_WEIGHTED_LOSS:
@@ -385,6 +385,12 @@ def log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta):
     mirror_thresh = pipe.get("mirror_steering_threshold", 0.0)
     tb_writer.add_scalar("Dataset_Pipeline/mirror_enabled", float(bool(mirror_enabled)), 0)
     
+    
+    use_spatial_features = pipe.get("use_spatial_features", False)
+    tb_writer.add_scalar("Dataset_Pipeline/use_spatial_features", float(bool(use_spatial_features)), 0)
+    
+     
+    
     if mirror_thresh is not None:
         tb_writer.add_scalar("Dataset_Pipeline/mirror_steering_threshold", float(mirror_thresh), 0)
 
@@ -468,7 +474,8 @@ def main():
     "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
     "latent_dim": config.LATENT_DIM,
     "use_one_hot_grid": config.USE_ONE_HOT_GRID,
-    "scaling": config.SCALING_METHOD
+    "scaling": config.SCALING_METHOD,
+    "decoupled": config.IS_DECOUPLED
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -611,6 +618,7 @@ def main():
     "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
     "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
     "latent_dim": config.LATENT_DIM,
+    "decoupled": config.IS_DECOUPLED
     }
 
     if args.mode == "discrete":
@@ -626,6 +634,7 @@ def main():
             is_gaussian=args.is_gaussian,
             **kwargs
         ).to(device)
+        print("Scalar dimension:", scalar_dim)
         print("Grid channels:", grid_channels)
         print("Grid shape:", grid0.shape)
 

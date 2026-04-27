@@ -55,6 +55,9 @@ MIRROR_DATASET = config.MIRROR_DATASET
 MIRROR_STEERING_THRESHOLD = config.MIRROR_STEERING_THRESHOLD
 
 
+
+USE_SPATIAL_FEATURES=  config.USE_SPATIAL_FEATURES
+
 # Target keys mapping
 TARGET_RENAME_KEYS = ["obs_throttle", "obs_brake", "obs_steering_angle", "obs_reverse"]
 GRID_KEYS = ["obs_presence", "obs_speed_x", "obs_speed_y"]
@@ -99,6 +102,7 @@ def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode, norm
         "idle_throttle_threshold": IDLE_THROTTLE_THRESHOLD,
         "mirror_enabled": MIRROR_DATASET,
         "mirror_steering_threshold": MIRROR_STEERING_THRESHOLD,
+        "use_spatial_features": USE_SPATIAL_FEATURES
     }
 
     meta = {
@@ -214,7 +218,7 @@ def add_spatial_features(d):
     """
     Wrapper function to compute and add spatial distances for an entire episode.
     """
-    if not config.USE_SPATIAL_FEATURES or "obs_presence" not in d:
+    if not USE_SPATIAL_FEATURES or "obs_presence" not in d:
         return
             
     presence_grids = d["obs_presence"]

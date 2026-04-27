@@ -96,6 +96,9 @@ specific places in the map) it did like a super crazy random behavoir and that i
 
 
 thirteenth experiment:
+
+experiments\2026_04_23_11_01_11_bc_continuous
+imma call this the baseline without car  from now on
 went back to small model , train on with car data (120k data)
 tested on no car env , did kinda decent (almost 900 compared to 1k-1.2k )
 tested on with car got 600 , it kinda acts weird around cars but does have a sense of them being around.(weird, i trained this for like another 70 epoch got it up to 100 epoch, i used patience 
@@ -110,7 +113,7 @@ for 10 epoch to make sure we dont overfit , but the car forgot how to turn mostl
 fourtheenth experiment:
 
 fixed a little wrap around bug in lange angle, did the baseline+z score test again on no car data and no car env , got around 1k(tho bad luck kinda happened)
-imma call this the baseline from now on
+imma call this the baseline with car  from now on
 
 C:\carla\Carla-Integration-Modules\experiments\2026_04_23_16_46_39_bc_continuous
 
@@ -157,3 +160,13 @@ C:\carla\Carla-Integration-Modules\experiments\2026_04_23_16_46_39_bc_continuous
 fifteenth experiment:
   same experiment as thirteenth but drove some more , got worse results , 500 on no car env pretty bad driving compared to smaller data test ,  338 on with car env, really bad 
   like it lowkey reacts no car , but doenst really drive well. weird , i mixed newer data(60k) with a portion of older data (40k) it resulted in a performance simliar to performance before i added extra 60k
+imma put that 60k away for now 
+
+
+
+sixteenth experiment:
+
+
+added 4 spatial features , scalars to detect nearest walls and vehiles 
+adding this to baseline with car , we got about 500 for with car env and again about 1k on no car 
+

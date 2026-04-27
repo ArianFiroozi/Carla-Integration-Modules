@@ -37,7 +37,7 @@ CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
-    MANUAL_DIR / "test",
+    # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
     MANUAL_DIR / "map1_30car"
 ]
@@ -45,7 +45,7 @@ DEMO_LIST= [
 # =========================================================
 # MODEL ARCHITECTURE HYPERPARAMETERS
 # =========================================================
-# CNN settings
+IS_DECOUPLED = False
 
 # ---BASELINE---
 CNN_CHANNELS = [16, 32, 64]
@@ -220,7 +220,7 @@ USE_ONE_HOT_GRID = True
 # =========================================================
 # IMITATION LEARNING TRAINING
 # =========================================================
-BC_EPOCHS = 1000
+BC_EPOCHS = 30
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -231,7 +231,7 @@ BC_PATIENCE = 10
 # =========================================================
 MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
-MANUAL_DEBUG_GRIDS = True
+MANUAL_DEBUG_GRIDS = False
 
 MANUAL_RECORD = False
 MANUAL_BASE_NAME = "map1"
@@ -246,7 +246,7 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 # =========================================================
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 50
+CARLA_VEHICLES = 00
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -268,7 +268,7 @@ DEBUG_PRINT_STEPS = 500
 INSPECT_VISUALIZE = True
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
-BUILD_VISUALIZE = True
+BUILD_VISUALIZE = False
 FEATURE_HIST_MAX_SAMPLES = 100000
 
 # =========================================================

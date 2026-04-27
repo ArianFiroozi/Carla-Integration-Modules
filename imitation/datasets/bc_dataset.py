@@ -273,7 +273,7 @@ class BaseDataset(Dataset):
             add_scalar("obs_dist_front")
             add_scalar("obs_dist_left")
             add_scalar("obs_dist_right")
-            add_scalar("obs_dist_behind")
+            add_scalar("obs_dist_back")
 
         if include_traffic_signs:
             add_scalar("obs_traffic_signs")

@@ -11,6 +11,7 @@ class ImitationPolicy(nn.Module):
         self,
         mode="discrete",
         is_gaussian=False,
+        decoupled=False,
         grid_channels=9,
         scalar_dim=4,
         n_speed=None,
@@ -46,13 +47,16 @@ class ImitationPolicy(nn.Module):
             if is_gaussian:
                 self.actor = BCGaussianContinuousHead(
                     latent_dim=latent_dim,
-                    n_mlp_layers=head_n_mlp_layers, mlp_hidden_size=head_mlp_hidden_size
+                    n_mlp_layers=head_n_mlp_layers,
+                    mlp_hidden_size=head_mlp_hidden_size,
+                    decoupled=decoupled
                 )
             else:
-                self.actor = BCDecoupledContinuousHead(
+                self.actor = BCContinuousHead(
                     latent_dim=latent_dim,
-                    n_mlp_layers=head_n_mlp_layers, 
-                    mlp_hidden_size=head_mlp_hidden_size 
+                    n_mlp_layers=head_n_mlp_layers,
+                    mlp_hidden_size=head_mlp_hidden_size,
+                    decoupled=decoupled
                 )
 
     def forward(self, grid, scalars):
@@ -60,4 +64,3 @@ class ImitationPolicy(nn.Module):
         if self.mode == "continuous" and self.is_gaussian:
             return self.actor(latent, mode="bc")
         return self.actor(latent)
-       

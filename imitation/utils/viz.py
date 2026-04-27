@@ -153,7 +153,7 @@ def plot_feature_distributions(features):
     n = len(keys)
     if n == 0: return
     
-    cols = 4
+    cols = 5
     rows = int(np.ceil(n / cols))
 
     plt.figure(figsize=(cols * 5, rows * 3))
