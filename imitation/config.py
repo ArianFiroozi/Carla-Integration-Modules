@@ -38,8 +38,8 @@ DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
     MANUAL_DIR / "test",
-    MANUAL_DIR / "map1_0car",
-    # MANUAL_DIR / "map1_30car"
+    # MANUAL_DIR / "map1_0car",
+    MANUAL_DIR / "map1_30car"
 ]
 
 # =========================================================
@@ -203,6 +203,9 @@ WEIGHTED_SAMPLING = "none" # "inverse" or "none" or "handmade"
 
 
 
+USE_SPATIAL_FEATURES = True
+
+
 
 # ================================
 # Dataset Augmentation
@@ -228,9 +231,9 @@ BC_PATIENCE = 10
 # =========================================================
 MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
-MANUAL_DEBUG_GRIDS = False
+MANUAL_DEBUG_GRIDS = True
 
-MANUAL_RECORD = True
+MANUAL_RECORD = False
 MANUAL_BASE_NAME = "map1"
 
 RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
@@ -265,7 +268,7 @@ DEBUG_PRINT_STEPS = 500
 INSPECT_VISUALIZE = True
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
-BUILD_VISUALIZE = False
+BUILD_VISUALIZE = True
 FEATURE_HIST_MAX_SAMPLES = 100000
 
 # =========================================================
@@ -275,12 +278,3 @@ MIN_STEER_VAR = 0.005
 MIN_THROTTLE_VAR = 0.001 
 MIN_BRAKE_VAR = 0.001
 
-# =========================================================
-# FEATURE ENGINEERING (SPATIAL DISTANCES)
-# =========================================================
-USE_SPATIAL_FEATURES = True
-
-if USE_SPATIAL_FEATURES:
-    EXTRA_SCALARS_DIM = 3
-else:
-    EXTRA_SCALARS_DIM = 0

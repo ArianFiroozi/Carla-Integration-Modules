@@ -198,7 +198,7 @@ class ManualController:
                 if self.print_every and (t % self.print_every == 0):
                     self._debug_obs(obs, prefix=f"[t={t}]")
                     if self.debug_grids and "presence" in obs:
-                        self._print_grid(obs["speed_x"])
+                        self._print_grid(obs["presence"])
 
             if done:
                 if record:

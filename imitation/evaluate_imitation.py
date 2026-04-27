@@ -162,44 +162,74 @@ def create_video_recorder(env, save_path, width=640, height=360, fps=20):
 
     return camera, video
 
+
+
 def compute_spatial_distances(grid_2d):
-    max_dist = 25.0
-    dist_front, dist_left, dist_right = max_dist, max_dist, max_dist
-    
+    """
+    Computes the distance to the nearest obstacle in 4 directions (front, back, left, right).
+    """
+    MAX_FRONT = 10.0
+    MAX_BACK = 10.0
+    MAX_SIDE = 5.0
+
+    dist_front = MAX_FRONT
+    dist_back  = MAX_BACK
+    dist_right = MAX_SIDE
+    dist_left  = MAX_SIDE
+
+    # Find the ego vehicle's position
     ego_positions = np.argwhere(grid_2d == 9)
     if len(ego_positions) == 0:
-        return dist_front, dist_left, dist_right
-    
+        # Return default max distances if ego is not found
+        return np.array([dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
+
     ego_y, ego_x = ego_positions[0]
-    
-    column_ahead = grid_2d[:ego_y, ego_x]
-    obstacles_ahead = np.argwhere(column_ahead == 1)
+
+    # Front
+    column_in_front = grid_2d[ego_y + 1:, ego_x]
+    obstacles_ahead = np.argwhere((column_in_front == 1) | (column_in_front == 2))
     if len(obstacles_ahead) > 0:
-        closest_obs_y = obstacles_ahead[-1][0]
-        dist_front = float(ego_y - closest_obs_y)
-        
-    row_left = grid_2d[ego_y, :ego_x]
-    obstacles_left = np.argwhere((row_left == 1) | (row_left == 2))
+        closest_obs_y = obstacles_ahead[0][0]
+        dist_front = float(closest_obs_y + 1)
+
+    # Back
+    column_behind = grid_2d[:ego_y, ego_x][::-1]
+    obstacles_behind = np.argwhere((column_behind == 1) | (column_behind == 2))
+    if len(obstacles_behind) > 0:
+        closest_obs_y = obstacles_behind[0][0]
+        dist_back = float(closest_obs_y + 1)
+
+    # Left
+    row_to_left = grid_2d[ego_y, :ego_x][::-1]
+    obstacles_left = np.argwhere((row_to_left == 1) | (row_to_left == 2))
     if len(obstacles_left) > 0:
-        closest_obs_x = obstacles_left[-1][0]
-        dist_left = float(ego_x - closest_obs_x)
-        
-    row_right = grid_2d[ego_y, ego_x+1:]
-    obstacles_right = np.argwhere((row_right == 1) | (row_right == 2))
+        closest_obs_x = obstacles_left[0][0]
+        dist_left = float(closest_obs_x + 1)
+
+    # Right
+    row_to_right = grid_2d[ego_y, ego_x + 1:]
+    obstacles_right = np.argwhere((row_to_right == 1) | (row_to_right == 2))
     if len(obstacles_right) > 0:
         closest_obs_x = obstacles_right[0][0]
         dist_right = float(closest_obs_x + 1)
         
-    return dist_front, dist_left, dist_right
+    return np.array([dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
 
 
 def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
-    dist_front, dist_left, dist_right = 25.0, 25.0, 25.0
-    if getattr(config, "USE_SPATIAL_FEATURES", False):
-        dist_front, dist_left, dist_right = compute_spatial_distances(obs["presence"])
+    # Initialize with default values (matching the MAX constants)
+    dist_front, dist_back, dist_left, dist_right = 10.0, 10.0, 5.0, 5.0
+    
+    if config.USE_SPATIAL_FEATURES:
+        dists = compute_spatial_distances(obs["presence"])
+        dist_front = dists[0]
+        dist_back  = dists[1]
+        dist_left  = dists[2]
+        dist_right = dists[3]
         
         dist_front = _normalize_value(dist_front, "obs_dist_front", norm_stats)
-        dist_left = _normalize_value(dist_left, "obs_dist_left", norm_stats)
+        dist_back  = _normalize_value(dist_back, "obs_dist_back", norm_stats)
+        dist_left  = _normalize_value(dist_left, "obs_dist_left", norm_stats)
         dist_right = _normalize_value(dist_right, "obs_dist_right", norm_stats)
 
     obs["presence"][obs["presence"] == 9] = 3
@@ -213,12 +243,13 @@ def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
     speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
     speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
     
-    if getattr(config, "USE_SPATIAL_FEATURES", False):
-        scalars = np.array([lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_left, dist_right], dtype=np.float32)
+    if config.USE_SPATIAL_FEATURES:
+        scalars = np.array([lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
     else:
         scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
         
     return grid, scalars
+
 
 
 def map_action_for_env(action):

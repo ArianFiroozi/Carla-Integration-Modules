@@ -141,58 +141,102 @@ def gather_demo_files(dirs):
 
 
 
+
 def compute_spatial_distances(grid_2d):
-    max_dist = 25.0
-    dist_front, dist_left, dist_right = max_dist, max_dist, max_dist
+    """
+    Computes the distance to the nearest obstacle in 4 directions (front, back, left, right).
+
+    Args:
+        grid_2d (np.ndarray): A 2D array representing the bird's-eye view.
+
+    Returns:
+        np.ndarray: A float32 array of shape (4,) containing distances
+                    in the order [front, back, left, right].
+    """
     
+    MAX_FRONT = 10.0
+    MAX_BACK = 10.0
+    MAX_SIDE = 5.0
+
+    dist_front = MAX_FRONT
+    dist_back  = MAX_BACK
+    dist_right  = MAX_SIDE
+    dist_left = MAX_SIDE
+
+    # Find the ego vehicle's position
     ego_positions = np.argwhere(grid_2d == 9)
     if len(ego_positions) == 0:
-        return np.array([dist_front, dist_left, dist_right], dtype=np.float32)
-    
+        # Return default max distances if ego is not found
+        return np.array([dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
+
     ego_y, ego_x = ego_positions[0]
     
-    column_ahead = grid_2d[:ego_y, ego_x]
-    obstacles_ahead = np.argwhere(column_ahead == 1)
+
+    # High row index is front, so we look from ego_y + 1 to the end.
+    column_in_front = grid_2d[ego_y + 1:, ego_x]
+    obstacles_ahead = np.argwhere((column_in_front == 1) |(column_in_front == 2))
     if len(obstacles_ahead) > 0:
-        closest_obs_y = obstacles_ahead[-1][0]
-        dist_front = float(ego_y - closest_obs_y)
-        
-    row_left = grid_2d[ego_y, :ego_x]
-    obstacles_left = np.argwhere((row_left == 1) | (row_left == 2))
+        # The first obstacle found is the closest one
+        closest_obs_y = obstacles_ahead[0][0]
+        dist_front = float(closest_obs_y + 1) # +1 because index 0 is 1 cell away
+
+
+    # Low row index is back, so we look from the start up to ego_y.
+    # We reverse the array `[::-1]` so the closest obstacle is at the first index.
+    column_behind = grid_2d[:ego_y, ego_x][::-1]
+    obstacles_behind = np.argwhere((column_behind == 1)| (column_behind == 2))
+    if len(obstacles_behind) > 0:
+        closest_obs_y = obstacles_behind[0][0]
+        dist_back = float(closest_obs_y + 1)
+
+
+    # Low col index is left, so we look from the start up to ego_x.
+    # We reverse `[::-1]` to find the closest one first.
+    row_to_left = grid_2d[ego_y, :ego_x][::-1]
+    
+    obstacles_left = np.argwhere((row_to_left == 1) | (row_to_left == 2))
     if len(obstacles_left) > 0:
-        closest_obs_x = obstacles_left[-1][0]
-        dist_left = float(ego_x - closest_obs_x)
-        
-    row_right = grid_2d[ego_y, ego_x+1:]
-    obstacles_right = np.argwhere((row_right == 1) | (row_right == 2))
+        closest_obs_x = obstacles_left[0][0]
+        dist_left = float(closest_obs_x + 1)
+
+    # Slice the grid for the row to the right of the ego
+    # High col index is right, so we look from ego_x + 1 to the end.
+    row_to_right = grid_2d[ego_y, ego_x + 1:]
+    obstacles_right = np.argwhere((row_to_right == 1) | (row_to_right == 2))
     if len(obstacles_right) > 0:
         closest_obs_x = obstacles_right[0][0]
         dist_right = float(closest_obs_x + 1)
         
-    return np.array([dist_front, dist_left, dist_right], dtype=np.float32)
+    return np.array([dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
 
 
 def add_spatial_features(d):
-    if getattr(config, "USE_SPATIAL_FEATURES", False):
-        if "obs_presence" not in d:
-            return
+    """
+    Wrapper function to compute and add spatial distances for an entire episode.
+    """
+    if not config.USE_SPATIAL_FEATURES or "obs_presence" not in d:
+        return
             
-        presence = d["obs_presence"]
-        T = presence.shape[0]
-        
-        dist_front = np.zeros((T, 1), dtype=np.float32)
-        dist_left = np.zeros((T, 1), dtype=np.float32)
-        dist_right = np.zeros((T, 1), dtype=np.float32)
-        
-        for t in range(T):
-            dists = compute_spatial_distances(presence[t])
-            dist_front[t, 0] = dists[0]
-            dist_left[t, 0] = dists[1]
-            dist_right[t, 0] = dists[2]
+    presence_grids = d["obs_presence"]
+    T = presence_grids.shape[0]
+    
+
+    dist_front = np.zeros((T, 1), dtype=np.float32)
+    dist_back = np.zeros((T, 1), dtype=np.float32)
+    dist_left = np.zeros((T, 1), dtype=np.float32)
+    dist_right = np.zeros((T, 1), dtype=np.float32)
+    
+    for t in range(T):
+        dists = compute_spatial_distances(presence_grids[t])
+        dist_front[t, 0] = dists[0]
+        dist_back[t, 0]  = dists[1]
+        dist_left[t, 0]  = dists[2]
+        dist_right[t, 0] = dists[3]
             
-        d["obs_dist_front"] = dist_front
-        d["obs_dist_left"] = dist_left
-        d["obs_dist_right"] = dist_right
+    d["obs_dist_front"] = dist_front
+    d["obs_dist_back"] = dist_back
+    d["obs_dist_left"] = dist_left
+    d["obs_dist_right"] = dist_right
 
 
 # ==============================================================================

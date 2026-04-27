@@ -273,8 +273,10 @@ def train_epoch_continuous(model, loader, opt, device):
             per_element_loss = -dist.log_prob(target)
         else:
             # STANDARD MODE (Smooth L1 Loss)
-            # استفاده از Smooth L1 (Huber) به جای MSE برای جلوگیری از فرار به سمت میانگین (صفر)
-            per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
+          
+            ## STANDARD MODE (MSE)
+            per_element_loss = (pred - target) ** 2
+            # per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
 
 
         if config.USE_WEIGHTED_LOSS:
