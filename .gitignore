@@ -186,3 +186,4 @@ imitation/data/
 *.pt
 __pycache__/
 experiments_archive
+report.txt

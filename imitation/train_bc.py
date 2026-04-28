@@ -837,8 +837,10 @@ def main():
 
         else:
             patience_counter += 1
-            if args.mode == "continuous":
-                print(f"⚠️  [Warning] Action Collapse Detected! Steer var: {steer_var:.5f},threshold: {min_steer_th} | Throttle var: {throttle_var:.5f},threshold {min_throttle_th}")
+            
+            
+            # if args.mode == "continuous":
+            #     print(f"⚠️  [Warning] Action Collapse Detected! Steer var: {steer_var:.5f},threshold: {min_steer_th} | Throttle var: {throttle_var:.5f},threshold {min_throttle_th}")
                 
                 
             if patience_counter >= args.patience:

@@ -37,7 +37,7 @@ CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",
     # MANUAL_DIR / "lab-map_0car",
-    MANUAL_DIR / "test",
+    # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
     MANUAL_DIR / "map1_30car"
 ]
@@ -47,31 +47,31 @@ DEMO_LIST= [
 # =========================================================
 IS_DECOUPLED = False
 
-# # ---BASELINE---
-# CNN_CHANNELS = [16, 32, 64]
-# KERNEL_SIZES = [3, 3, 3]
-# # Fully Connected settings (Scalars)
-# SCALAR_N_MLP_LAYERS = 2
-# SCALAR_MLP_HIDDEN_SIZE = 32
-# # Fusion & Latent
-# LATENT_DIM = 128
-# # Actor Head settings (Gaussian)
-# HEAD_N_MLP_LAYERS = 2
-# HEAD_MLP_HIDDEN_SIZE = 64
-
-
-
-# ---BALANCED---
-CNN_CHANNELS = [32, 64, 128]
+# ---BASELINE---
+CNN_CHANNELS = [16, 32, 64]
 KERNEL_SIZES = [3, 3, 3]
 # Fully Connected settings (Scalars)
 SCALAR_N_MLP_LAYERS = 2
-SCALAR_MLP_HIDDEN_SIZE = 64
+SCALAR_MLP_HIDDEN_SIZE = 32
 # Fusion & Latent
-LATENT_DIM = 256
+LATENT_DIM = 128
 # Actor Head settings (Gaussian)
 HEAD_N_MLP_LAYERS = 2
-HEAD_MLP_HIDDEN_SIZE = 128
+HEAD_MLP_HIDDEN_SIZE = 64
+
+
+
+# # ---BALANCED---
+# CNN_CHANNELS = [32, 64, 128]
+# KERNEL_SIZES = [3, 3, 3]
+# # Fully Connected settings (Scalars)
+# SCALAR_N_MLP_LAYERS = 2
+# SCALAR_MLP_HIDDEN_SIZE = 64
+# # Fusion & Latent
+# LATENT_DIM = 256
+# # Actor Head settings (Gaussian)
+# HEAD_N_MLP_LAYERS = 2
+# HEAD_MLP_HIDDEN_SIZE = 128
 
 
 
@@ -96,8 +96,8 @@ HEAD_MLP_HIDDEN_SIZE = 128
 # ACTION SPACE
 # =========================================================
 ACTION_MODE = "continuous"   # "discrete" or "continuous"
-IS_GAUSSIAN = True
-MIN_STD=0.2
+IS_GAUSSIAN = False
+MIN_STD=0.05
 MAX_STD=1
 SMOOTH_STEERING = False
 
@@ -268,7 +268,7 @@ DEBUG_PRINT_STEPS = 5000
 INSPECT_VISUALIZE = True
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
-BUILD_VISUALIZE = False
+BUILD_VISUALIZE = True
 FEATURE_HIST_MAX_SAMPLES = 100000
 
 # =========================================================

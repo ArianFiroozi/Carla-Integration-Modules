@@ -1,5 +1,11 @@
 ok so first i tunred off every kind of flag that might effecct  the performance BTW all eval lengths which imma tell you is avg of 10-20(experminet after fiftth i think are 20 eval run) eval run with random spawn points therefore bad luch can exist,
-also every expermient ill report on only i state the change compared to prevoius experminet , if a new kind of config was used ill mentiond the whole config,  this was the config for first experminet:
+also every expermient ill report on only i state the change compared to prevoius experminet , if a new kind of config was used ill mentiond the whole config,  this was the config for 
+
+
+first experminet:
+
+experiments\2026_04_21_20_46_31_bc_continuous
+
 {
   "mode": "continuous",
   "epochs": 30,
@@ -42,8 +48,13 @@ also every expermient ill report on only i state the change compared to prevoius
 it did surprisingly well ,  i am mostly sure it is bc that single flag called use one hot grid did the trick which turns presnec grid into wall grid car grid and echo grid
 also the data was map 1 no cars(avg 528) and tested in same env 
 
+
+
+
+
+
 second expermint:
-switched over to map 1 with cars , it did pretty bad idk why but it seems it did have a senese of other cars exitence , it wasnt good at turning tho , unlike others 
+switched over to map 1 with cars , it did pretty bad idk why but it seems it did have a senese of other cars exitence , it wasnt good at turning tho , unlike prevoius runs 
 which were better at turning , i mostly suspect the reason is the dataset is more like focused on exitence of other cars (avg 300-400 ish)
 
 third experminet:
@@ -85,6 +96,7 @@ bit more fast paced and well i overtook other cars by going left of them then sp
 
 
 eleventh experiment:
+experiments\2026_04_23_09_23_32_bc_continuous
 
 went back to baseline  experiment , just with z score and the bigger model from exp 3.
 it did pretty bad compared to smaller model(600 vs 1k)
@@ -160,7 +172,7 @@ C:\carla\Carla-Integration-Modules\experiments\2026_04_23_16_46_39_bc_continuous
 fifteenth experiment:
 experiments\2026_04_23_18_04_25_bc_continuous
 
-  same experiment as thirteenth but drove some more , got worse results , 500 on no car env pretty bad driving compared to smaller data test ,  338 on with car env, really bad 
+  same experiment as thirteenth but drove some more , got worse results , 500 on no car env pretty bad driving compared to smaller dataset ,  338 on with car env, really bad 
   like it lowkey reacts no car , but doenst really drive well. weird , i mixed newer data(60k) with a portion of older data (40k) it resulted in a performance simliar to performance before i added extra 60k
 imma put that 60k away for now 
 
@@ -242,3 +254,9 @@ experiments\2026_04_27_22_33_48_bc_continuous
 
 same as prevoius experiment just decoupled the head , did a bit better but still very bad compared to non gaussian version
 
+
+twentyth first and second:
+experiments\2026_04_28_12_13_00_bc_continuous
+experiments\2026_04_28_12_36_57_bc_continuous
+baseline, with gaussian head and bigger network , nope  , although it did slightly better than small network version of the experiment(experiment ninetheeth)
+also increased the min var a bit again , still kinda meh although it did better than 0.05 min var.
