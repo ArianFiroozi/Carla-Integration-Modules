@@ -186,4 +186,3 @@ imitation/data/
 *.pt
 __pycache__/
 experiments_archive
-experiments/2026_04_27_12_16_57_bc_continuous

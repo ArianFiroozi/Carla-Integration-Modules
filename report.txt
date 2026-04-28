@@ -158,6 +158,8 @@ C:\carla\Carla-Integration-Modules\experiments\2026_04_23_16_46_39_bc_continuous
 
 
 fifteenth experiment:
+experiments\2026_04_23_18_04_25_bc_continuous
+
   same experiment as thirteenth but drove some more , got worse results , 500 on no car env pretty bad driving compared to smaller data test ,  338 on with car env, really bad 
   like it lowkey reacts no car , but doenst really drive well. weird , i mixed newer data(60k) with a portion of older data (40k) it resulted in a performance simliar to performance before i added extra 60k
 imma put that 60k away for now 
@@ -165,8 +167,78 @@ imma put that 60k away for now
 
 
 sixteenth experiment:
-
+experiments\2026_04_27_12_16_57_bc_continuous
 
 added 4 spatial features , scalars to detect nearest walls and vehiles 
 adding this to baseline with car , we got about 500 for with car env and again about 1k on no car 
+
+from this experiment onward we gonna remove the force throttle and just giev throttle a little boost(if throttle>0.05 and <0.13 we bump it up to 0.13)
+
+
+seventheenth experiment:
+experiments\2026_04_27_12_54_48_bc_continuous
+
+added  back the 60k data , model improved, maybe without that extra spatial features model couldnt grasp the whole feature space
+1500 on withoutcar,750-800 on with car
+also for a little test to see how it is in turning i added force throttle it got a whopping 1681, yum.
+lets call this baseline from now on 
+
+{
+  "mode": "continuous",
+  "epochs": 30,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "val_split": 0.1,
+  "patience": 10,
+  "device": "cuda",
+  "is_gaussian": false,
+  "use_continuous_undersampling": false,
+  "undersampling_threshold_continuous": 0.05,
+  "undersampling_probability_continuous": 0.6,
+  "use_weighted_loss": false,
+  "steer_loss_weight_continuous": 3.0,
+  "throttle_loss_weight_continuous": 1.0,
+  "brake_loss_weight_continuous": 1.0,
+  "weighted_loss_threshold_continuous": 0.1,
+  "min_std": 0.05,
+  "max_std": 1,
+  "weight_sampling": "none",
+  "cnn_channels": [
+    16,
+    32,
+    64
+  ],
+  "head_n_mlp_layers": 2,
+  "head_mlp_hidden_size": 64,
+  "scalar_n_mlp_layers": 2,
+  "scalar_mlp_hidden_size": 32,
+  "latent_dim": 128,
+  "use_one_hot_grid": true,
+  "scaling": "z_score",
+  "decoupled": false,
+  "metadata": {
+    "timestamp": "2026-04-27T12:54:48.981823",
+    "git_commit": "515614c7e0c20889953ce03b2df026acea0905e9"
+  }
+}
+
+
+
+eighteenth experiment:
+experiments\2026_04_27_13_45_04_bc_continuous
+
+decoupled the head , got about 800 on with car and 1300 on without car , cant really say it did better than coupled or it did worse not enough evidence for either. it was okay ig
+
+ninetheeth experiment:
+
+experiments\2026_04_27_22_21_40_bc_continuous
+
+used baseline with is is_gaussian set to true, it did pretty bad like it  have a sense of turning and other cars but it looked lazy , instead of fully normally turning it very slowy rotated the wheel 
+caausing to crash on a lot of turns (i didnt this model on no car env only withcar env )
+
+twentyth experiment:
+
+experiments\2026_04_27_22_33_48_bc_continuous
+
+same as prevoius experiment just decoupled the head , did a bit better but still very bad compared to non gaussian version
 

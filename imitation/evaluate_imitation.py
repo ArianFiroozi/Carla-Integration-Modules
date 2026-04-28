@@ -285,9 +285,14 @@ def process_continuous_output(out):
     """
     global prev_steer
 
-    throttle = max(float(np.clip(out[0], 0.0, 1.0)), 0.13)
+    throttle = float(np.clip(out[0], 0.0, 1.0))
     brake = float(np.clip(out[1], 0.0, 1.0))
     steer = float(np.clip(out[2], -1.0, 1.0))
+    
+    if throttle < 0.13 and throttle > throttle > 0.05:
+        throttle = 0.13
+    
+    
     # prevent throttle+brake conflict
     if brake > 0.1:
         throttle = 0.0
