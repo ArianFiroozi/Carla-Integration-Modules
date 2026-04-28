@@ -396,6 +396,18 @@ def log_metadata_to_tensorboard(tb_writer, config_dict, dataset_meta):
 
     print(f"[TB] ✅ Metadata and Config successfully logged. (Mirror: {mirror_enabled}, Window: {pipe.get('window_size')})")
 
+def count_parameters(model):
+    total = sum(p.numel() for p in model.parameters())
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print(f"\nModel Parameters:")
+    print(f"Total: {total:,}")
+    print(f"Trainable: {trainable:,}")
+    print(f"Non-trainable: {total - trainable:,}\n")
+    for name, p in model.named_parameters():
+        print(f"{name:40} {p.numel():,}")
+
+    return total, trainable
 
 
 
@@ -637,6 +649,9 @@ def main():
         print("Scalar dimension:", scalar_dim)
         print("Grid channels:", grid_channels)
         print("Grid shape:", grid0.shape)
+
+
+    count_parameters(model)
 
     opt = optim.AdamW(model.parameters(), lr=args.lr)
 
