@@ -8,8 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from imitation.models.feature_extractor import FeatureExtractor
-from imitation.models.actor_heads import BCDecoupledContinuousHead
+from networks.feature_extractor import FeatureExtractor
+from networks.actor_heads import BCDecoupledContinuousHead
 
 class UTCarActorCritic(nn.Module):
     def __init__(self, latent_dim=128):

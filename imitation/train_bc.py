@@ -17,17 +17,18 @@ from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from sklearn.metrics import f1_score
 from.utils.stats import extract_dataset_sources
 from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
-from .models.imitation_policy import ImitationPolicy
+from agents.bc.imitation_policy import ImitationPolicy
 
-from . import config
+
+from . import bc_config
 from .utils.experiment_logger import ExperimentLogger
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
 from .utils.seed_utils import seed_everything, seed_worker
-seed_everything(config.GLOBAL_SEED)
+seed_everything(bc_config.GLOBAL_SEED)
 g = torch.Generator()
-g.manual_seed(config.GLOBAL_SEED)
+g.manual_seed(bc_config.GLOBAL_SEED)
 
 def get_device(device_arg):
     if device_arg == "auto":
@@ -137,7 +138,7 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
         # Handle Gaussian vs Standard Continuous
         if is_gaussian:
             mean, std = pred
-            std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD)
+            std = torch.clamp(std, min=bc_config.MIN_STD, max=bc_config.MAX_STD)
             dist = torch.distributions.Normal(mean, std)
 
             nll_sum += -dist.log_prob(target).sum().item()
@@ -265,10 +266,10 @@ def train_epoch_continuous(model, loader, opt, device):
         pred = model(grid, scalars)
 
 
-        if config.IS_GAUSSIAN:
+        if bc_config.IS_GAUSSIAN:
             # GAUSSIAN MODE (NLL)
             mean, std = pred
-            std = torch.clamp(std, min=config.MIN_STD, max=config.MAX_STD) 
+            std = torch.clamp(std, min=bc_config.MIN_STD, max=bc_config.MAX_STD) 
             dist = torch.distributions.Normal(mean, std)
             per_element_loss = -dist.log_prob(target)
         else:
@@ -279,14 +280,14 @@ def train_epoch_continuous(model, loader, opt, device):
             
 
 
-        if config.USE_WEIGHTED_LOSS:
-            throttle_loss = per_element_loss[:, 0] * config.THROTTLE_LOSS_WEIGHT
-            brake_loss = per_element_loss[:, 1] * config.BRAKE_LOSS_WEIGHT
+        if bc_config.USE_WEIGHTED_LOSS:
+            throttle_loss = per_element_loss[:, 0] * bc_config.THROTTLE_LOSS_WEIGHT
+            brake_loss = per_element_loss[:, 1] * bc_config.BRAKE_LOSS_WEIGHT
             
             steer_diff = torch.abs(target[:, 2])
             steer_weights = torch.where(
-                steer_diff > config.WEIGHTED_LOSS_THRESHOLD,
-                torch.tensor(config.STEER_LOSS_WEIGHT, device=device, dtype=torch.float32),
+                steer_diff > bc_config.WEIGHTED_LOSS_THRESHOLD,
+                torch.tensor(bc_config.STEER_LOSS_WEIGHT, device=device, dtype=torch.float32),
                 torch.tensor(1.0, device=device, dtype=torch.float32)
             )
             steer_loss = per_element_loss[:, 2] * steer_weights
@@ -421,19 +422,19 @@ def main():
     parser.add_argument(
         "--mode",
         choices=["discrete", "continuous"],
-        default=config.ACTION_MODE,
+        default=bc_config.ACTION_MODE,
     )
 
-    parser.add_argument("--epochs", type=int, default=config.BC_EPOCHS)
-    parser.add_argument("--batch", type=int, default=config.BC_BATCH_SIZE)
-    parser.add_argument("--lr", type=float, default=config.BC_LR)
-    parser.add_argument("--is_gaussian", action="store_true", help="Use Gaussian head for continuous mode" , default=config.IS_GAUSSIAN)
+    parser.add_argument("--epochs", type=int, default=bc_config.BC_EPOCHS)
+    parser.add_argument("--batch", type=int, default=bc_config.BC_BATCH_SIZE)
+    parser.add_argument("--lr", type=float, default=bc_config.BC_LR)
+    parser.add_argument("--is_gaussian", action="store_true", help="Use Gaussian head for continuous mode" , default=bc_config.IS_GAUSSIAN)
     
-    parser.add_argument("--val_split", type=float, default=config.BC_VAL_SPLIT)
+    parser.add_argument("--val_split", type=float, default=bc_config.BC_VAL_SPLIT)
 
-    parser.add_argument("--patience", type=int, default=config.BC_PATIENCE)
+    parser.add_argument("--patience", type=int, default=bc_config.BC_PATIENCE)
 
-    parser.add_argument("--device", default=config.DEVICE)
+    parser.add_argument("--device", default=bc_config.DEVICE)
 
 
     args = parser.parse_args()
@@ -441,9 +442,9 @@ def main():
     DATASET_PATH = None
     dataset_meta = None
     if args.mode == args.mode == "discrete":
-        DATASET_PATH = config.DISCRETE_DATASET_PATH
+        DATASET_PATH = bc_config.DISCRETE_DATASET_PATH
     else: 
-        DATASET_PATH = config.CONTINUOUS_DATASET_PATH
+        DATASET_PATH = bc_config.CONTINUOUS_DATASET_PATH
     meta_path = Path(DATASET_PATH).with_suffix(".meta.json")
 
     if meta_path.exists():
@@ -456,7 +457,7 @@ def main():
 
 
     experiment_name = f"bc_{args.mode}"
-    logger = ExperimentLogger(experiment_name)
+    logger = ExperimentLogger(experiment_name,str(bc_config.BC_EXPERIMENT_FOLDER))
 
     
     config_dict = {
@@ -468,26 +469,26 @@ def main():
     "patience": args.patience,
     "device": args.device,
     "is_gaussian": args.is_gaussian,
-    "use_continuous_undersampling": config.USE_CONTINUOUS_UNDERSAMPLING,
-    "undersampling_threshold_continuous": config.UNDERSAMPLING_THRESHOLD,
-    "undersampling_probability_continuous": config.UNDERSAMPLING_PROBABILITY,
-    "use_weighted_loss": config.USE_WEIGHTED_LOSS,
-    "steer_loss_weight_continuous": config.STEER_LOSS_WEIGHT,
-    "throttle_loss_weight_continuous": config.THROTTLE_LOSS_WEIGHT,
-    "brake_loss_weight_continuous": config.BRAKE_LOSS_WEIGHT,
-    "weighted_loss_threshold_continuous": config.WEIGHTED_LOSS_THRESHOLD,
-    "min_std": config.MIN_STD,
-    "max_std": config.MAX_STD,
-    "weight_sampling": config.WEIGHTED_SAMPLING,
-    "cnn_channels": config.CNN_CHANNELS,
-    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
-    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
-    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
-    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
-    "latent_dim": config.LATENT_DIM,
-    "use_one_hot_grid": config.USE_ONE_HOT_GRID,
-    "scaling": config.SCALING_METHOD,
-    "decoupled": config.IS_DECOUPLED
+    "use_continuous_undersampling": bc_config.USE_CONTINUOUS_UNDERSAMPLING,
+    "undersampling_threshold_continuous": bc_config.UNDERSAMPLING_THRESHOLD,
+    "undersampling_probability_continuous": bc_config.UNDERSAMPLING_PROBABILITY,
+    "use_weighted_loss": bc_config.USE_WEIGHTED_LOSS,
+    "steer_loss_weight_continuous": bc_config.STEER_LOSS_WEIGHT,
+    "throttle_loss_weight_continuous": bc_config.THROTTLE_LOSS_WEIGHT,
+    "brake_loss_weight_continuous": bc_config.BRAKE_LOSS_WEIGHT,
+    "weighted_loss_threshold_continuous": bc_config.WEIGHTED_LOSS_THRESHOLD,
+    "min_std": bc_config.MIN_STD,
+    "max_std": bc_config.MAX_STD,
+    "weight_sampling": bc_config.WEIGHTED_SAMPLING,
+    "cnn_channels": bc_config.CNN_CHANNELS,
+    "head_n_mlp_layers": bc_config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": bc_config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": bc_config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": bc_config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": bc_config.LATENT_DIM,
+    "use_one_hot_grid": bc_config.USE_ONE_HOT_GRID,
+    "scaling": bc_config.SCALING_METHOD,
+    "decoupled": bc_config.IS_DECOUPLED
     }
     # attach dataset metadata
     if dataset_meta is not None:
@@ -506,16 +507,16 @@ def main():
 
     # Initialize dataset based on mode
     if args.mode == "discrete":
-        ds = BCDataset(DATASET_PATH, one_hot_presence=config.USE_ONE_HOT_GRID)
+        ds = BCDataset(DATASET_PATH, one_hot_presence=bc_config.USE_ONE_HOT_GRID)
         n_speed = int(ds.actions[:, 0].max()) + 1
         n_turn  = int(ds.actions[:, 1].max()) + 1
     else:
-        ds = BCDatasetContinuous(DATASET_PATH, one_hot_presence=config.USE_ONE_HOT_GRID)
+        ds = BCDatasetContinuous(DATASET_PATH, one_hot_presence=bc_config.USE_ONE_HOT_GRID)
 
     print(type(ds))
     
     
-    if args.mode == "discrete" and config.USE_WEIGHTED_LOSS:
+    if args.mode == "discrete" and bc_config.USE_WEIGHTED_LOSS:
         actions = ds.actions
         speed_weights = compute_class_weights(actions[:, 0]).to(device)
         turn_weights = compute_class_weights(actions[:, 1]).to(device)
@@ -523,14 +524,14 @@ def main():
         
 
 
-    if args.mode == "continuous" and config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
+    if args.mode == "continuous" and bc_config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
         # Only load the raw dataset into memory if we actually need it for weights
         data_raw = np.load(DATASET_PATH)
         
         throttle = data_raw["target_throttle"].astype(np.float32).squeeze()
         steer = data_raw["target_steering_angle"].astype(np.float32).squeeze()
         
-        if config.WEIGHTED_SAMPLING == "handmade":
+        if bc_config.WEIGHTED_SAMPLING == "handmade":
             brake = data_raw["target_brake"].astype(np.float32).squeeze()
             
             continuous_weights = np.ones_like(throttle, dtype=np.float32)
@@ -542,7 +543,7 @@ def main():
             # emphasize braking
             continuous_weights[brake > 0.05] *= 3.0
             
-        elif config.WEIGHTED_SAMPLING == "inverse":
+        elif bc_config.WEIGHTED_SAMPLING == "inverse":
             # Bin steering
             bin_size = 0.1
             steer_bins = np.floor((steer + 1.0) / bin_size).astype(int)
@@ -569,12 +570,12 @@ def main():
 
 
 
-    train_ds, val_ds = split_dataset(ds, args.val_split, seed=config.BC_SPLIT_SEED)
+    train_ds, val_ds = split_dataset(ds, args.val_split, seed=bc_config.BC_SPLIT_SEED)
 
 
     
     # If we are in continuous mode AND we created a sampler
-    if args.mode == "continuous" and config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
+    if args.mode == "continuous" and bc_config.WEIGHTED_SAMPLING in ["inverse", "handmade"]:
         # Get the indices of the data that ended up in the training split
         train_indices = train_ds.indices
         train_weights_subset = continuous_weights[train_indices]
@@ -623,14 +624,14 @@ def main():
     kwargs = {
     "grid_channels": grid_channels,
     "scalar_dim": scalar_dim,
-    "cnn_channels": config.CNN_CHANNELS,
-    "kernel_sizes": config.KERNEL_SIZES,
-    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
-    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
-    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
-    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
-    "latent_dim": config.LATENT_DIM,
-    "decoupled": config.IS_DECOUPLED
+    "cnn_channels": bc_config.CNN_CHANNELS,
+    "kernel_sizes": bc_config.KERNEL_SIZES,
+    "head_n_mlp_layers": bc_config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": bc_config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": bc_config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": bc_config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": bc_config.LATENT_DIM,
+    "decoupled": bc_config.IS_DECOUPLED
     }
 
     if args.mode == "discrete":
@@ -662,7 +663,7 @@ def main():
             def criterion(pred, target):
                 mean, std = pred
 
-                std = torch.clamp(std, config.MIN_STD, config.MAX_STD)
+                std = torch.clamp(std, bc_config.MIN_STD, bc_config.MAX_STD)
 
                 dist = torch.distributions.Normal(mean, std)
                 return -dist.log_prob(target).mean()
@@ -688,7 +689,7 @@ def main():
 
         if args.mode == "discrete":
             # Loss function setup
-            if config.USE_WEIGHTED_LOSS:
+            if bc_config.USE_WEIGHTED_LOSS:
                 ce_speed = nn.CrossEntropyLoss(weight=speed_weights)
                 ce_turn = nn.CrossEntropyLoss(weight=turn_weights)
             else:
@@ -821,8 +822,8 @@ def main():
         if args.mode == "continuous":
             steer_var = val_metrics.get("var_steer", 1.0) 
             throttle_var = val_metrics.get("var_throttle", 1.0)
-            min_steer_th = config.MIN_STEER_VAR
-            min_throttle_th = config.MIN_THROTTLE_VAR
+            min_steer_th = bc_config.MIN_STEER_VAR
+            min_throttle_th = bc_config.MIN_THROTTLE_VAR
             # is_variance_ok = (steer_var >= min_steer_th) and (throttle_var > min_throttle_th)
 
         if val_loss < best_val and is_variance_ok:

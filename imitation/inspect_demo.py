@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
 import argparse
-from . import config
+from . import bc_config
 from .utils.viz import *
 from.utils.stats import * 
 
@@ -10,12 +10,12 @@ from.utils.stats import *
 ROOT = Path(__file__).resolve().parents[0]
 
 
-DEMO_DIRS = config.DEMO_LIST
+DEMO_DIRS = bc_config.DEMO_LIST
 
-OBS_BOUNDS =config.OBS_BOUNDS
+OBS_BOUNDS =bc_config.OBS_BOUNDS
 
 
-def process_demos(files, max_feature_samples=config.MAX_INSPECT_FEATURE_SAMPLES, is_continuous=False):
+def process_demos(files, max_feature_samples=bc_config.MAX_INSPECT_FEATURE_SAMPLES, is_continuous=False):
     """
     Makes a single pass over all demo files to collect data based on pipeline type.
     """
@@ -190,7 +190,7 @@ def continuous_pipeline(stats, features, visualize=True):
         plot_continuous_2d_relationships(features)
         plot_feature_distributions(features)
 
-def main(demo_dirs=None, is_continuous=False, visualize=config.INSPECT_VISUALIZE, max_feature_samples=config.MAX_INSPECT_FEATURE_SAMPLES):
+def main(demo_dirs=None, is_continuous=False, visualize=bc_config.INSPECT_VISUALIZE, max_feature_samples=bc_config.MAX_INSPECT_FEATURE_SAMPLES):
 
 
 
@@ -222,14 +222,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         choices=["discrete", "continuous"],
-        default=config.ACTION_MODE,
+        default=bc_config.ACTION_MODE,
     )
     parser.add_argument("--visualize", action="store_true")
-    parser.add_argument("--max-feature-samples", type=int, default=config.MAX_INSPECT_FEATURE_SAMPLES)
+    parser.add_argument("--max-feature-samples", type=int, default=bc_config.MAX_INSPECT_FEATURE_SAMPLES)
 
     args = parser.parse_args()
 
-    visualize_flag = args.visualize if args.visualize else config.INSPECT_VISUALIZE
+    visualize_flag = args.visualize if args.visualize else bc_config.INSPECT_VISUALIZE
     is_continuous = True if args.mode=="continuous" else False
     main(
         demo_dirs=DEMO_DIRS,

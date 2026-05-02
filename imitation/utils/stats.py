@@ -1,38 +1,38 @@
 import numpy as np
-from .. import config
+from .. import bc_config
 from pathlib import Path
 from collections import Counter
 
 ROOT = Path(__file__).resolve().parents[0]
 
-DEMO_DIRS = config.DEMO_LIST
-RNG_SEED = config.BUILD_RNG_SEED
+DEMO_DIRS = bc_config.DEMO_LIST
+RNG_SEED = bc_config.BUILD_RNG_SEED
 
 # Termination Filtering
-DROP_TERMINATED = config.DROP_TERMINATED
-DROP_LAST_N_BEFORE_TERMINATION = config.DROP_LAST_N_BEFORE_TERMINATION
+DROP_TERMINATED = bc_config.DROP_TERMINATED
+DROP_LAST_N_BEFORE_TERMINATION = bc_config.DROP_LAST_N_BEFORE_TERMINATION
 
 # Idle / Silence Filtering
-FILTER_IDLE_FRAMES = config.FILTER_IDLE_FRAMES
-IDLE_FILTER_MODE = config.IDLE_FILTER_MODE
-IDLE_SPEED_THRESHOLD = config.IDLE_SPEED_THRESHOLD
-IDLE_THROTTLE_THRESHOLD = config.IDLE_THROTTLE_THRESHOLD
-IDLE_BRAKE_THRESHOLD = config.IDLE_BRAKE_THRESHOLD
+FILTER_IDLE_FRAMES = bc_config.FILTER_IDLE_FRAMES
+IDLE_FILTER_MODE = bc_config.IDLE_FILTER_MODE
+IDLE_SPEED_THRESHOLD = bc_config.IDLE_SPEED_THRESHOLD
+IDLE_THROTTLE_THRESHOLD = bc_config.IDLE_THROTTLE_THRESHOLD
+IDLE_BRAKE_THRESHOLD = bc_config.IDLE_BRAKE_THRESHOLD
 
 # Action Maps (for discrete)
-SPEED_MAP = config.SPEED_MAP
-TURN_MAP = config.TURN_MAP
+SPEED_MAP = bc_config.SPEED_MAP
+TURN_MAP = bc_config.TURN_MAP
 
 # Discrete sampling config
-JOINT_KEEP_PROBS = config.JOINT_KEEP_PROBS
+JOINT_KEEP_PROBS = bc_config.JOINT_KEEP_PROBS
 
 # Observation Bounds
-OBS_BOUNDS = config.OBS_BOUNDS
+OBS_BOUNDS = bc_config.OBS_BOUNDS
 
 # Optional simplification
-SIMPLIFY_ACTIONS = config.SIMPLIFY_ACTIONS
-REMOVE_REVERSE = config.REMOVE_REVERSE
-REMOVE_NO_TURN = config.REMOVE_NO_TURN
+SIMPLIFY_ACTIONS = bc_config.SIMPLIFY_ACTIONS
+REMOVE_REVERSE = bc_config.REMOVE_REVERSE
+REMOVE_NO_TURN = bc_config.REMOVE_NO_TURN
  
 
 
@@ -60,16 +60,16 @@ def print_discrete_stats(stats):
     print("\nSpeed Distribution:")
     for i, count in enumerate(sp_counts):
         pct = 100 * count / max(1, sp_counts.sum())
-        print(f"  {config.SPEED_MAP.get(i, str(i)):10s} : {count:8d} ({pct:5.2f}%)")
+        print(f"  {bc_config.SPEED_MAP.get(i, str(i)):10s} : {count:8d} ({pct:5.2f}%)")
 
     print("\nTurn Distribution:")
     for i, count in enumerate(tr_counts):
         pct = 100 * count / max(1, tr_counts.sum())
-        print(f"  {config.TURN_MAP.get(i, str(i)):10s} : {count:8d} ({pct:5.2f}%)")
+        print(f"  {bc_config.TURN_MAP.get(i, str(i)):10s} : {count:8d} ({pct:5.2f}%)")
 
     print("\nTop 20 Joint Actions (Speed | Turn):")
     for (speed, turn), count in stats["joint_counts"].most_common(20):
-        print(f"  {config.SPEED_MAP.get(speed, str(speed)):10s} | {config.TURN_MAP.get(turn, str(turn)):10s} : {count:8d}")
+        print(f"  {bc_config.SPEED_MAP.get(speed, str(speed)):10s} | {bc_config.TURN_MAP.get(turn, str(turn)):10s} : {count:8d}")
 
 
 

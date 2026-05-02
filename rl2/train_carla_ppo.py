@@ -16,7 +16,7 @@ from CarlaEnv.env import CarlaEnv
 from rl2.actor_critic import UTCarActorCritic
 from imitation.datasets.bc_dataset import BCDatasetContinuous
 from imitation.evaluate_imitation import ObsHistory, extract_grid_and_scalars
-from imitation import config
+from imitation import bc_config
 
 # ==========================================
 # setting PPO
@@ -66,20 +66,20 @@ def train_carla_ppo():
     
     norm_stats = get_il_config_and_stats(IL_CONFIG_DIR)
     
-    expert_dataset = BCDatasetContinuous(str(config.CONTINUOUS_DATASET_PATH), one_hot_presence=config.USE_ONE_HOT_GRID)
+    expert_dataset = BCDatasetContinuous(str(bc_config.CONTINUOUS_DATASET_PATH), one_hot_presence=bc_config.USE_ONE_HOT_GRID)
     expert_loader = DataLoader(expert_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     expert_iter = iter(expert_loader)
     
     print("\n2. Initializing CARLA Environment and Actor-Critic...")
     env = CarlaEnv(
-        map_path=config.CARLA_MAP_PATH,
-        walkers_count=config.CARLA_WALKERS,
-        vehicles_count=config.CARLA_VEHICLES,
-        max_steps=config.CARLA_MAX_STEPS,
-        init_speed=config.CARLA_INIT_SPEED,
+        map_path=bc_config.CARLA_MAP_PATH,
+        walkers_count=bc_config.CARLA_WALKERS,
+        vehicles_count=bc_config.CARLA_VEHICLES,
+        max_steps=bc_config.CARLA_MAX_STEPS,
+        init_speed=bc_config.CARLA_INIT_SPEED,
         action_mode="continuous",
-        random_ego_spawn=config.RANDOM_EGO_START_POS,
-        random_vehicle_spawn=config.RANDOM_VEHICLE_START_POS
+        random_ego_spawn=bc_config.RANDOM_EGO_START_POS,
+        random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS
     )
     
     model = UTCarActorCritic(latent_dim=128).to(DEVICE)
@@ -99,7 +99,7 @@ def train_carla_ppo():
         obs_grid, obs_scalars, actions, log_probs, rewards, values, dones = [], [], [], [], [], [], []
         
         obs, _ = env.reset()
-        history = ObsHistory(window_size=config.WINDOW_SIZE, norm_stats=norm_stats)
+        history = ObsHistory(window_size=bc_config.WINDOW_SIZE, norm_stats=norm_stats)
         
         # رول‌اوت تو محیط واقعی CARLA
         for step in range(MAX_STEPS):

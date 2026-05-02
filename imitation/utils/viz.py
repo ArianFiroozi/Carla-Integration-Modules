@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from .. import config
+from .. import bc_config
 
 
 
@@ -12,8 +12,8 @@ def plot_discrete_actions(stats):
     sp_probs = sp_counts / max(1, sp_counts.sum())
     tr_probs = tr_counts / max(1, tr_counts.sum())
     
-    sp_labels = [config.SPEED_MAP.get(i, str(i)) for i in range(len(sp_counts))]
-    tr_labels = [config.TURN_MAP.get(i, str(i)) for i in range(len(tr_counts))]
+    sp_labels = [bc_config.SPEED_MAP.get(i, str(i)) for i in range(len(sp_counts))]
+    tr_labels = [bc_config.TURN_MAP.get(i, str(i)) for i in range(len(tr_counts))]
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     
@@ -44,8 +44,8 @@ def plot_joint_heatmap(joint_counts):
     im = plt.imshow(joint_probs, cmap="viridis")
     plt.colorbar(im, label="Probability")
 
-    plt.xticks(range(4), [config.TURN_MAP.get(i, str(i)) for i in range(4)])
-    plt.yticks(range(5), [config.SPEED_MAP.get(i, str(i)) for i in range(5)])
+    plt.xticks(range(4), [bc_config.TURN_MAP.get(i, str(i)) for i in range(4)])
+    plt.yticks(range(5), [bc_config.SPEED_MAP.get(i, str(i)) for i in range(5)])
     plt.xlabel("Turn Action")
     plt.ylabel("Speed Action")
     plt.title("Joint Action Distribution (Speed × Turn)")

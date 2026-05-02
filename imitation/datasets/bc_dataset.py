@@ -216,7 +216,7 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import json
 from pathlib import Path
-from .. import config
+from .. import bc_config
 
 
 
@@ -269,7 +269,7 @@ class BaseDataset(Dataset):
         add_scalar("obs_ego_speed_x")
         add_scalar("obs_ego_speed_y")
 
-        if config.USE_SPATIAL_FEATURES:
+        if bc_config.USE_SPATIAL_FEATURES:
             add_scalar("obs_dist_front")
             add_scalar("obs_dist_left")
             add_scalar("obs_dist_right")
@@ -300,7 +300,7 @@ class BaseDataset(Dataset):
     
     def _normalize(self, v, key):
         """Unified normalization function based on config.SCALING_METHOD."""
-        if config.SCALING_METHOD == "min_max":
+        if bc_config.SCALING_METHOD == "min_max":
             if key in self.norm_stats:
                 s_min = self.norm_stats[key]["min"]
                 s_max = self.norm_stats[key]["max"]
@@ -309,7 +309,7 @@ class BaseDataset(Dataset):
                     return np.clip(norm_v, -1.0, 1.0)
             return np.zeros_like(v) # Fallback if stats are missing
 
-        elif config.SCALING_METHOD == "z_score":
+        elif bc_config.SCALING_METHOD == "z_score":
             if key in self.norm_stats:
                 mean = self.norm_stats[key]["mean"]
                 std = self.norm_stats[key]["std"]
@@ -317,8 +317,8 @@ class BaseDataset(Dataset):
                     return (v - mean) / std
             return np.zeros_like(v) # Fallback if stats are missing
             
-        elif config.SCALING_METHOD == "fixed" and "speed" in key:
-            return v / config.MAX_SPEED
+        elif bc_config.SCALING_METHOD == "fixed" and "speed" in key:
+            return v / bc_config.MAX_SPEED
 
         # Default: return unnormalized value or zero for scalars in 'fixed' mode
         return v if "speed" in key else np.zeros_like(v)
@@ -403,11 +403,11 @@ class BCDatasetContinuous(BaseDataset):
         # =========================================================
         # Continuous Undersampling (Feature Flag)
         # =========================================================
-        if config.USE_CONTINUOUS_UNDERSAMPLING:
+        if bc_config.USE_CONTINUOUS_UNDERSAMPLING:
             steer_angles = np.abs(self.targets[:, 2])
-            is_straight = steer_angles < config.UNDERSAMPLING_THRESHOLD
+            is_straight = steer_angles < bc_config.UNDERSAMPLING_THRESHOLD
             random_probs = np.random.rand(len(steer_angles))
-            keep_straight = is_straight & (random_probs > config.UNDERSAMPLING_PROBABILITY)
+            keep_straight = is_straight & (random_probs > bc_config.UNDERSAMPLING_PROBABILITY)
             keep_turned = ~is_straight
             keep_mask = keep_straight | keep_turned
             self.presence = self.presence[keep_mask]

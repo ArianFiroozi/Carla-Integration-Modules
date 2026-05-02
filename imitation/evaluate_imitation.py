@@ -6,24 +6,24 @@ import json
 import numpy as np
 import torch
 from CarlaEnv.env import CarlaEnv
-from .models.imitation_policy import ImitationPolicy
-from . import config
+from agents.bc.imitation_policy import ImitationPolicy
+from . import bc_config
 import datetime
 from torch.utils.tensorboard import SummaryWriter 
 import carla
 import cv2
 
-ACTION_MODE = config.ACTION_MODE
-DEVICE = config.DEVICE
-SIMPLIFIED_ACTION_SPACE = config.SIMPLIFY_ACTIONS
-DEBUG_PRINT_STEPS = config.DEBUG_PRINT_STEPS
+ACTION_MODE = bc_config.ACTION_MODE
+DEVICE = bc_config.DEVICE
+SIMPLIFIED_ACTION_SPACE = bc_config.SIMPLIFY_ACTIONS
+DEBUG_PRINT_STEPS = bc_config.DEBUG_PRINT_STEPS
 
 if SIMPLIFIED_ACTION_SPACE:
-    speed_map = config.SIMPLIFY_SPEED_MAP
-    turn_map = config.SIMPLIFY_TURN_MAP
+    speed_map = bc_config.SIMPLIFY_SPEED_MAP
+    turn_map = bc_config.SIMPLIFY_TURN_MAP
 else:
-    speed_map = config.SPEED_MAP
-    turn_map = config.TURN_MAP
+    speed_map = bc_config.SPEED_MAP
+    turn_map = bc_config.TURN_MAP
 
 
 def _normalize_value(v, key, norm_stats):
@@ -34,7 +34,7 @@ def _normalize_value(v, key, norm_stats):
     # This check ensures the function can handle both single float values and numpy arrays
     v = np.asarray(v)
 
-    if config.SCALING_METHOD == "min_max":
+    if bc_config.SCALING_METHOD == "min_max":
         if key in norm_stats:
             s_min = norm_stats[key]["min"]
             s_max = norm_stats[key]["max"]
@@ -43,7 +43,7 @@ def _normalize_value(v, key, norm_stats):
                 return np.clip(norm_v, -1.0, 1.0)
         return np.zeros_like(v)
 
-    elif config.SCALING_METHOD == "z_score":
+    elif bc_config.SCALING_METHOD == "z_score":
         if key in norm_stats:
             mean = norm_stats[key]["mean"]
             std = norm_stats[key]["std"]
@@ -51,8 +51,8 @@ def _normalize_value(v, key, norm_stats):
                 return (v - mean) / std
         return np.zeros_like(v)
 
-    elif config.SCALING_METHOD == "fixed" and "speed" in key:
-        return v / config.MAX_SPEED
+    elif bc_config.SCALING_METHOD == "fixed" and "speed" in key:
+        return v / bc_config.MAX_SPEED
     
     # Default for 'fixed' mode scalars, or if stats are missing
     return v if "speed" in key else np.zeros_like(v)
@@ -231,7 +231,7 @@ def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
     # Initialize with default values
     dist_front, dist_back, dist_left, dist_right = 10.0, 10.0, 5.0, 5.0
 
-    if getattr(config, "USE_SPATIAL_FEATURES", False):
+    if getattr(bc_config, "USE_SPATIAL_FEATURES", False):
         dists = compute_spatial_distances(obs["presence"])
         dist_front = dists[0]
         dist_back  = dists[1]
@@ -254,7 +254,7 @@ def extract_grid_and_scalars(obs, history: ObsHistory, norm_stats):
     speed_x = _normalize_value(obs["ego_speed_x"][0], "obs_ego_speed_x", norm_stats)
     speed_y = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", norm_stats)
     
-    if getattr(config, "USE_SPATIAL_FEATURES", False):
+    if getattr(bc_config, "USE_SPATIAL_FEATURES", False):
         scalars = np.array([lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
     else:
         scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
@@ -299,7 +299,7 @@ def process_continuous_output(out):
     else:
         brake = 0.0
 
-    if config.SMOOTH_STEERING:
+    if bc_config.SMOOTH_STEERING:
         steer = 0.7 * prev_steer + 0.3 * steer
         prev_steer = steer
         steer = np.clip(steer, -1.0, 1.0)
@@ -395,7 +395,7 @@ def update_spectator(env):
     
 def run_episode(env, policy, norm_stats, max_steps=2000, render_log_every=200, video_path=None):
     obs, _ = env.reset()
-    history = ObsHistory(one_hot=config.USE_ONE_HOT_GRID, window_size= config.WINDOW_SIZE, norm_stats=norm_stats)
+    history = ObsHistory(one_hot=bc_config.USE_ONE_HOT_GRID, window_size= bc_config.WINDOW_SIZE, norm_stats=norm_stats)
     camera = None
     video = None
     if video_path is not None:
@@ -491,14 +491,14 @@ def load_policy_from_checkpoint(model_path, config_path):
     kwargs = {
     "grid_channels": grid_channels,
     "scalar_dim": scalar_dim,
-    "cnn_channels": config.CNN_CHANNELS,
-    "kernel_sizes": config.KERNEL_SIZES,
-    "head_n_mlp_layers": config.HEAD_N_MLP_LAYERS,
-    "head_mlp_hidden_size": config.HEAD_MLP_HIDDEN_SIZE,
-    "scalar_n_mlp_layers": config.SCALAR_N_MLP_LAYERS,
-    "scalar_mlp_hidden_size": config.SCALAR_MLP_HIDDEN_SIZE,
-    "latent_dim": config.LATENT_DIM,
-    "decoupled": config.IS_DECOUPLED 
+    "cnn_channels": bc_config.CNN_CHANNELS,
+    "kernel_sizes": bc_config.KERNEL_SIZES,
+    "head_n_mlp_layers": bc_config.HEAD_N_MLP_LAYERS,
+    "head_mlp_hidden_size": bc_config.HEAD_MLP_HIDDEN_SIZE,
+    "scalar_n_mlp_layers": bc_config.SCALAR_N_MLP_LAYERS,
+    "scalar_mlp_hidden_size": bc_config.SCALAR_MLP_HIDDEN_SIZE,
+    "latent_dim": bc_config.LATENT_DIM,
+    "decoupled": bc_config.IS_DECOUPLED 
     }
 
     if mode == "discrete":
@@ -513,11 +513,11 @@ def load_policy_from_checkpoint(model_path, config_path):
     else:
         policy = ImitationPolicy(
             mode="continuous",
-            is_gaussian=config.IS_GAUSSIAN,
+            is_gaussian=bc_config.IS_GAUSSIAN,
             **kwargs
         ).to(DEVICE)
 
-    expected_channels = config.WINDOW_SIZE * (5 if config.USE_ONE_HOT_GRID else 3)
+    expected_channels = bc_config.WINDOW_SIZE * (5 if bc_config.USE_ONE_HOT_GRID else 3)
 
     assert expected_channels == grid_channels, \
         f"Grid channel mismatch! model={grid_channels}, expected={expected_channels}"
@@ -536,14 +536,14 @@ def load_policy_from_checkpoint(model_path, config_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--map", type=str, default=config.CARLA_MAP_PATH)
-    parser.add_argument("--episodes", type=int, default=config.EVAL_NUM_EPISODES)
-    parser.add_argument("--max-steps", type=int, default=config.EVAL_MAX_STEPS)
-    parser.add_argument("--mode", choices=["discrete", "continuous"], default=config.ACTION_MODE)
-    parser.add_argument("--device", default=config.DEVICE)
+    parser.add_argument("--map", type=str, default=bc_config.CARLA_MAP_PATH)
+    parser.add_argument("--episodes", type=int, default=bc_config.EVAL_NUM_EPISODES)
+    parser.add_argument("--max-steps", type=int, default=bc_config.EVAL_MAX_STEPS)
+    parser.add_argument("--mode", choices=["discrete", "continuous"], default=bc_config.ACTION_MODE)
+    parser.add_argument("--device", default=bc_config.DEVICE)
     parser.add_argument("--exp_id", type=str, default=None)
     parser.add_argument("--model_path", type=str, default=None)
-    parser.add_argument("--experiments_root", type=str, default="experiments")
+    parser.add_argument("--experiments_root", type=str, default=bc_config.BC_EXPERIMENT_FOLDER)
 
     args = parser.parse_args()
 
@@ -574,13 +574,13 @@ def main():
 
     env = CarlaEnv(
         map_path=args.map,
-        walkers_count=config.CARLA_WALKERS,
-        vehicles_count=config.CARLA_VEHICLES,
+        walkers_count=bc_config.CARLA_WALKERS,
+        vehicles_count=bc_config.CARLA_VEHICLES,
         max_steps=args.max_steps,
-        init_speed=config.CARLA_INIT_SPEED,
+        init_speed=bc_config.CARLA_INIT_SPEED,
         action_mode=ACTION_MODE,
-        random_ego_spawn= config.RANDOM_EGO_START_POS,
-        random_vehicle_spawn= config.RANDOM_VEHICLE_START_POS
+        random_ego_spawn= bc_config.RANDOM_EGO_START_POS,
+        random_vehicle_spawn= bc_config.RANDOM_VEHICLE_START_POS
     )
     print("Action mode:", ACTION_MODE)
     print("Device:", DEVICE)
@@ -656,8 +656,8 @@ def main():
             "end_reasons": dict(end_reasons),
             "wall_time_sec": total_time,
             "action_mode": ACTION_MODE,
-            "smooth_steering": config.SMOOTH_STEERING,
-            "number of cars": config.CARLA_VEHICLES,
+            "smooth_steering": bc_config.SMOOTH_STEERING,
+            "number of cars": bc_config.CARLA_VEHICLES,
         }
 
         if ACTION_MODE == "discrete":
@@ -672,8 +672,8 @@ def main():
         # TensorBoard summary metrics
         tb_writer.add_scalar("eval/avg_return", np.mean(all_returns), 0)
         tb_writer.add_scalar("eval/avg_length", np.mean(all_lengths), 0)
-        tb_writer.add_scalar("eval/carla_vehicles", config.CARLA_VEHICLES, 0)
-        tb_writer.add_scalar("eval/smooth_steering", float(config.SMOOTH_STEERING),0)
+        tb_writer.add_scalar("eval/carla_vehicles", bc_config.CARLA_VEHICLES, 0)
+        tb_writer.add_scalar("eval/smooth_steering", float(bc_config.SMOOTH_STEERING),0)
         tb_writer.flush()
         tb_writer.close()
         

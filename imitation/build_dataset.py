@@ -5,58 +5,58 @@ from collections import Counter
 import argparse
 import json
 import time
-from . import config
+from . import bc_config
 from .utils.viz import *
 from .utils.stats import *
 from .utils.seed_utils import seed_everything
 
-seed_everything(config.GLOBAL_SEED)
+seed_everything(bc_config.GLOBAL_SEED)
 
 ROOT = Path(__file__).resolve().parents[0]
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-DEMO_DIRS = config.DEMO_LIST
-if config.ACTION_MODE == "discrete":
-    OUT_PATH = config.DISCRETE_DATASET_PATH
+DEMO_DIRS = bc_config.DEMO_LIST
+if bc_config.ACTION_MODE == "discrete":
+    OUT_PATH = bc_config.DISCRETE_DATASET_PATH
 else:
-    OUT_PATH = config.CONTINUOUS_DATASET_PATH
-RNG_SEED = config.BUILD_RNG_SEED
+    OUT_PATH = bc_config.CONTINUOUS_DATASET_PATH
+RNG_SEED = bc_config.BUILD_RNG_SEED
 
 # Window Size configuration 
-WINDOW_SIZE = config.WINDOW_SIZE
+WINDOW_SIZE = bc_config.WINDOW_SIZE
 
 # Termination Filtering
-DROP_TERMINATED = config.DROP_TERMINATED
-DROP_LAST_N_BEFORE_TERMINATION = config.DROP_LAST_N_BEFORE_TERMINATION
+DROP_TERMINATED = bc_config.DROP_TERMINATED
+DROP_LAST_N_BEFORE_TERMINATION = bc_config.DROP_LAST_N_BEFORE_TERMINATION
 
 # Idle / Silence Filtering
-FILTER_IDLE_FRAMES = config.FILTER_IDLE_FRAMES
-IDLE_FILTER_MODE = config.IDLE_FILTER_MODE
-IDLE_SPEED_THRESHOLD = config.IDLE_SPEED_THRESHOLD
-IDLE_THROTTLE_THRESHOLD = config.IDLE_THROTTLE_THRESHOLD
-IDLE_BRAKE_THRESHOLD = config.IDLE_BRAKE_THRESHOLD
+FILTER_IDLE_FRAMES = bc_config.FILTER_IDLE_FRAMES
+IDLE_FILTER_MODE = bc_config.IDLE_FILTER_MODE
+IDLE_SPEED_THRESHOLD = bc_config.IDLE_SPEED_THRESHOLD
+IDLE_THROTTLE_THRESHOLD = bc_config.IDLE_THROTTLE_THRESHOLD
+IDLE_BRAKE_THRESHOLD = bc_config.IDLE_BRAKE_THRESHOLD
 
 # Action Maps & Discrete
-SPEED_MAP = config.SPEED_MAP
-TURN_MAP = config.TURN_MAP
-JOINT_KEEP_PROBS = config.JOINT_KEEP_PROBS
+SPEED_MAP = bc_config.SPEED_MAP
+TURN_MAP = bc_config.TURN_MAP
+JOINT_KEEP_PROBS = bc_config.JOINT_KEEP_PROBS
 
 
 # Observation Bounds
-OBS_BOUNDS = config.OBS_BOUNDS
+OBS_BOUNDS = bc_config.OBS_BOUNDS
 
 # Optional simplification
-SIMPLIFY_ACTIONS = config.SIMPLIFY_ACTIONS
-REMOVE_REVERSE = config.REMOVE_REVERSE
-REMOVE_NO_TURN = config.REMOVE_NO_TURN
+SIMPLIFY_ACTIONS = bc_config.SIMPLIFY_ACTIONS
+REMOVE_REVERSE = bc_config.REMOVE_REVERSE
+REMOVE_NO_TURN = bc_config.REMOVE_NO_TURN
  
 # Mirror augmentation
-MIRROR_DATASET = config.MIRROR_DATASET
-MIRROR_STEERING_THRESHOLD = config.MIRROR_STEERING_THRESHOLD
+MIRROR_DATASET = bc_config.MIRROR_DATASET
+MIRROR_STEERING_THRESHOLD = bc_config.MIRROR_STEERING_THRESHOLD
 
 
 
-USE_SPATIAL_FEATURES=  config.USE_SPATIAL_FEATURES
+USE_SPATIAL_FEATURES=  bc_config.USE_SPATIAL_FEATURES
 
 # Target keys mapping
 TARGET_RENAME_KEYS = ["obs_throttle", "obs_brake", "obs_steering_angle", "obs_reverse"]
@@ -685,10 +685,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-path", type=str, default=None)
     parser.add_argument("--visualize", action="store_true")
-    parser.add_argument("--action-mode", type=str, default=config.ACTION_MODE, choices=["discrete", "continuous"])
+    parser.add_argument("--action-mode", type=str, default=bc_config.ACTION_MODE, choices=["discrete", "continuous"])
     args = parser.parse_args()
 
     if args.out_path:
         OUT_PATH = Path(args.out_path)
 
-    run_pipeline(mode=args.action_mode, visualize=args.visualize or config.BUILD_VISUALIZE)
+    run_pipeline(mode=args.action_mode, visualize=args.visualize or bc_config.BUILD_VISUALIZE)

@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from .feature_extractor import FeatureExtractor
-from .actor_heads import *
+from networks.feature_extractor import FeatureExtractor
+from networks.actor_heads import *
 
 class ImitationPolicy(nn.Module):
     """

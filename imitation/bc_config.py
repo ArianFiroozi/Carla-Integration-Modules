@@ -33,6 +33,10 @@ MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_30car"
 DISCRETE_DATASET_PATH = PROCESSED_DIR / "dataset_bc_discrete.npz"
 CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
 
+
+BC_EXPERIMENT_FOLDER = REPO_ROOT / "experiments" / "bc"
+
+
 # input of build dataset and inspect demo
 DEMO_LIST= [
     # EXPERT_DIR / "town01_0car",

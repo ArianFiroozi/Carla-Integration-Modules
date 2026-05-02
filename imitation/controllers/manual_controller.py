@@ -3,7 +3,7 @@ from pathlib import Path
 import keyboard
 import numpy as np
 import carla
-from .. import config
+from .. import bc_config
 
 class ManualController:
     """
@@ -15,10 +15,10 @@ class ManualController:
       - Reset:   U (after episode ends)
     """
     def __init__(self, env,
-                 demo_dir=config.MANUAL_RECORD_DIR,
-                 sleep_seconds=config.MANUAL_SLEEP_SECONDS,
-                 print_every=config.MANUAL_PRINT_EVERY,
-                 debug_grids=config.MANUAL_DEBUG_GRIDS):
+                 demo_dir=bc_config.MANUAL_RECORD_DIR,
+                 sleep_seconds=bc_config.MANUAL_SLEEP_SECONDS,
+                 print_every=bc_config.MANUAL_PRINT_EVERY,
+                 debug_grids=bc_config.MANUAL_DEBUG_GRIDS):
 
         self.env = env
         self.demo_dir = Path(demo_dir)
@@ -150,7 +150,7 @@ class ManualController:
             row = " ".join(f"{p[r, c]:.0f}" for c in range(p.shape[1]))
             print(row)
 
-    def run(self, record=config.MANUAL_RECORD, base_name=config.MANUAL_BASE_NAME):
+    def run(self, record=bc_config.MANUAL_RECORD, base_name=bc_config.MANUAL_BASE_NAME):
         print("Manual control mode activated.")
         print("Keys: Up/Down/Space/R for speed | Left/Right for steer | Q quit | U reset after episode")
 

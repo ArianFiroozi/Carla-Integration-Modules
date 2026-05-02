@@ -185,5 +185,4 @@ explaination.md
 __pycache__/
 experiments_archive
 report.txt
-imitation/data/demos/aaaaaaaa
-imitation/data/demos/test
+imitation/data

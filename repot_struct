@@ -1,0 +1,59 @@
+CarlaEnv/
+
+data/
+    demos
+    expert_demos
+    processed
+
+datasets/
+
+experiments/
+experiments_archive/
+
+imitation/
+    train_bc.py
+    evaluate_imitation.py
+    build_dataset.py
+    inspect_demo.py
+    record_demos.py
+
+    utils/
+        bc_logger.py
+        stats.py
+        viz.py
+
+rl/
+    ppo/
+        train_ppo.py
+        rollout_buffer.py
+
+    sac/
+        train_ppo.py
+        replay_buffer.py
+
+agents/
+    bc/
+        bc_agent.py
+
+    ppo/
+        ppo_agent.py
+
+    sac/
+        sac_agent.py
+
+networks/
+    feature_extractor.py
+    actor_heads.py
+    critic_heads.py
+
+config/
+    bc_config.py
+    ppo_config.py
+    sac_config.py
+
+
+main/
+    run_imitation.py
+    run_rl.py
+
+README.md
