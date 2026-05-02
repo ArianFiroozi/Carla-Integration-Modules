@@ -5,7 +5,7 @@ from collections import Counter
 import argparse
 import json
 import time
-from . import bc_config
+from config import bc_config
 from .utils.viz import *
 from .utils.stats import *
 from .utils.seed_utils import seed_everything

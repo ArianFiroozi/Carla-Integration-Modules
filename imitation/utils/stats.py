@@ -1,5 +1,5 @@
 import numpy as np
-from .. import bc_config
+from config import bc_config
 from pathlib import Path
 from collections import Counter
 

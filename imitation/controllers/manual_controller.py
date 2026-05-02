@@ -3,7 +3,7 @@ from pathlib import Path
 import keyboard
 import numpy as np
 import carla
-from .. import bc_config
+from config import bc_config
 
 class ManualController:
     """

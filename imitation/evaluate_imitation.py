@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from CarlaEnv.env import CarlaEnv
 from agents.bc.imitation_policy import ImitationPolicy
-from . import bc_config
+from config import bc_config
 import datetime
 from torch.utils.tensorboard import SummaryWriter 
 import carla

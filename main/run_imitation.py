@@ -14,7 +14,7 @@ def run(cmd):
 def main():
 
     # # 1 Record demonstrations
-    run("python -m imitation.record_demos")
+    # run("python -m imitation.record_demos")
 
     # # # 2 Inspect demos
     run("python -m imitation.inspect_demo")

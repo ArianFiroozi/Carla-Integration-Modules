@@ -20,7 +20,7 @@ from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
 from agents.bc.imitation_policy import ImitationPolicy
 
 
-from . import bc_config
+from config import bc_config
 from .utils.experiment_logger import ExperimentLogger
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F

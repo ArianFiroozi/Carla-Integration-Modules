@@ -6,7 +6,7 @@ import numpy as np
 import carla
 from .controllers.autopilot_controller import AutopilotController
 from .controllers.manual_controller import ManualController
-from . import bc_config
+from config import bc_config
 
 
 

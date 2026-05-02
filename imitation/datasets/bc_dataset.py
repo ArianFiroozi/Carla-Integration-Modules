@@ -216,7 +216,7 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import json
 from pathlib import Path
-from .. import bc_config
+from config import bc_config
 
 
 

@@ -224,7 +224,7 @@ USE_ONE_HOT_GRID = True
 # =========================================================
 # IMITATION LEARNING TRAINING
 # =========================================================
-BC_EPOCHS = 30
+BC_EPOCHS = 50
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -269,10 +269,10 @@ EVAL_RENDER_LOG_EVERY = 200
 # =========================================================
 DEBUG_PRINT_STEPS = 5000
 
-INSPECT_VISUALIZE = True
+INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000
 
-BUILD_VISUALIZE = True
+BUILD_VISUALIZE = False
 FEATURE_HIST_MAX_SAMPLES = 100000
 
 # =========================================================

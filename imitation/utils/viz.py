@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from .. import bc_config
+from config import bc_config
 
 
 

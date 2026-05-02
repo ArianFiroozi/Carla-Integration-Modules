@@ -13,7 +13,7 @@ import time
 import random
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RL_ROOT = REPO_ROOT / "extra_statss"
+RL_ROOT = REPO_ROOT / "extra_stats"
 
 RUN_DIR = RL_ROOT / "runs"
 RUN_DIR.mkdir(exist_ok=True)

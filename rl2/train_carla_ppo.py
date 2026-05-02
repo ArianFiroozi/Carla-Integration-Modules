@@ -16,7 +16,7 @@ from CarlaEnv.env import CarlaEnv
 from rl2.actor_critic import UTCarActorCritic
 from imitation.datasets.bc_dataset import BCDatasetContinuous
 from imitation.evaluate_imitation import ObsHistory, extract_grid_and_scalars
-from imitation import bc_config
+from config import bc_config
 
 # ==========================================
 # setting PPO

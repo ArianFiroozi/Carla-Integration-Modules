@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 from collections import Counter, defaultdict
 import argparse
-from . import bc_config
+from config import bc_config
 from .utils.viz import *
 from.utils.stats import * 
 
