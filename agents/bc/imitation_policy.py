@@ -22,12 +22,25 @@ class ImitationPolicy(nn.Module):
         head_mlp_hidden_size=64,
         scalar_n_mlp_layers = 2,
         scalar_mlp_hidden_size = 64,
-        latent_dim=128
+        latent_dim=128,
+        action_low=None, action_high=None
     ):
         super().__init__()
         self.mode = mode
         self.is_gaussian = is_gaussian
-
+        
+        
+        if action_low is None:  action_low = [0.0, 0.0, -1.0]
+        if action_high is None: action_high = [1.0, 1.0,  1.0]
+        action_low  = torch.tensor(action_low, dtype=torch.float32)
+        action_high = torch.tensor(action_high, dtype=torch.float32)
+        
+        self.register_buffer("action_low", action_low)
+        self.register_buffer("action_high", action_high)
+        self.register_buffer("action_scale", (action_high - action_low) / 2.0)
+        self.register_buffer("action_bias",  (action_high + action_low) / 2.0)
+        
+        
         self.extractor = FeatureExtractor(
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
@@ -61,6 +74,19 @@ class ImitationPolicy(nn.Module):
 
     def forward(self, grid, scalars):
         latent = self.extractor(grid, scalars)
+
         if self.mode == "continuous" and self.is_gaussian:
-            return self.actor(latent, mode="bc")
-        return self.actor(latent)
+            mean, log_std = self.actor(latent)
+            # squash mean to env bounds
+            a = torch.tanh(mean)
+            mean = a * self.action_scale + self.action_bias
+            return mean, log_std
+
+        elif self.mode == "continuous":
+            raw = self.actor(latent)
+            a = torch.tanh(raw)
+            action = a * self.action_scale + self.action_bias
+            return action
+
+        else:
+            return self.actor(latent)

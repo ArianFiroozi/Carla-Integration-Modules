@@ -18,7 +18,7 @@ from sklearn.metrics import f1_score
 from.utils.stats import extract_dataset_sources
 from .datasets.bc_dataset import BCDataset, BCDatasetContinuous
 from agents.bc.imitation_policy import ImitationPolicy
-
+import math
 
 from config import bc_config
 from .utils.experiment_logger import ExperimentLogger
@@ -49,6 +49,43 @@ def validate_dataset_config(dataset_meta, args):
 
     print("Dataset configuration validated successfully.")
 
+
+def atanh(x):
+    # numerically stable inverse tanh
+    return 0.5 * (torch.log1p(x) - torch.log1p(-x))
+
+def squashed_gaussian_nll(mean, log_std, target, action_scale, action_bias, eps=1e-6):
+    """
+    Negative log-likelihood of target under tanh-squashed Gaussian with affine scaling.
+    mean, log_std: (B, A) raw Gaussian params in pre-tanh space
+    target: (B, A) in env action space (scaled)
+    action_scale, action_bias: (A,)
+    """
+    # 1) map target -> [-1,1] tanh space
+    y = (target - action_bias) / action_scale
+    y = torch.clamp(y, -1.0 + eps, 1.0 - eps)
+
+    # 2) inverse tanh to pre-squash space
+    z = atanh(y)
+
+    # 3) Gaussian log-prob in pre-squash space
+    std = torch.exp(log_std)
+    dist = torch.distributions.Normal(mean, std)
+    log_prob = dist.log_prob(z)  # (B,A)
+
+    # 4) log-det of tanh + affine scaling
+    # tanh derivative: 1 - tanh(z)^2 = 1 - y^2
+    log_det_tanh = torch.log(1 - y.pow(2) + eps)
+    # affine scaling derivative: action_scale
+    log_det_scale = torch.log(action_scale + eps)
+
+    # change of variables: log p(y) = log p(z) - log|det(dy/dz)|
+    # and dy/dz = (1 - y^2) * action_scale
+    log_prob = log_prob - log_det_tanh - log_det_scale
+
+    # NLL per element -> sum over action dims
+    nll = -log_prob.sum(dim=1)  # (B,)
+    return nll
 
 def split_dataset(dataset, val_split, seed):
 
@@ -137,16 +174,22 @@ def evaluate_continuous(model, loader, device, is_gaussian=False):
         pred = model(grid, scalars)
         # Handle Gaussian vs Standard Continuous
         if is_gaussian:
-            mean, std = pred
-            std = torch.clamp(std, min=bc_config.MIN_STD, max=bc_config.MAX_STD)
-            dist = torch.distributions.Normal(mean, std)
+            mean, log_std = pred
+            log_std = torch.clamp(log_std, min=bc_config.MIN_STD, max=bc_config.MAX_STD)
 
-            nll_sum += -dist.log_prob(target).sum().item()
-            std_sum += std.sum().item()
+            nll = squashed_gaussian_nll(
+                mean, log_std, target,
+                model.action_scale, model.action_bias
+            )
+            nll_sum += nll.sum().item()
+            std_sum += torch.exp(log_std).sum().item()
 
-            point_pred = mean  # use mean for mse/mae + variance
+            # for MAE/MSE just use squashed mean
+            a = torch.tanh(mean).clamp(-0.999, 0.999)
+            point_pred = a * model.action_scale + model.action_bias
         else:
             point_pred = pred
+
 
         mse_sum += F.mse_loss(point_pred, target, reduction="sum").item()
         mae_sum += torch.abs(point_pred - target).sum().item()
@@ -267,11 +310,16 @@ def train_epoch_continuous(model, loader, opt, device):
 
 
         if bc_config.IS_GAUSSIAN:
-            # GAUSSIAN MODE (NLL)
-            mean, std = pred
-            std = torch.clamp(std, min=bc_config.MIN_STD, max=bc_config.MAX_STD) 
-            dist = torch.distributions.Normal(mean, std)
-            per_element_loss = -dist.log_prob(target)
+            mean, log_std = pred
+            log_std = torch.clamp(log_std, min=bc_config.MIN_STD, max=bc_config.MAX_STD)
+
+            # action_scale/action_bias should be buffers in the policy
+            nll = squashed_gaussian_nll(
+                mean, log_std, target,
+                model.action_scale, model.action_bias
+            )
+            per_element_loss = nll  # (B,)
+
         else:
             # STANDARD MODE (Smooth L1 Loss)
             # per_element_loss = F.smooth_l1_loss(pred, target, reduction='none', beta=0.1)
@@ -636,11 +684,13 @@ def main():
 
     if args.mode == "discrete":
         model = ImitationPolicy(
-            mode="discrete",
-            n_speed=n_speed,
-            n_turn=n_turn,
+            mode="continuous",
+            is_gaussian=args.is_gaussian,
+            action_low=bc_config.ACTION_LOW,
+            action_high=bc_config.ACTION_HIGH,
             **kwargs
         ).to(device)
+
     else:
         model = ImitationPolicy(
             mode="continuous",

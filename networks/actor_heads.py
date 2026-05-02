@@ -78,18 +78,11 @@ class BCContinuousHead(nn.Module):
             steer_feat = self.steer_net(latent)
             steer_raw = self.steer_head(steer_feat)
 
-            throttle = torch.sigmoid(speed_raw[:, 0:1])
-            brake    = torch.sigmoid(speed_raw[:, 1:2])
-            steer    = torch.tanh(steer_raw[:, 0:1])
+            raw = torch.cat([speed_raw, steer_raw], dim=1)
         else:
             feat = self.shared_net(latent)
-            raw = self.head(feat)
-
-            throttle = torch.sigmoid(raw[:, 0:1])      # Bounds to [0, 1]
-            brake = torch.sigmoid(raw[:, 1:2])         # Bounds to [0, 1]
-            steer = torch.tanh(raw[:, 2:3])            # Bounds to [-1, 1]
-
-        return torch.cat([throttle, brake, steer], dim=1)
+            raw = self.head(feat)   # raw, unbounded
+        return raw
     
         
     
@@ -126,9 +119,12 @@ class BCGaussianContinuousHead(nn.Module):
             self.log_std_head = nn.Linear(out_dim, action_dim)
 
         # bias init
-        for m in self.modules():
-            if isinstance(m, nn.Linear) and "logstd" in m._get_name().lower():
-                m.bias.data.fill_(-1.0)
+        if not decoupled:
+            self.log_std_head.bias.data.fill_(-1.0)
+        else:
+            self.speed_logstd.bias.data.fill_(-1.0)
+            self.steer_logstd.bias.data.fill_(-1.0)
+
 
     def forward(self, latent, mode="bc"):
         if self.decoupled:
@@ -148,16 +144,8 @@ class BCGaussianContinuousHead(nn.Module):
             log_std = self.log_std_head(feat)
 
         log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
-        std = torch.exp(log_std)
 
-        # Bound mean for BC
-        if mode == "bc":
-            throttle = torch.sigmoid(mean[:, 0:1])
-            brake    = torch.sigmoid(mean[:, 1:2])
-            steer    = torch.tanh(mean[:, 2:3])
-            mean = torch.cat([throttle, brake, steer], dim=1)
-
-        return mean, std
+        return mean, log_std
 
 
 

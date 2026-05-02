@@ -1,23 +1,7 @@
 from pathlib import Path
 import numpy as np
 import torch
-
-# =========================================================
-# SYSTEM
-# =========================================================
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-# =========================================================
-# RANDOM SEEDS 
-# =========================================================
-BUILD_RNG_SEED = 42
-BC_SPLIT_SEED = 42
-GLOBAL_SEED = 42
-
-# =========================================================
-# ROOT PATHS
-# =========================================================
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from .general_config import *
 
 # =========================================================
 # DATA PATHS
@@ -46,61 +30,12 @@ DEMO_LIST= [
     MANUAL_DIR / "map1_30car"
 ]
 
-# =========================================================
-# MODEL ARCHITECTURE HYPERPARAMETERS
-# =========================================================
-IS_DECOUPLED = False
-
-# ---BASELINE---
-CNN_CHANNELS = [16, 32, 64]
-KERNEL_SIZES = [3, 3, 3]
-# Fully Connected settings (Scalars)
-SCALAR_N_MLP_LAYERS = 2
-SCALAR_MLP_HIDDEN_SIZE = 32
-# Fusion & Latent
-LATENT_DIM = 128
-# Actor Head settings (Gaussian)
-HEAD_N_MLP_LAYERS = 2
-HEAD_MLP_HIDDEN_SIZE = 64
-
-
-
-# # ---BALANCED---
-# CNN_CHANNELS = [32, 64, 128]
-# KERNEL_SIZES = [3, 3, 3]
-# # Fully Connected settings (Scalars)
-# SCALAR_N_MLP_LAYERS = 2
-# SCALAR_MLP_HIDDEN_SIZE = 64
-# # Fusion & Latent
-# LATENT_DIM = 256
-# # Actor Head settings (Gaussian)
-# HEAD_N_MLP_LAYERS = 2
-# HEAD_MLP_HIDDEN_SIZE = 128
-
-
-
-
-# # ---BIG---
-# CNN_CHANNELS = [32, 64, 128]
-# KERNEL_SIZES = [5, 3, 3]
-# # Fully Connected settings (Scalars)
-# SCALAR_N_MLP_LAYERS = 2
-# SCALAR_MLP_HIDDEN_SIZE = 64
-# # Fusion & Latent
-# LATENT_DIM = 256
-# # Actor Head settings (Gaussian)
-# HEAD_N_MLP_LAYERS = 2
-# HEAD_MLP_HIDDEN_SIZE = 256
-
-
-
-
 
 # =========================================================
 # ACTION SPACE
 # =========================================================
 ACTION_MODE = "continuous"   # "discrete" or "continuous"
-IS_GAUSSIAN = False
+IS_GAUSSIAN = False  #TODO: this has a bug and i was too lazy to debug , dont activate it unless you fixed the bug the bug is in training script and imitation policy 
 MIN_STD=0.05
 MAX_STD=1
 SMOOTH_STEERING = False
@@ -140,24 +75,7 @@ SIMPLIFY_TURN_MAP = {
     2: "Straight",
 }
 
-# =========================================================
-# OBSERVATION SPACE LIMITS
-# =========================================================
-OBS_BOUNDS = {
-    "obs_speed_x": dict(low=-np.inf, high=np.inf),
-    "obs_speed_y": dict(low=-np.inf, high=np.inf),
-    "obs_presence": dict(low=0, high=9),
-    "obs_lane_angle": dict(low=-np.pi, high=np.pi),
-    "obs_max_speed": dict(low=0.0, high=200.0),
-    "obs_traffic_signs": dict(low=0.0, high=1.0),
-    "obs_ego_speed_x": dict(low=-np.inf, high=np.inf),
-    "obs_ego_speed_y": dict(low=-np.inf, high=np.inf),
-    "obs_ego_in_lane_position_x": dict(low=-100.0, high=100.0),
-    "obs_throttle": dict(low=0.0, high=1.0),
-    "obs_brake": dict(low=0.0, high=1.0),
-    "obs_steering_angle": dict(low=-1.0, high=1.0),
-    "obs_reverse": dict(low=0.0, high=1.0),
-}
+
 
 # =========================================================
 # DATASET SETTINGS
@@ -207,24 +125,19 @@ WEIGHTED_SAMPLING = "none" # "inverse" or "none" or "handmade"
 
 
 
-USE_SPATIAL_FEATURES = True
-
-
 
 # ================================
 # Dataset Augmentation
 # ================================
 MIRROR_DATASET = False
 MIRROR_STEERING_THRESHOLD = 0.04
-WINDOW_SIZE = 1
-USE_ONE_HOT_GRID = True
 
 
 
 # =========================================================
 # IMITATION LEARNING TRAINING
 # =========================================================
-BC_EPOCHS = 50
+BC_EPOCHS = 30
 BC_BATCH_SIZE = 512
 BC_LR = 3e-4
 BC_VAL_SPLIT = 0.1
@@ -245,17 +158,6 @@ RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
 DEFAULT_AUTOPILOT_EPISODES = 1000
 AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 
-# =========================================================
-# CARLA ENVIRONMENT DEFAULTS
-# =========================================================
-CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
-CARLA_WALKERS = 0
-CARLA_VEHICLES = 30
-CARLA_MAX_STEPS = 2000
-CARLA_INIT_SPEED = 0
-
-RANDOM_VEHICLE_START_POS = True
-RANDOM_EGO_START_POS = True
 
 # =========================================================
 # POLICY EVALUATION / ROLLOUT

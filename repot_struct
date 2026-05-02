@@ -1,14 +1,11 @@
 CarlaEnv/
 
-data/
-    demos
-    expert_demos
-    processed
 
-datasets/
 
 experiments/
-experiments_archive/
+    bc
+    rl
+
 
 imitation/
     train_bc.py
@@ -16,19 +13,21 @@ imitation/
     build_dataset.py
     inspect_demo.py
     record_demos.py
+    data/
+        demos
+        expert_demos
+        processed
 
-    utils/
-        bc_logger.py
-        stats.py
-        viz.py
+    datasets/
+
 
 rl/
     ppo/
-        train_ppo.py
+        ppo_trainer.py
         rollout_buffer.py
 
     sac/
-        train_ppo.py
+        sac_trainer.py
         replay_buffer.py
 
 agents/
@@ -56,4 +55,6 @@ main/
     run_imitation.py
     run_rl.py
 
+utils/
+    obs_wrapper.py
 README.md
