@@ -9,7 +9,7 @@ from networks.feature_extractor import FeatureExtractor
 from networks.actor_heads import BCGaussianContinuousHead
 from networks.critic_heads import TwinQCriticHead
 
-
+ 
 class SACActor(nn.Module):
     """
     Actor = FeatureExtractor + Gaussian Head (mean/log_std)
@@ -31,12 +31,18 @@ class SACActor(nn.Module):
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
             latent_dim=latent_dim,
+            cnn_channels=cfg.CNN_CHANNELS,
+            kernel_sizes=cfg.KERNEL_SIZES,
+            n_mlp_layers=cfg.SCALAR_N_MLP_LAYERS,
+            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE
         )
         self.head = BCGaussianContinuousHead(
             latent_dim=latent_dim,
             action_dim=action_dim,
             log_std_min=log_std_min,
             log_std_max=log_std_max,
+            n_mlp_layers=cfg.HEAD_N_MLP_LAYERS,
+            mlp_hidden_size=cfg.HEAD_MLP_HIDDEN_SIZE
         )
 
         # action scaling buffers
@@ -95,7 +101,11 @@ class SACCritic(nn.Module):
             grid_channels=grid_channels,
             scalar_dim=scalar_dim,
             latent_dim=latent_dim,
-        )
+            cnn_channels=cfg.CNN_CHANNELS,
+            kernel_sizes=cfg.KERNEL_SIZES,
+            n_mlp_layers=cfg.SCALAR_N_MLP_LAYERS,
+            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE
+        )   
         self.head = TwinQCriticHead(
             latent_dim=latent_dim,
             action_dim=action_dim,
@@ -143,9 +153,7 @@ class SACAgent:
         self.auto_entropy = cfg.AUTO_ENTROPY
         if self.auto_entropy:
             self.target_entropy = -cfg.ACTION_DIM * cfg.TARGET_ENTROPY_SCALE
-            self.log_alpha = torch.tensor(
-                torch.log(torch.tensor(cfg.INIT_ALPHA)), device=self.device, requires_grad=True
-            )
+            self.log_alpha = torch.tensor(cfg.INIT_ALPHA, dtype=torch.float32, device=self.device).log().requires_grad_(True)
             self.alpha_opt = optim.Adam([self.log_alpha], lr=cfg.ALPHA_LR)
         else:
             self._alpha = cfg.INIT_ALPHA
@@ -262,13 +270,38 @@ class SACAgent:
     def load_actor_from_bc(self, bc_checkpoint_path, strict=False):
         """
         Optional: load BC weights into SAC actor.
-        Expects compatible keys (feature_extractor + gaussian head).
+        Translates keys from ImitationPolicy (BC) to SACActor (RL).
         """
-        ckpt = torch.load(bc_checkpoint_path, map_location=self.device)
+        ckpt = torch.load(bc_checkpoint_path, map_location=self.device, weights_only=False)
+        
         if "model_state_dict" in ckpt:
             state = ckpt["model_state_dict"]
         else:
             state = ckpt
-        self.actor.load_state_dict(state, strict=strict)
+            
+        translated_state = {}
+        for k, v in state.items():
+            if k.startswith("extractor."):
+                new_key = k.replace("extractor.", "feature_extractor.", 1)
+                translated_state[new_key] = v
+                
+            elif k.startswith("actor.head."):
+                new_key = k.replace("actor.head.", "head.mean_head.", 1)
+                translated_state[new_key] = v
+            # --------------------------------------------------------
+                
+            elif k.startswith("actor."):
+                new_key = k.replace("actor.", "head.", 1)
+                translated_state[new_key] = v
+            else:
+                translated_state[k] = v
+                
+        missing, unexpected = self.actor.load_state_dict(translated_state, strict=strict)
+        
+        print("\n[INFO] BC Weights Loaded into SAC Actor Successfully!")
+        if missing:
+            print(f"[WARN] Missing keys during load (Usually safe if just log_std): {missing}")
+        if unexpected:
+            print(f"[WARN] Unexpected keys in BC checkpoint: {unexpected}\n")
         
         

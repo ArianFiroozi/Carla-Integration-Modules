@@ -17,7 +17,7 @@ from utils.obs_wrapper import CarlaObsWrapper
 from config import sac_config as cfg
 from config import bc_config  # for wrapper settings
 
-
+ 
 # -------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------
@@ -159,22 +159,17 @@ def main():
     ## TODO: mehdi , here we load the saved bc, you might need to check or even fix how we "save" and load the model 
     ## begin
     
-    # Optional: load BC weights into SAC actor
+# =========================================================
+    # Load BC Weights (Warm Start)
+    # =========================================================
     if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():
-        print("Loading BC weights from:", cfg.BC_CHECKPOINT_PATH)
-        agent.load_actor_from_bc(cfg.BC_CHECKPOINT_PATH, strict=True)
+        print(f"Loading BC weights from: {cfg.BC_CHECKPOINT_PATH}")
+        # strict=False allows ignoring keys that don't match perfectly (e.g., log_std which is not in deterministic BC)
+        agent.load_actor_from_bc(cfg.BC_CHECKPOINT_PATH, strict=False)
     elif cfg.LOAD_BC_WEIGHTS:
-        print("[WARN] BC checkpoint not found:", cfg.BC_CHECKPOINT_PATH)
+        print(f"[WARN] BC checkpoint not found at: {cfg.BC_CHECKPOINT_PATH}")
+    # =========================================================
         
-    # # Force-check the keys
-    # bc_state_dict = torch.load(cfg.BC_CHECKPOINT_PATH)
-    # agent_state_dict = agent.actor.state_dict()
-    # missing_keys = set(agent_state_dict.keys()) - set(bc_state_dict.keys())
-    # print(f"DEBUG: Missing keys in BC checkpoint: {missing_keys}")
-
-
-    ## end
-
 
 
     total_steps = 0
