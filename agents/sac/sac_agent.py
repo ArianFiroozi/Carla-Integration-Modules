@@ -257,6 +257,8 @@ class SACAgent:
                 self.alpha_opt.load_state_dict(ckpt["alpha_opt"])
 
 
+
+    ## TODO: mehdi , here actor loads the bc weight
     def load_actor_from_bc(self, bc_checkpoint_path, strict=False):
         """
         Optional: load BC weights into SAC actor.

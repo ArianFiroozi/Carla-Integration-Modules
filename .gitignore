@@ -181,8 +181,8 @@ explaination.md
 
 # Ignore datasets and logs
 # *.npz
-*.pt
+
 __pycache__/
-experiments_archive
+experiments_archive/**/*.pt
 report.txt
 imitation/data

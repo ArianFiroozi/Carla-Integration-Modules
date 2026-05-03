@@ -155,6 +155,10 @@ def main():
     agent = SACAgent(device=args.device)
     replay_buffer = SACReplayBuffer(capacity=cfg.REPLAY_BUFFER_SIZE, device=args.device)
 
+
+    ## TODO: mehdi , here we load the saved bc, you might need to check or even fix how we "save" and load the model 
+    ## begin
+    
     # Optional: load BC weights into SAC actor
     if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():
         print("Loading BC weights from:", cfg.BC_CHECKPOINT_PATH)
@@ -167,6 +171,10 @@ def main():
     # agent_state_dict = agent.actor.state_dict()
     # missing_keys = set(agent_state_dict.keys()) - set(bc_state_dict.keys())
     # print(f"DEBUG: Missing keys in BC checkpoint: {missing_keys}")
+
+
+    ## end
+
 
 
     total_steps = 0
