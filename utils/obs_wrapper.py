@@ -218,6 +218,15 @@ class CarlaObsWrapper:
             if turn == 2:  turn = 3
         return [speed, turn]
 
+    def clip_actions(self,out):
+        
+        throttle = float(np.clip(out[0], 0.0, 1.0))
+        brake    = float(np.clip(out[1], 0.0, 1.0))
+        steer    = float(np.clip(out[2], -1.0, 1.0))
+        
+        return [throttle, brake, steer]
+
+        
     def process_continuous_output(self, out):
         throttle = float(np.clip(out[0], 0.0, 1.0))
         brake    = float(np.clip(out[1], 0.0, 1.0))

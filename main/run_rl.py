@@ -19,7 +19,7 @@ def main():
     # run("python -m rl.train_ppo")
 
 
-    # run("python -m rl.train_sac")
+    run("python -m rl.sac.train_sac")
 
 
 

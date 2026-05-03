@@ -25,7 +25,8 @@ from .utils.experiment_logger import ExperimentLogger
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-from .utils.seed_utils import seed_everything, seed_worker
+from utils.seed_utils import seed_everything, seed_worker
+
 seed_everything(bc_config.GLOBAL_SEED)
 g = torch.Generator()
 g.manual_seed(bc_config.GLOBAL_SEED)

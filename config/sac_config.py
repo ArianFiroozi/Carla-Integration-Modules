@@ -62,7 +62,7 @@ LOG_STD_MAX = 2
 # EXPLORATION
 # =========================================================
 
-USE_RANDOM_POLICY_WARMUP = True
+USE_RANDOM_POLICY_WARMUP = False 
 
 # =========================================================
 # EVALUATION
@@ -83,4 +83,4 @@ SAVE_DIR = REPO_ROOT / "experiments" / "rl" / "sac"
 # =========================================================
 
 LOAD_BC_WEIGHTS = True
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "best_model.pt"
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_09_24_20_bc_continuous" /"models" /  "best_model.pt"

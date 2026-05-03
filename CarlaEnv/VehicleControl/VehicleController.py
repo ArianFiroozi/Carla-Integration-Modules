@@ -3,7 +3,7 @@ import enum
 import json
 import numpy as np
 from pathlib import Path
-
+from config import general_config as config
 class Command(enum.Enum):
     SPEED_UP = 0
     SPEED_DOWN = 1
@@ -47,7 +47,6 @@ class VehicleController():
         else:
             self.__spawn_vehicle()
         self.__init_reward_sensors()
-        self.get_config()
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -86,30 +85,97 @@ class VehicleController():
         self.sensor_c.listen(collision_callback)
         self.sensor_l.listen(lane_callback)
 
-    def get_config(self):
-        CONFIG_PATH = Path(__file__).resolve().parent / "reward_config.json"
 
-        with open(CONFIG_PATH, "r") as file:
-            config = json.load(file)
-
-        self.speed_reward = config["speed_reward"]
-        self.collision_penalty = config["collision_penalty"]
-        self.lane_penalty = config["lane_penalty"]
 
     def get_reward(self, observation=None):
+
         reward = 0.0
+
         velocity = self.vehicle.get_velocity()
-        speed = 3.6 * ((velocity.x**2 + velocity.y**2)**0.5) ##km/h
-        reward += speed * self.speed_reward * (0.1 if self.control.reverse==False else -0.05)
+        speed = 3.6 * np.sqrt(velocity.x**2 + velocity.y**2)
+
+        transform = self.vehicle.get_transform()
+        forward = transform.get_forward_vector()
+
+        # -------------------------------------------------
+        # 1. Forward progress reward
+        # -------------------------------------------------
+
+        vel_vec = np.array([velocity.x, velocity.y])
+        forward_vec = np.array([forward.x, forward.y])
+
+        progress = np.dot(vel_vec, forward_vec)
+
+        reward += progress * config.PROGRESS_REWARD
+
+
+        # -------------------------------------------------
+        # 2. Speed tracking reward
+        # -------------------------------------------------
+
+        speed_error = abs(speed - config.TARGET_SPEED)
+
+        reward -= speed_error * config.SPEED_REWARD
+
+
+        # -------------------------------------------------
+        # 3. Lane centering reward
+        # -------------------------------------------------
+
+        waypoint = self.world.get_map().get_waypoint(self.vehicle.get_location())
+        lane_center = waypoint.transform.location
+        vehicle_loc = self.vehicle.get_location()
+
+        lane_distance = vehicle_loc.distance(lane_center)
+
+        reward -= lane_distance * config.LANE_CENTER_REWARD
+
+
+        # -------------------------------------------------
+        # 4. Smooth driving reward
+        # -------------------------------------------------
+
+        if not hasattr(self, "prev_steer"):
+            self.prev_steer = self.control.steer
+            self.prev_throttle = self.control.throttle
+
+        steer_change = abs(self.control.steer - self.prev_steer)
+        throttle_change = abs(self.control.throttle - self.prev_throttle)
+
+        reward -= steer_change * config.SMOOTH_STEER_PENALTY
+        reward -= throttle_change * config.SMOOTH_THROTTLE_PENALTY
+
+        self.prev_steer = self.control.steer
+        self.prev_throttle = self.control.throttle
+
+
+        # -------------------------------------------------
+        # 5. Safety penalties
+        # -------------------------------------------------
+
+        if self.lane_invaded:
+            reward += config.LANE_INVASION_PENALTY
 
         if self.collision_happened or self.vehicle.get_location().z <= -5:
-            reward += self.collision_penalty
-            print("Kalaps")
-        
+            reward += config.COLLISION_PENALTY
+
+        if self.control.reverse:
+            reward += config.REVERSE_PENALTY
+
+        if speed < config.MIN_SPEED:
+            reward += config.STALL_PENALTY
+
+
+        # reset sensors
         self.collision_happened = False
         self.lane_invaded = False
 
-        return reward
+
+        reward *= config.REWARD_SCALE
+
+        return float(reward)
+
+
     
     def speed_action_convertor(self, speed_action):
         if speed_action == SPEED_UP:

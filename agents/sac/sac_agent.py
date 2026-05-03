@@ -55,6 +55,8 @@ class SACActor(nn.Module):
         action_bias = (action_high + action_low) / 2.0
         self.register_buffer("action_scale", action_scale)
         self.register_buffer("action_bias", action_bias)
+        if torch.any(action_scale <= 0):
+            raise ValueError(f"Invalid action bounds: low={action_low}, high={action_high}")
 
     def forward(self, grid, scalars):
         latent = self.feature_extractor(grid, scalars)
@@ -146,7 +148,7 @@ class SACAgent:
             )
             self.alpha_opt = optim.Adam([self.log_alpha], lr=cfg.ALPHA_LR)
         else:
-            self._alpha = cfg.INIT_ALPHA  # FIX: store fixed alpha here
+            self._alpha = cfg.INIT_ALPHA
 
         self.train_step = 0
 
@@ -238,6 +240,7 @@ class SACAgent:
             "actor_opt": self.actor_opt.state_dict(),
             "critic_opt": self.critic_opt.state_dict(),
             "log_alpha": self.log_alpha.detach().cpu() if self.auto_entropy else None,
+            "alpha_opt": self.alpha_opt.state_dict() if self.auto_entropy else None,
         }, path)
 
     def load(self, path):
@@ -249,6 +252,10 @@ class SACAgent:
         self.critic_opt.load_state_dict(ckpt["critic_opt"])
         if self.auto_entropy and ckpt.get("log_alpha") is not None:
             self.log_alpha = ckpt["log_alpha"].to(self.device).requires_grad_()
+            self.alpha_opt = optim.Adam([self.log_alpha], lr=cfg.ALPHA_LR)
+            if ckpt.get("alpha_opt") is not None:
+                self.alpha_opt.load_state_dict(ckpt["alpha_opt"])
+
 
     def load_actor_from_bc(self, bc_checkpoint_path, strict=False):
         """
@@ -261,3 +268,5 @@ class SACAgent:
         else:
             state = ckpt
         self.actor.load_state_dict(state, strict=strict)
+        
+        

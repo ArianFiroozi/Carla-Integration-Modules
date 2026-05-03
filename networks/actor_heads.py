@@ -118,7 +118,7 @@ class BCGaussianContinuousHead(nn.Module):
             self.mean_head = nn.Linear(out_dim, action_dim)
             self.log_std_head = nn.Linear(out_dim, action_dim)
 
-        # bias init
+        # bias init TODO: add to config
         if not decoupled:
             self.log_std_head.bias.data.fill_(-1.0)
         else:

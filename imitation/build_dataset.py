@@ -8,7 +8,7 @@ import time
 from config import bc_config
 from .utils.viz import *
 from .utils.stats import *
-from .utils.seed_utils import seed_everything
+from utils.seed_utils import seed_everything
 
 seed_everything(bc_config.GLOBAL_SEED)
 
