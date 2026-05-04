@@ -112,7 +112,7 @@ ACTION_HIGH = [1.0, 1.0, 1.0]
 # =========================================================
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 0
+CARLA_VEHICLES = 30
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 

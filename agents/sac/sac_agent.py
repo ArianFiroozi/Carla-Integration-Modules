@@ -182,7 +182,7 @@ class SACAgent:
         self.actor.train()
         return action.cpu().numpy()
 
-    def update(self, replay_buffer):
+    def update(self, replay_buffer, action_processor=None):
         """
         One SAC update step
         """
@@ -193,6 +193,8 @@ class SACAgent:
         # ---------------------- Critic update ----------------------
         with torch.no_grad():
             next_action, next_logp, _ = self.actor.sample(next_grid, next_scalars)
+            if action_processor is not None:
+                next_action = action_processor(next_action)
             q1_t, q2_t = self.critic_target(next_grid, next_scalars, next_action)
             q_t = torch.min(q1_t, q2_t) - self.alpha * next_logp
             target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
@@ -206,6 +208,8 @@ class SACAgent:
 
         # ---------------------- Actor update -----------------------
         new_action, logp, _ = self.actor.sample(grid, scalars)
+        if action_processor is not None:
+            new_action = action_processor(new_action)
         q1_pi, q2_pi = self.critic(grid, scalars, new_action)
         q_pi = torch.min(q1_pi, q2_pi)
 

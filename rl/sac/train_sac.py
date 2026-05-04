@@ -156,10 +156,7 @@ def main():
     replay_buffer = SACReplayBuffer(capacity=cfg.REPLAY_BUFFER_SIZE, device=args.device)
 
 
-    ## TODO: mehdi , here we load the saved bc, you might need to check or even fix how we "save" and load the model 
-    ## begin
-    
-# =========================================================
+    # =========================================================
     # Load BC Weights (Warm Start)
     # =========================================================
     if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():
@@ -193,20 +190,21 @@ def main():
             # Action selection
             if cfg.USE_RANDOM_POLICY_WARMUP and total_steps < cfg.WARMUP_STEPS:
                 # random action in env bounds
-                action = np.random.uniform(low=cfg.ACTION_LOW, high=cfg.ACTION_HIGH, size=(cfg.ACTION_DIM,))
+                raw_action = np.random.uniform(low=cfg.ACTION_LOW, high=cfg.ACTION_HIGH, size=(cfg.ACTION_DIM,))
             else:
-                action = agent.select_action(grid_t, scalars_t, evaluate=True)[0]
+                raw_action = agent.select_action(grid_t, scalars_t, evaluate=False)[0]
                 # print("actions", action)
                 # print("scalars", scalars_t)
                 # print("grid", grid_t)
 
 
+            raw_action = np.asarray(raw_action, dtype=np.float32)
 
-
-            # env_action = wrapper.process_continuous_output(action)
+            # Apply post-processing
+            env_action = wrapper.process_continuous_output(raw_action)
 
             # Env step
-            next_obs, reward, terminated, truncated, info = env.step(action)
+            next_obs, reward, terminated, truncated, info = env.step(env_action)
             done = terminated or truncated
 
             # Preprocess next obs
@@ -216,7 +214,7 @@ def main():
             replay_buffer.add(
                 grid_obs=grid,
                 scalar_obs=scalars,
-                action= action,
+                action= env_action,
                 reward=reward,
                 next_grid_obs=next_grid,
                 next_scalar_obs=next_scalars,
@@ -232,7 +230,7 @@ def main():
             if total_steps >= cfg.UPDATE_AFTER and len(replay_buffer) >= cfg.BATCH_SIZE:
                 if total_steps % cfg.UPDATE_EVERY == 0:
                     for _ in range(cfg.GRADIENT_UPDATES):
-                        losses = agent.update(replay_buffer)
+                        losses = agent.update(replay_buffer, wrapper.process_continuous_output_torch)
                         tb_writer.add_scalar("train/critic_loss", losses["critic_loss"], total_steps)
                         tb_writer.add_scalar("train/actor_loss", losses["actor_loss"], total_steps)
                         tb_writer.add_scalar("train/alpha_loss", losses["alpha_loss"], total_steps)

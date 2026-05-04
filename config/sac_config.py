@@ -83,4 +83,4 @@ SAVE_DIR = REPO_ROOT / "experiments" / "rl" / "sac"
 # =========================================================
 
 LOAD_BC_WEIGHTS = True
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_09_24_20_bc_continuous" /"models" /  "best_model.pt"
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" /"models" /  "best_model.pt"

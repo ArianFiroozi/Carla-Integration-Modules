@@ -246,3 +246,23 @@ class CarlaObsWrapper:
             steer = np.clip(steer, -1.0, 1.0)
 
         return [throttle, brake, steer]
+
+    def process_continuous_output_torch(self, out):
+        # out: [B,3]
+        throttle = out[:, 0].clamp(0.0, 1.0)
+        brake    = out[:, 1].clamp(0.0, 1.0)
+        steer    = out[:, 2].clamp(-1.0, 1.0)
+
+        # throttle floor
+        throttle = torch.where(
+            (throttle < 0.13) & (throttle > 0.05),
+            torch.full_like(throttle, 0.13),
+            throttle
+        )
+
+        # brake/throttle exclusivity
+        brake_active = (brake > 0.1).float()
+        throttle = throttle * (1.0 - brake_active)
+        brake = brake * brake_active
+
+        return torch.stack([throttle, brake, steer], dim=-1)

@@ -346,6 +346,13 @@ class BaseDataset(Dataset):
         W, C, H, Wd = stacked.shape
         return stacked.view(W * C, H, Wd)
 
+
+
+
+
+
+
+
 class BCDataset(BaseDataset):
     """Dataset for Discrete High-Level Actions"""
     def __init__(
@@ -369,6 +376,25 @@ class BCDataset(BaseDataset):
         action = torch.from_numpy(self.actions[idx])
 
         return grid, scalars, action
+
+
+
+def _process_actions_np(targets):
+    # targets: (N,3) [throttle, brake, steer]
+    t = np.clip(targets[:, 0], 0.0, 1.0)
+    b = np.clip(targets[:, 1], 0.0, 1.0)
+    s = np.clip(targets[:, 2], -1.0, 1.0)
+
+    # throttle floor
+    mask = (t < 0.13) & (t > 0.05)
+    t[mask] = 0.13
+
+    # brake/throttle exclusivity
+    brake_active = b > 0.1
+    t = t * (~brake_active)
+    b = b * brake_active
+
+    return np.stack([t, b, s], axis=1)
 
 class BCDatasetContinuous(BaseDataset):
     """Dataset for Continuous Low-Level Control"""
@@ -394,11 +420,9 @@ class BCDatasetContinuous(BaseDataset):
         steer = np.clip(steer, -1.0, 1.0)
 
         targets = np.column_stack([throttle, brake, steer])
-
-        targets[:, 0] = np.clip(targets[:, 0], 0.0, 1.0)
-        targets[:, 1] = np.clip(targets[:, 1], 0.0, 1.0)
-
+        targets = _process_actions_np(targets)
         self.targets = targets.astype(np.float32)
+
         
         # =========================================================
         # Continuous Undersampling (Feature Flag)
@@ -418,6 +442,10 @@ class BCDatasetContinuous(BaseDataset):
             dropped_count = len(keep_mask) - keep_mask.sum()
             print(f"[Dataset] Continuous Undersampling is ON!")
             print(f"[Dataset] Dropped {dropped_count} straight-driving samples out of {len(keep_mask)}.")
+
+
+
+
 
     def __getitem__(self, idx):
         grid = self._get_processed_grid(idx).float()
