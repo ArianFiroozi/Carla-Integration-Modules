@@ -120,10 +120,13 @@ class BCGaussianContinuousHead(nn.Module):
 
         # bias init TODO: add to config
         if not decoupled:
-            self.log_std_head.bias.data.fill_(-1.0)
+            self.log_std_head.bias.data.fill_(-2.0)
+            nn.init.zeros_(self.log_std_head.weight)
         else:
-            self.speed_logstd.bias.data.fill_(-1.0)
-            self.steer_logstd.bias.data.fill_(-1.0)
+            self.speed_logstd.bias.data.fill_(-2.0)
+            self.steer_logstd.bias.data.fill_(-2.0)
+            
+
 
 
     def forward(self, latent, mode="bc"):

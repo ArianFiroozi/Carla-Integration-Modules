@@ -204,6 +204,10 @@ class SACAgent:
 
         self.critic_opt.zero_grad()
         critic_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+
+
+
         self.critic_opt.step()
 
         # ---------------------- Actor update -----------------------
@@ -217,6 +221,7 @@ class SACAgent:
 
         self.actor_opt.zero_grad()
         actor_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         self.actor_opt.step()
 
         # ---------------------- Alpha update -----------------------
@@ -224,6 +229,7 @@ class SACAgent:
             alpha_loss = -(self.log_alpha * (logp + self.target_entropy).detach()).mean()
             self.alpha_opt.zero_grad()
             alpha_loss.backward()
+            # print(f"log_alpha: {self.log_alpha.item():.4f}, grad: {self.log_alpha.grad}")
             self.alpha_opt.step()
         else:
             alpha_loss = torch.tensor(0.0)
@@ -256,26 +262,28 @@ class SACAgent:
         }, path)
 
     def load(self, path):
-        ckpt = torch.load(path, map_location=self.device)
+        ckpt = torch.load(path, map_location=self.device, weights_only=True)
         self.actor.load_state_dict(ckpt["actor"])
         self.critic.load_state_dict(ckpt["critic"])
         self.critic_target.load_state_dict(ckpt["critic_target"])
         self.actor_opt.load_state_dict(ckpt["actor_opt"])
         self.critic_opt.load_state_dict(ckpt["critic_opt"])
         if self.auto_entropy and ckpt.get("log_alpha") is not None:
-            self.log_alpha = ckpt["log_alpha"].to(self.device).requires_grad_()
-            self.alpha_opt = optim.Adam([self.log_alpha], lr=cfg.ALPHA_LR)
+
+            
+            # Copy data into existing tensor instead
+            self.log_alpha.data.copy_(ckpt["log_alpha"].to(self.device))
+            # Optimizer already exists and points to correct tensor
             if ckpt.get("alpha_opt") is not None:
                 self.alpha_opt.load_state_dict(ckpt["alpha_opt"])
 
 
-
-    ## TODO: mehdi , here actor loads the bc weight
     def load_actor_from_bc(self, bc_checkpoint_path, strict=False):
         """
         Optional: load BC weights into SAC actor.
         Translates keys from ImitationPolicy (BC) to SACActor (RL).
         """
+
         ckpt = torch.load(bc_checkpoint_path, map_location=self.device, weights_only=False)
         
         if "model_state_dict" in ckpt:
