@@ -12,7 +12,8 @@ TAU = 0.005                # target network soft update
 # =========================================================
 
 AUTO_ENTROPY = True        # learn alpha automatically
-INIT_ALPHA = 0.1           #  0.1 since BC gives good initialization
+# INIT_ALPHA = 0.1           #  0.1 since BC gives good initialization
+INIT_ALPHA = 0.01
 TARGET_ENTROPY_SCALE = 0.5 #  0.5 to reduce exploration with BC init
 
 # =========================================================
@@ -38,7 +39,8 @@ BATCH_SIZE = 128              #  128 works better for smaller networks
 
 MAX_TRAIN_STEPS = 500_000     #  with BC init, 500k might be enough
 
-WARMUP_STEPS = 5_000          #  BC already gives good actions
+# WARMUP_STEPS = 5_000          #  BC already gives good actions
+WARMUP_STEPS = 5000
 UPDATE_AFTER = 1_000          # START earlier since BC gives good data
 UPDATE_EVERY = 2              # Update every 2 steps to be more stable
 GRADIENT_UPDATES = 1          # keep

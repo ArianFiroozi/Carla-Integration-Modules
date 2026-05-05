@@ -209,6 +209,14 @@ class SACAgent:
 
 
         self.critic_opt.step()
+        # --- Critic Warm-up ---
+        if self.train_step < cfg.WARMUP_STEPS:
+            return {
+                "critic_loss": critic_loss.item(),
+                "actor_loss": 0.0,
+                "alpha_loss": 0.0,
+                "alpha": self.alpha.item(),
+            }
 
         # ---------------------- Actor update -----------------------
         new_action, logp, _ = self.actor.sample(grid, scalars)
