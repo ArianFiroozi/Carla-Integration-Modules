@@ -1,0 +1,16 @@
+{
+  "model_path": "C:\\carla\\Carla-Integration-Modules\\experiments\\rl\\sac\\2026-05-05_20-29-06\\models\\best_model.pt",
+  "episodes": 10,
+  "avg_return": -165.37500443862044,
+  "std_return": 14.525873752580974,
+  "min_return": -187.23312518659452,
+  "max_return": -138.9444742538113,
+  "avg_length": 52.3,
+  "std_length": 14.339107364128354,
+  "end_reasons": {
+    "terminated": 10
+  },
+  "wall_time_sec": 20.645694971084595,
+  "carla_vehicles": 30,
+  "carla_walkers": 0
+}

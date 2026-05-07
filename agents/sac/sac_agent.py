@@ -210,7 +210,7 @@ class SACAgent:
 
         self.critic_opt.step()
         # --- Critic Warm-up ---
-        if self.train_step < cfg.WARMUP_STEPS:
+        if self.train_step < cfg.CRITIC_WARMUP_STEPS:
             return {
                 "critic_loss": critic_loss.item(),
                 "actor_loss": 0.0,
@@ -267,6 +267,7 @@ class SACAgent:
             "critic_opt": self.critic_opt.state_dict(),
             "log_alpha": self.log_alpha.detach().cpu() if self.auto_entropy else None,
             "alpha_opt": self.alpha_opt.state_dict() if self.auto_entropy else None,
+            "train_step": self.train_step,
         }, path)
 
     def load(self, path):
@@ -284,6 +285,9 @@ class SACAgent:
             # Optimizer already exists and points to correct tensor
             if ckpt.get("alpha_opt") is not None:
                 self.alpha_opt.load_state_dict(ckpt["alpha_opt"])
+                
+        if "train_step" in ckpt:
+            self.train_step = ckpt["train_step"]
 
 
     def load_actor_from_bc(self, bc_checkpoint_path, strict=False):

@@ -12,8 +12,7 @@ TAU = 0.005                # target network soft update
 # =========================================================
 
 AUTO_ENTROPY = True        # learn alpha automatically
-# INIT_ALPHA = 0.1           #  0.1 since BC gives good initialization
-INIT_ALPHA = 0.01
+INIT_ALPHA = 0.1           #  0.1 since BC gives good initialization
 TARGET_ENTROPY_SCALE = 0.5 #  0.5 to reduce exploration with BC init
 
 # =========================================================
@@ -39,11 +38,11 @@ BATCH_SIZE = 128              #  128 works better for smaller networks
 
 MAX_TRAIN_STEPS = 500_000     #  with BC init, 500k might be enough
 
-# WARMUP_STEPS = 5_000          #  BC already gives good actions
-WARMUP_STEPS = 5000
+
+CRITIC_WARMUP_STEPS = 20_000 
 UPDATE_AFTER = 1_000          # START earlier since BC gives good data
 UPDATE_EVERY = 2              # Update every 2 steps to be more stable
-GRADIENT_UPDATES = 1          # keep
+GRADIENT_UPDATES = 1       
 
 # =========================================================
 # TARGET NETWORK UPDATE
@@ -63,12 +62,12 @@ LOG_STD_MAX = 0
 # =========================================================
 
 USE_RANDOM_POLICY_WARMUP = False  # keep False with BC init
-
+WARMUP_STEPS = 5_000 
 # =========================================================
 # EVALUATION
 # =========================================================
 
-EVAL_INTERVAL = 5_000         # Check more frequently
+EVAL_INTERVAL = 10_000         # Check more frequently
 EVAL_EPISODES = 5             # keep
 
 # =========================================================
@@ -84,4 +83,4 @@ SAVE_DIR = REPO_ROOT / "experiments" / "rl" / "sac"
 
 LOAD_BC_WEIGHTS = True
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
-RESUME_CHECKPOINT = False     # Set to True only when you want to resume
+RESUME_CHECKPOINT = True     # Set to True only when you want to resume

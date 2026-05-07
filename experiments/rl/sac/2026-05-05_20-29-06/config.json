@@ -1,0 +1,140 @@
+{
+  "DEVICE": "cuda",
+  "BUILD_RNG_SEED": 42,
+  "BC_SPLIT_SEED": 42,
+  "GLOBAL_SEED": 42,
+  "REPO_ROOT": "C:\\carla\\Carla-Integration-Modules",
+  "IS_DECOUPLED": false,
+  "CNN_CHANNELS": [
+    16,
+    32,
+    64
+  ],
+  "KERNEL_SIZES": [
+    3,
+    3,
+    3
+  ],
+  "SCALAR_N_MLP_LAYERS": 2,
+  "SCALAR_MLP_HIDDEN_SIZE": 32,
+  "LATENT_DIM": 128,
+  "HEAD_N_MLP_LAYERS": 2,
+  "HEAD_MLP_HIDDEN_SIZE": 64,
+  "OBS_BOUNDS": {
+    "obs_speed_x": {
+      "low": -Infinity,
+      "high": Infinity
+    },
+    "obs_speed_y": {
+      "low": -Infinity,
+      "high": Infinity
+    },
+    "obs_presence": {
+      "low": 0,
+      "high": 9
+    },
+    "obs_lane_angle": {
+      "low": -3.141592653589793,
+      "high": 3.141592653589793
+    },
+    "obs_max_speed": {
+      "low": 0.0,
+      "high": 200.0
+    },
+    "obs_traffic_signs": {
+      "low": 0.0,
+      "high": 1.0
+    },
+    "obs_ego_speed_x": {
+      "low": -Infinity,
+      "high": Infinity
+    },
+    "obs_ego_speed_y": {
+      "low": -Infinity,
+      "high": Infinity
+    },
+    "obs_ego_in_lane_position_x": {
+      "low": -100.0,
+      "high": 100.0
+    },
+    "obs_throttle": {
+      "low": 0.0,
+      "high": 1.0
+    },
+    "obs_brake": {
+      "low": 0.0,
+      "high": 1.0
+    },
+    "obs_steering_angle": {
+      "low": -1.0,
+      "high": 1.0
+    },
+    "obs_reverse": {
+      "low": 0.0,
+      "high": 1.0
+    }
+  },
+  "WINDOW_SIZE": 1,
+  "USE_ONE_HOT_GRID": true,
+  "USE_SPATIAL_FEATURES": true,
+  "SCALAR_DIM": 8,
+  "GRID_CHANNELS": 5,
+  "ACTION_DIM": 3,
+  "ACTION_LOW": [
+    0,
+    0,
+    -1.0
+  ],
+  "ACTION_HIGH": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "CARLA_MAP_PATH": "C:\\carla\\Carla-Integration-Modules\\CarlaEnv\\LoadOpenDrive2\\map1.xodr",
+  "CARLA_WALKERS": 0,
+  "CARLA_VEHICLES": 30,
+  "CARLA_MAX_STEPS": 2000,
+  "CARLA_INIT_SPEED": 0,
+  "RANDOM_VEHICLE_START_POS": true,
+  "RANDOM_EGO_START_POS": true,
+  "TARGET_SPEED": 35.0,
+  "PROGRESS_REWARD": 0.05,
+  "SPEED_REWARD": 0.02,
+  "LANE_CENTER_REWARD": 0.6,
+  "SMOOTH_STEER_PENALTY": 0.05,
+  "SMOOTH_THROTTLE_PENALTY": 0.02,
+  "COLLISION_PENALTY": -50.0,
+  "LANE_INVASION_PENALTY": -5.0,
+  "REVERSE_PENALTY": -2.0,
+  "STALL_PENALTY": -0.5,
+  "MIN_SPEED": 5.0,
+  "REWARD_SCALE": 1.0,
+  "GAMMA": 0.99,
+  "TAU": 0.005,
+  "AUTO_ENTROPY": true,
+  "INIT_ALPHA": 0.1,
+  "TARGET_ENTROPY_SCALE": 0.5,
+  "ACTOR_LR": 0.0001,
+  "CRITIC_LR": 0.0001,
+  "ALPHA_LR": 0.0001,
+  "WEIGHT_DECAY": 1e-05,
+  "REPLAY_BUFFER_SIZE": 500000,
+  "BATCH_SIZE": 128,
+  "MAX_TRAIN_STEPS": 500000,
+  "CRITIC_WARMUP_STEPS": 20000,
+  "UPDATE_AFTER": 1000,
+  "UPDATE_EVERY": 2,
+  "GRADIENT_UPDATES": 1,
+  "TARGET_UPDATE_INTERVAL": 2,
+  "LOG_STD_MIN": -5,
+  "LOG_STD_MAX": 0,
+  "USE_RANDOM_POLICY_WARMUP": false,
+  "WARMUP_STEPS": 5000,
+  "EVAL_INTERVAL": 10000,
+  "EVAL_EPISODES": 5,
+  "CHECKPOINT_INTERVAL": 25000,
+  "SAVE_DIR": "C:\\carla\\Carla-Integration-Modules\\experiments\\rl\\sac",
+  "LOAD_BC_WEIGHTS": true,
+  "BC_CHECKPOINT_PATH": "C:\\carla\\Carla-Integration-Modules\\experiments\\bc\\2026_05_03_21_45_02_bc_continuous\\models\\best_model.pt",
+  "RESUME_CHECKPOINT": false
+}
