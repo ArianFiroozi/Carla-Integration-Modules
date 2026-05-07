@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # MODEL ARCHITECTURE HYPERPARAMETERS
 # =========================================================
 IS_DECOUPLED = False
-
+LOG_STD_INIT_BIAS = -2.0
 # ---BASELINE---
 CNN_CHANNELS = [16, 32, 64]
 KERNEL_SIZES = [3, 3, 3]
@@ -104,7 +104,7 @@ GRID_CHANNELS = (3+ 2*int(USE_ONE_HOT_GRID)) * WINDOW_SIZE
 
 ACTION_DIM = 3   # throttle, brake, steering
 
-ACTION_LOW = [0, 0, -1.0]
+ACTION_LOW = [0.0, 0.0, -1.0]
 ACTION_HIGH = [1.0, 1.0, 1.0]
 
 # =========================================================

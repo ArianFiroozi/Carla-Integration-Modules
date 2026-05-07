@@ -166,9 +166,8 @@ def run_eval_episode(env, agent, wrapper, max_steps):
         grid_t, scalars_t = wrapper.to_tensor(grid, scalars)
 
         action = agent.select_action(grid_t, scalars_t, evaluate=True)[0]
-        env_action = wrapper.process_continuous_output(action)
 
-        obs, reward, terminated, truncated, info = env.step(env_action)
+        obs, reward, terminated, truncated, info = env.step(action)
         rewards.append(float(reward))
 
         if terminated or truncated:
@@ -201,6 +200,172 @@ def evaluate(agent, env, wrapper, episodes, max_steps):
         "avg_length": float(np.mean(all_lengths)) if all_lengths else 0.0,
         "end_reasons": end_reasons,
     }
+
+
+
+
+
+
+# ============================================================
+# Enhanced TensorBoard Logging
+# ============================================================
+
+def log_config_to_tensorboard(tb_writer, config_dict):
+    """
+    Log all config parameters to TensorBoard as both text and scalars.
+    """
+    # Full config as formatted JSON in Text tab
+    clean_config = {k: str(v) if isinstance(v, Path) else v 
+                    for k, v in config_dict.items() 
+                    if k.isupper() and not k.startswith('_')}
+    
+    config_str = json.dumps(clean_config, indent=2, default=str)
+    tb_writer.add_text("Config/Hyperparameters", f"```json\n{config_str}\n```", 0)
+    
+    # Individual parameters as scalars or text
+    for k, v in clean_config.items():
+        if isinstance(v, (int, float, bool)):
+            tb_writer.add_scalar(f"Config/{k}", float(v), 0)
+        else:
+            tb_writer.add_text(f"Config/{k}", str(v), 0)
+    
+    print("[TB] Config logged to TensorBoard")
+
+
+def log_network_info(tb_writer, agent):
+    """
+    Log network architecture details.
+    """
+    # Count parameters
+    actor_params = sum(p.numel() for p in agent.actor.parameters())
+    critic_params = sum(p.numel() for p in agent.critic.parameters())
+    total_params = actor_params + critic_params
+    
+    info_text = (
+        f"Actor parameters: {actor_params:,}\n"
+        f"Critic parameters: {critic_params:,}\n"
+        f"Total parameters: {total_params:,}\n"
+        f"Grid channels: {cfg.GRID_CHANNELS}\n"
+        f"Scalar dim: {cfg.SCALAR_DIM}\n"
+        f"Latent dim: {cfg.LATENT_DIM}\n"
+        f"Action dim: {cfg.ACTION_DIM}\n"
+        f"CNN channels: {cfg.CNN_CHANNELS}\n"
+        f"Kernel sizes: {cfg.KERNEL_SIZES}"
+    )
+    tb_writer.add_text("Network/Architecture", info_text, 0)
+    tb_writer.add_scalar("Network/actor_params", actor_params, 0)
+    tb_writer.add_scalar("Network/critic_params", critic_params, 0)
+    tb_writer.add_scalar("Network/total_params", total_params, 0)
+    
+    print(f"[TB] Network info logged ({total_params:,} total params)")
+
+
+def log_policy_stats(tb_writer, agent, grid_t, scalars_t, step):
+    """
+    Log detailed policy statistics: log_std, action distribution, etc.
+    """
+    with torch.no_grad():
+        mean, log_std = agent.actor.forward(grid_t, scalars_t)
+        std = log_std.exp()
+        
+        # Log log_std statistics
+        tb_writer.add_scalar("policy/log_std_mean", log_std.mean().item(), step)
+        tb_writer.add_scalar("policy/log_std_max", log_std.max().item(), step)
+        tb_writer.add_scalar("policy/log_std_min", log_std.min().item(), step)
+        
+        # Log std statistics
+        tb_writer.add_scalar("policy/std_mean", std.mean().item(), step)
+        tb_writer.add_scalar("policy/std_max", std.max().item(), step)
+        
+        # Per-dimension log_std
+        for i, name in enumerate(["throttle", "brake", "steer"]):
+            tb_writer.add_scalar(f"policy/log_std_{name}", log_std[0, i].item(), step)
+            tb_writer.add_scalar(f"policy/mean_{name}", mean[0, i].item(), step)
+        
+        # Sample actions and log their statistics
+        actions, logp, mean_actions = agent.actor.sample(grid_t, scalars_t)
+        
+        tb_writer.add_scalar("policy/action_mean_throttle", actions[:, 0].mean().item(), step)
+        tb_writer.add_scalar("policy/action_mean_brake", actions[:, 1].mean().item(), step)
+        tb_writer.add_scalar("policy/action_mean_steer", actions[:, 2].mean().item(), step)
+        
+        tb_writer.add_scalar("policy/action_std_throttle", actions[:, 0].std().item(), step)
+        tb_writer.add_scalar("policy/action_std_brake", actions[:, 1].std().item(), step)
+        tb_writer.add_scalar("policy/action_std_steer", actions[:, 2].std().item(), step)
+        
+        # Log deterministic action (for comparison)
+        tb_writer.add_scalar("policy/det_action_throttle", mean_actions[:, 0].mean().item(), step)
+        tb_writer.add_scalar("policy/det_action_brake", mean_actions[:, 1].mean().item(), step)
+        tb_writer.add_scalar("policy/det_action_steer", mean_actions[:, 2].mean().item(), step)
+        
+        # Log entropy of current policy
+        tb_writer.add_scalar("policy/entropy", -logp.mean().item(), step)
+
+
+def log_critic_stats(tb_writer, agent, grid_t, scalars_t, actions_t, step):
+    """
+    Log critic Q-value statistics.
+    """
+    with torch.no_grad():
+        q1, q2 = agent.critic(grid_t, scalars_t, actions_t)
+        
+        tb_writer.add_scalar("critic/q1_mean", q1.mean().item(), step)
+        tb_writer.add_scalar("critic/q1_std", q1.std().item(), step)
+        tb_writer.add_scalar("critic/q1_min", q1.min().item(), step)
+        tb_writer.add_scalar("critic/q1_max", q1.max().item(), step)
+        
+        tb_writer.add_scalar("critic/q2_mean", q2.mean().item(), step)
+        tb_writer.add_scalar("critic/q2_std", q2.std().item(), step)
+        
+        tb_writer.add_scalar("critic/q_diff_mean", (q1 - q2).abs().mean().item(), step)
+
+
+def log_replay_buffer_stats(tb_writer, replay_buffer, step):
+    """
+    Log replay buffer statistics.
+    """
+    if len(replay_buffer) > 0:
+        # Sample a batch to get reward statistics
+        _, _, _, rewards, _, _, _ = replay_buffer.sample(min(1000, len(replay_buffer)))
+        
+        tb_writer.add_scalar("replay/buffer_size", len(replay_buffer), step)
+        tb_writer.add_scalar("replay/reward_mean", rewards.mean().item(), step)
+        tb_writer.add_scalar("replay/reward_std", rewards.std().item(), step)
+        tb_writer.add_scalar("replay/reward_min", rewards.min().item(), step)
+        tb_writer.add_scalar("replay/reward_max", rewards.max().item(), step)
+
+
+def log_training_diagnostics(tb_writer, agent, replay_buffer, grid_t, scalars_t, 
+                             actions_t, losses, step, episode, episode_reward):
+    """
+    Comprehensive logging called periodically during training.
+    """
+    # Only log detailed stats every N steps to avoid overhead
+    LOG_DETAIL_EVERY = 1000  # Adjust based on your preference
+    
+    if step % LOG_DETAIL_EVERY == 0:
+        log_policy_stats(tb_writer, agent, grid_t, scalars_t, step)
+        log_critic_stats(tb_writer, agent, grid_t, scalars_t, actions_t, step)
+        log_replay_buffer_stats(tb_writer, replay_buffer, step)
+    
+    # Always log these (lightweight)
+    tb_writer.add_scalar("train/critic_loss", losses["critic_loss"], step)
+    tb_writer.add_scalar("train/actor_loss", losses["actor_loss"], step)
+    tb_writer.add_scalar("train/alpha_loss", losses["alpha_loss"], step)
+    tb_writer.add_scalar("train/alpha", losses["alpha"], step)
+    
+    # Log learning rates
+    tb_writer.add_scalar("train/actor_lr", agent.actor_opt.param_groups[0]['lr'], step)
+    tb_writer.add_scalar("train/critic_lr", agent.critic_opt.param_groups[0]['lr'], step)
+    if agent.auto_entropy:
+        tb_writer.add_scalar("train/alpha_lr", agent.alpha_opt.param_groups[0]['lr'], step)
+    
+    # Gradient norms (if you want to add - requires accessing after backward, before step)
+    # This would need to be added inside agent.update() itself
+
+
+
+
 
 
 def main():
@@ -238,7 +403,7 @@ def main():
         save_config(exp_dir)
     
     tb_writer = SummaryWriter(str(exp_dir / "tb"))
-
+    log_config_to_tensorboard(tb_writer, cfg.__dict__)
     print("Experiment dir:", exp_dir)
     print("Device:", args.device)
 
@@ -262,7 +427,7 @@ def main():
     # Wrapper + Agent + Replay Buffer
     wrapper = CarlaObsWrapper(norm_stats=norm_stats, device=args.device, action_mode="continuous")
     agent = SACAgent(device=args.device)
-    
+    log_network_info(tb_writer, agent)
     # Initialize training state variables
     total_steps = 0
     episode = 0
@@ -365,11 +530,8 @@ def main():
             raw_action = np.asarray(raw_action, dtype=np.float32)
             
 
-            # Apply post-processing
-            env_action = wrapper.process_continuous_output(raw_action)
-            # print(env_action)
             # Env step
-            next_obs, reward, terminated, truncated, info = env.step(env_action)
+            next_obs, reward, terminated, truncated, info = env.step(raw_action)
             done = terminated or truncated
 
             # Preprocess next obs
@@ -379,7 +541,7 @@ def main():
             replay_buffer.add(
                 grid_obs=grid,
                 scalar_obs=scalars,
-                action=env_action,
+                action=raw_action,
                 reward=reward,
                 next_grid_obs=next_grid,
                 next_scalar_obs=next_scalars,
@@ -395,7 +557,17 @@ def main():
             if total_steps >= cfg.UPDATE_AFTER and len(replay_buffer) >= cfg.BATCH_SIZE:
                 if total_steps % cfg.UPDATE_EVERY == 0:
                     for _ in range(cfg.GRADIENT_UPDATES):
-                        losses = agent.update(replay_buffer, wrapper.process_continuous_output_torch)
+                        losses = agent.update(replay_buffer)
+                        
+                        
+                        tb_writer.add_scalar("grad_norms/critic", losses.get("critic_grad_norm", 0), total_steps)
+                        tb_writer.add_scalar("grad_norms/actor", losses.get("actor_grad_norm", 0), total_steps)
+                        tb_writer.add_scalar("grad_norms/alpha", losses.get("alpha_grad_norm", 0), total_steps)
+                        
+                        if total_steps % cfg.LOG_EVERY == 0:
+                            log_policy_stats(tb_writer, agent, grid_t, scalars_t, total_steps)
+                            log_replay_buffer_stats(tb_writer, replay_buffer, total_steps)
+
                         tb_writer.add_scalar("train/critic_loss", losses["critic_loss"], total_steps)
                         tb_writer.add_scalar("train/actor_loss", losses["actor_loss"], total_steps)
                         tb_writer.add_scalar("train/alpha_loss", losses["alpha_loss"], total_steps)

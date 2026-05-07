@@ -1,4 +1,3 @@
-
 import numpy as np
 import torch
 from collections import deque
@@ -142,13 +141,16 @@ class ObsHistory:
 
 class CarlaObsWrapper:
     """
-    Reusable wrapper for:
+    Observation preprocessing wrapper for:
     - grid/scalar preprocessing
     - history stacking
     - normalization
     - spatial features
-    - action mapping
-    - continuous post-processing
+    - action mapping (discrete mode only)
+    
+    NOTE: Action post-processing (throttle floor, brake exclusivity, 
+    steering smoothing) is now handled by CarlaEnv._process_action().
+    This wrapper only handles observation preprocessing.
     """
     def __init__(self, norm_stats, device, action_mode=None):
         self.norm_stats = norm_stats or {}
@@ -160,11 +162,9 @@ class CarlaObsWrapper:
             window_size=bc_config.WINDOW_SIZE,
             norm_stats=self.norm_stats
         )
-        self.prev_steer = 0.0
 
     def reset(self):
         self.history.reset()
-        self.prev_steer = 0.0
 
     def preprocess(self, obs):
         # fix presence grid shape
@@ -212,57 +212,9 @@ class CarlaObsWrapper:
         return grid_t, scal_t
 
     def map_action_for_env(self, action):
+        """Maps discrete action indices to environment action format."""
         speed, turn = action
         if SIMPLIFIED_ACTION_SPACE:
             if speed == 3: speed = 4
             if turn == 2:  turn = 3
         return [speed, turn]
-
-    def clip_actions(self,out):
-        
-        throttle = float(np.clip(out[0], 0.0, 1.0))
-        brake    = float(np.clip(out[1], 0.0, 1.0))
-        steer    = float(np.clip(out[2], -1.0, 1.0))
-        
-        return [throttle, brake, steer]
-
-        
-    def process_continuous_output(self, out):
-        throttle = float(np.clip(out[0], 0.0, 1.0))
-        brake    = float(np.clip(out[1], 0.0, 1.0))
-        steer    = float(np.clip(out[2], -1.0, 1.0))
-
-        if throttle < 0.13 and throttle > 0.05:
-            throttle = 0.13
-
-        if brake > 0.1:
-            throttle = 0.0
-        else:
-            brake = 0.0
-
-        if bc_config.SMOOTH_STEERING:
-            steer = 0.7 * self.prev_steer + 0.3 * steer
-            self.prev_steer = steer
-            steer = np.clip(steer, -1.0, 1.0)
-
-        return [throttle, brake, steer]
-
-    def process_continuous_output_torch(self, out):
-        # out: [B,3]
-        throttle = out[:, 0].clamp(0.0, 1.0)
-        brake    = out[:, 1].clamp(0.0, 1.0)
-        steer    = out[:, 2].clamp(-1.0, 1.0)
-
-        # throttle floor
-        throttle = torch.where(
-            (throttle < 0.13) & (throttle > 0.05),
-            torch.full_like(throttle, 0.13),
-            throttle
-        )
-
-        # brake/throttle exclusivity
-        brake_active = (brake > 0.1).float()
-        throttle = throttle * (1.0 - brake_active)
-        brake = brake * brake_active
-
-        return torch.stack([throttle, brake, steer], dim=-1)

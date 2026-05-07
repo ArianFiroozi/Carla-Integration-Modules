@@ -34,14 +34,15 @@ with open(PID_PATH, "w") as f:
 class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
-    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete" ,     random_ego_spawn=True,
-    random_vehicle_spawn=True ):
+    def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete",
+                 random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False):
         super(CarlaEnv, self).__init__()
         
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
         self.init_speed = init_speed
         self.action_mode = action_mode  # "discrete" or "continuous"
+        self.smooth_steering = smooth_steering
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)  
 
@@ -73,6 +74,10 @@ class CarlaEnv(gymnasium.Env):
         self.max_steps = max_steps
         self.current_step = 0
         self.map = self.world.get_map()
+        
+        # Steering smoothing state
+        self.prev_steer = 0.0
+        
         # Set action space based on mode
         if self.action_mode == "discrete":
             self.action_space = spaces.MultiDiscrete([5,4])
@@ -107,6 +112,7 @@ class CarlaEnv(gymnasium.Env):
                 
     def reset(self, seed=None):
         self.current_step = 0
+        self.prev_steer = 0.0
 
         # RANDOMIZE SEED (so NPC spawns differ each episode)
         if seed is not None:
@@ -124,8 +130,6 @@ class CarlaEnv(gymnasium.Env):
                 self.ego_vehicle.stop()
             if self.ego_vehicle.is_alive:
                 self.ego_vehicle.destroy()
-            
-            
             
             # Tick the world to properly flush the destroy commands from the server    
             self.world.tick()
@@ -161,8 +165,7 @@ class CarlaEnv(gymnasium.Env):
         return self._get_observation(), {}
 
     def _apply_sync(self, fixed_dt=0.05):
-        
-         # always grab the current world (after map load)
+        # always grab the current world (after map load)
         self.world = self.client.get_world()
         settings = self.world.get_settings()
         settings.synchronous_mode = True
@@ -174,6 +177,42 @@ class CarlaEnv(gymnasium.Env):
 
         tm = self.client.get_trafficmanager()
         tm.set_synchronous_mode(True)
+    
+
+    def _process_action(self, action):
+        """
+        Apply deterministic post-processing to the raw agent action.
+        This ensures the agent works with raw actions, and only the
+        environment applies constraints like throttle floor and
+        brake/throttle exclusivity.
+        
+        Args:
+            action: np.array [throttle, brake, steer] in range [0,1], [0,1], [-1,1]
+        
+        Returns:
+            np.array [throttle, brake, steer] post-processed
+        """
+        throttle = float(np.clip(action[0], 0.0, 1.0))
+        brake = float(np.clip(action[1], 0.0, 1.0))
+        steer = float(np.clip(action[2], -1.0, 1.0))
+        
+        # Throttle floor: very small throttle values don't move the vehicle
+        if 0.05 < throttle < 0.13:
+            throttle = 0.13
+        
+        # Brake/throttle exclusivity: if braking, cut throttle
+        if brake > 0.1:
+            throttle = 0.0
+        else:
+            brake = 0.0
+        
+        # Steering smoothing (if enabled)
+        if self.smooth_steering:
+            steer = 0.7 * self.prev_steer + 0.3 * steer
+            steer = float(np.clip(steer, -1.0, 1.0))
+            self.prev_steer = steer
+        
+        return np.array([throttle, brake, steer], dtype=np.float32)
         
     def step(self, action=None): 
         prev_obs = self._get_observation()        
@@ -190,6 +229,9 @@ class CarlaEnv(gymnasium.Env):
                 self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
                 self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
             elif self.action_mode == "continuous":
+                # Apply post-processing to raw action
+                action = self._process_action(action)
+                
                 throttle = float(action[0])
                 brake = float(action[1])
                 steer = float(action[2]) 
@@ -223,14 +265,12 @@ class CarlaEnv(gymnasium.Env):
         obs = self._get_observation()
         self.current_step += 1
         
-        
         # 4. Update Heartbeat
         current_time = time.time()
         if current_time - self.last_heartbeat_time >= 10.0:
             with open(HEARTBEAT_PATH, "w") as f:
                 f.write(str(current_time))
             self.last_heartbeat_time = current_time
-        
         
         # 5. Check for timeout (Truncated)
         if self.current_step >= self.max_steps:
@@ -290,17 +330,6 @@ class CarlaEnv(gymnasium.Env):
         return encoded_signs
 
     def _process_traffic_signs(self, traffic_signs):
-                # penalty = 0
-        # for sign in traffic_signs:
-        #     if sign.type == "1000001":  # Example: stop sign
-        #         penalty -= 5 if self.vehicle_controller.control.throttle > 0 else 0
-        #     elif sign.type == "1000002":  # Example: speed limit
-        #         speed = self.ego_vehicle.get_velocity()
-        #         speed_kmh = 3.6 * ((speed.x**2 + speed.y**2)**0.5)
-        #         if speed_kmh > 50:  # Assuming speed limit of 50 km/h
-        #             penalty -= 1
-        # return penalty
-        
         return 0
 
     def render(self, mode="human"):

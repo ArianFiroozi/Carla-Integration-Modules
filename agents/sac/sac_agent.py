@@ -182,7 +182,8 @@ class SACAgent:
         self.actor.train()
         return action.cpu().numpy()
 
-    def update(self, replay_buffer, action_processor=None):
+
+    def update(self, replay_buffer):
         """
         One SAC update step
         """
@@ -190,11 +191,12 @@ class SACAgent:
 
         grid, scalars, actions, rewards, next_grid, next_scalars, dones = replay_buffer.sample(cfg.BATCH_SIZE)
 
+        # For storing gradient norms to return
+        grad_norms = {}
+
         # ---------------------- Critic update ----------------------
         with torch.no_grad():
             next_action, next_logp, _ = self.actor.sample(next_grid, next_scalars)
-            if action_processor is not None:
-                next_action = action_processor(next_action)
             q1_t, q2_t = self.critic_target(next_grid, next_scalars, next_action)
             q_t = torch.min(q1_t, q2_t) - self.alpha * next_logp
             target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
@@ -204,24 +206,28 @@ class SACAgent:
 
         self.critic_opt.zero_grad()
         critic_loss.backward()
+        
+        # Compute critic gradient norm BEFORE clipping
+        critic_grad_norm = self._compute_grad_norm(self.critic.parameters())
+        grad_norms["critic_grad_norm"] = critic_grad_norm
+        
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
-
-
-
         self.critic_opt.step()
+        
         # --- Critic Warm-up ---
         if self.train_step < cfg.CRITIC_WARMUP_STEPS:
+            grad_norms["actor_grad_norm"] = 0.0
+            grad_norms["alpha_grad_norm"] = 0.0
             return {
                 "critic_loss": critic_loss.item(),
                 "actor_loss": 0.0,
                 "alpha_loss": 0.0,
                 "alpha": self.alpha.item(),
+                **grad_norms  # Include gradient norms in return dict
             }
 
         # ---------------------- Actor update -----------------------
         new_action, logp, _ = self.actor.sample(grid, scalars)
-        if action_processor is not None:
-            new_action = action_processor(new_action)
         q1_pi, q2_pi = self.critic(grid, scalars, new_action)
         q_pi = torch.min(q1_pi, q2_pi)
 
@@ -229,6 +235,11 @@ class SACAgent:
 
         self.actor_opt.zero_grad()
         actor_loss.backward()
+        
+        # Compute actor gradient norm BEFORE clipping
+        actor_grad_norm = self._compute_grad_norm(self.actor.parameters())
+        grad_norms["actor_grad_norm"] = actor_grad_norm
+        
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         self.actor_opt.step()
 
@@ -237,10 +248,15 @@ class SACAgent:
             alpha_loss = -(self.log_alpha * (logp + self.target_entropy).detach()).mean()
             self.alpha_opt.zero_grad()
             alpha_loss.backward()
-            # print(f"log_alpha: {self.log_alpha.item():.4f}, grad: {self.log_alpha.grad}")
+            
+            # Compute alpha gradient norm (before step, though not clipped)
+            alpha_grad_norm = self.log_alpha.grad.abs().item()
+            grad_norms["alpha_grad_norm"] = alpha_grad_norm
+            
             self.alpha_opt.step()
         else:
             alpha_loss = torch.tensor(0.0)
+            grad_norms["alpha_grad_norm"] = 0.0
 
         # ---------------------- Target update ----------------------
         if self.train_step % cfg.TARGET_UPDATE_INTERVAL == 0:
@@ -251,7 +267,20 @@ class SACAgent:
             "actor_loss": actor_loss.item(),
             "alpha_loss": alpha_loss.item() if isinstance(alpha_loss, torch.Tensor) else alpha_loss,
             "alpha": self.alpha.item(),
+            **grad_norms  # Include all gradient norms
         }
+
+    def _compute_grad_norm(self, parameters):
+        """
+        Compute total gradient norm for a set of parameters.
+        """
+        total_norm = 0.0
+        for p in parameters:
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        return total_norm ** 0.5
+
 
     @staticmethod
     def soft_update(source, target, tau):

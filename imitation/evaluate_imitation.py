@@ -114,7 +114,7 @@ def predict_action(policy, obs, wrapper: CarlaObsWrapper):
                 if uncertainty is not None:
                     print(f"σ_throttle={uncertainty[0]:.3f}, σ_brake={uncertainty[1]:.3f}, σ_steer={uncertainty[2]:.3f}")
 
-            env_action = wrapper.process_continuous_output(action)
+            env_action = action
 
             if debug_counter < DEBUG_PRINT_STEPS:
                 print(

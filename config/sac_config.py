@@ -67,7 +67,7 @@ WARMUP_STEPS = 5_000
 # EVALUATION
 # =========================================================
 
-EVAL_INTERVAL = 10_000         # Check more frequently
+EVAL_INTERVAL = 10_000         
 EVAL_EPISODES = 5             # keep
 
 # =========================================================
@@ -77,6 +77,7 @@ EVAL_EPISODES = 5             # keep
 CHECKPOINT_INTERVAL = 25_000  # Save more frequently
 SAVE_DIR = REPO_ROOT / "experiments" / "rl" / "sac"
 
+LOG_EVERY = 1000
 # =========================================================
 # BC INITIALIZATION
 # =========================================================

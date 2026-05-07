@@ -20,7 +20,6 @@ class FeatureExtractor(nn.Module):
         self.cnn = nn.Sequential(*cnn_layers)
 
         with torch.no_grad():
-            
             dummy = torch.zeros(1, grid_channels, 25, 11)
             out = self.cnn(dummy)
             cnn_dim = int(np.prod(out.shape[1:]))
@@ -34,6 +33,8 @@ class FeatureExtractor(nn.Module):
             
         self.scalar_mlp = nn.Sequential(*scalar_layers)
         scalar_out_dim = mlp_hidden_size if n_mlp_layers > 0 else scalar_dim
+        
+        
         self.fuse = nn.Sequential(
             nn.Linear(cnn_dim + scalar_out_dim, 256),
             nn.ReLU(inplace=True),
@@ -47,3 +48,6 @@ class FeatureExtractor(nn.Module):
         scalar_feat = self.scalar_mlp(scalars)
         fused = torch.cat([grid_feat, scalar_feat], dim=1)
         return self.fuse(fused)
+
+
+ # TODO : maybe not hardcord grid size or fuse mlp size(256 right now)

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+from config import general_config
 
 def build_mlp(input_dim, hidden_size, n_layers):
     layers = []
@@ -120,11 +120,11 @@ class BCGaussianContinuousHead(nn.Module):
 
         # bias init TODO: add to config
         if not decoupled:
-            self.log_std_head.bias.data.fill_(-2.0)
+            self.log_std_head.bias.data.fill_(general_config.LOG_STD_INIT_BIAS)
             nn.init.zeros_(self.log_std_head.weight)
         else:
-            self.speed_logstd.bias.data.fill_(-2.0)
-            self.steer_logstd.bias.data.fill_(-2.0)
+            self.speed_logstd.bias.data.fill_(general_config.LOG_STD_INIT_BIAS)
+            self.steer_logstd.bias.data.fill_(general_config.LOG_STD_INIT_BIAS)
             
 
 

@@ -169,7 +169,7 @@ EVAL_RENDER_LOG_EVERY = 200
 # =========================================================
 # DEBUG / VISUALIZATION
 # =========================================================
-DEBUG_PRINT_STEPS = 5000
+DEBUG_PRINT_STEPS = 0
 
 INSPECT_VISUALIZE = False
 MAX_INSPECT_FEATURE_SAMPLES = 200000
