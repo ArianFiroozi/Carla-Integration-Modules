@@ -90,3 +90,4 @@ LOG_EVERY = 1000
 LOAD_BC_WEIGHTS = True
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
 RESUME_CHECKPOINT = False     # Set to True only when you want to resume
+RECORD_SAC_EVAL_VID = True

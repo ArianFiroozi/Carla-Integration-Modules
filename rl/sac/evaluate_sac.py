@@ -250,7 +250,7 @@ def main():
     parser.add_argument("--model_path", type=str, default=None, help="Path to specific model checkpoint")
     parser.add_argument("--experiments_root", type=str, default=str(cfg.SAVE_DIR))
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
-    parser.add_argument("--record", action="store_true", default=cfg.RECORD_EVAL_VID,help="Record video of evaluation episodes")
+    parser.add_argument("--record", action="store_true", default=cfg.RECORD_SAC_EVAL_VID,help="Record video of evaluation episodes")
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
     
     args = parser.parse_args()

@@ -334,6 +334,8 @@ def main():
         for ep in range(num_episodes):
             print(f"\n=== Episode {ep+1}/{num_episodes} ===")
             video_path = current_eval_dir / f"episode_{ep+1:03d}.mp4"
+            if not bc_config.RECORD_BC_EVAL_VID:
+                video_path = None
 
             result = run_episode(
                 env,

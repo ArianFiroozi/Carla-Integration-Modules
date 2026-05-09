@@ -165,6 +165,8 @@ AUTOPILOT_DEMO_BASENAME = "autopilot_map1"
 EVAL_NUM_EPISODES = 20
 EVAL_MAX_STEPS = 2000
 EVAL_RENDER_LOG_EVERY = 200
+RECORD_BC_EVAL_VID = False
+RECORD_MODEL = True
 
 # =========================================================
 # DEBUG / VISUALIZATION
