@@ -188,4 +188,4 @@ report.txt
 imitation/data
 experiments/rl/**/*.pt
 experiments/rl/**/*.pkl
-offline_rl/data
+offline_rl/**/*.npz

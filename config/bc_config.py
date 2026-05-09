@@ -27,7 +27,8 @@ DEMO_LIST= [
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
-    MANUAL_DIR / "map1_30car"
+    MANUAL_DIR / "map1_30car",
+    # REPO_ROOT / "offline_rl" / "data"
 ]
 
 

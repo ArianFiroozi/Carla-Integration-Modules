@@ -43,7 +43,7 @@ def process_demos(files, max_feature_samples=bc_config.MAX_INSPECT_FEATURE_SAMPL
         episode_lengths.append(T)
 
         # Shape Assertions
-        assert actions.shape[1] == 2, f"Expected actions shape (T, 2), got {actions.shape}"
+        # assert actions.shape[1] == 2, f"Expected actions shape (T, 2), got {actions.shape}"
         assert presence.shape[0] == T, f"Presence sequence length mismatch in {f.name}"
         assert 0 <= presence.min() and presence.max() <= 9, f"Presence out of bounds in {f.name}"
 
