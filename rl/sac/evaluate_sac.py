@@ -204,15 +204,14 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
 
         # Use deterministic actions for evaluation
         action = agent.select_action(grid_t, scalars_t, evaluate=True)[0]
-        env_action = wrapper.process_continuous_output(action)
         
         action_history.append({
             "step": t,
             "raw_action": action.tolist() if hasattr(action, 'tolist') else list(action),
-            "env_action": env_action if isinstance(env_action, list) else env_action.tolist()
+            "env_action": action if isinstance(action, list) else action.tolist()
         })
 
-        obs, reward, terminated, truncated, info = env.step(env_action)
+        obs, reward, terminated, truncated, info = env.step(action)
         rewards.append(float(reward))
 
         # Update spectator camera in CARLA window

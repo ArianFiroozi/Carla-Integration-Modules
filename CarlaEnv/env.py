@@ -249,7 +249,6 @@ class CarlaEnv(gymnasium.Env):
         # 2. Check for failure (Terminated)
         if self.vehicle_controller.collision_happened:
             terminated = True
-            self.vehicle_controller.collision_happened = False
         
         if (self.ego_vehicle.get_location().z <= LEAST_HEIGHT and not terminated):
             terminated = True
@@ -257,10 +256,10 @@ class CarlaEnv(gymnasium.Env):
         # 3. Calculate reward
         reward = self.vehicle_controller.get_reward(prev_obs)
         if terminated:
-            reward += -100
+            self.vehicle_controller.collision_happened = False
             
-        traffic_signs = self._get_nearby_traffic_signs()
-        reward += self._process_traffic_signs(traffic_signs)
+        # traffic_signs = self._get_nearby_traffic_signs()
+        # reward += self._process_traffic_signs(traffic_signs)
 
         obs = self._get_observation()
         self.current_step += 1

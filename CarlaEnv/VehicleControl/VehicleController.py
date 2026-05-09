@@ -86,94 +86,71 @@ class VehicleController():
         self.sensor_l.listen(lane_callback)
 
 
-
     def get_reward(self, observation=None):
-
         reward = 0.0
 
         velocity = self.vehicle.get_velocity()
         speed = 3.6 * np.sqrt(velocity.x**2 + velocity.y**2)
-
         transform = self.vehicle.get_transform()
         forward = transform.get_forward_vector()
 
-        # -------------------------------------------------
-        # 1. Forward progress reward
-        # -------------------------------------------------
-
+        # 1. Forward progress (Bounded)
         vel_vec = np.array([velocity.x, velocity.y])
         forward_vec = np.array([forward.x, forward.y])
-
         progress = np.dot(vel_vec, forward_vec)
+        # Cap progress reward so it doesn't overpower safety
+        reward += np.clip(progress * 0.05, -1.0, 2.0)
 
-        reward += progress * config.PROGRESS_REWARD
+        # 2. Speed Tracking (Gaussian/Exponential drop-off)
+        # Instead of linear penalty, give a positive reward that peaks at TARGET_SPEED
+        # This prevents huge negative numbers.
+        speed_ms = np.sqrt(velocity.x**2 + velocity.y**2)   # m/s
+        target_speed_ms = 6.0  
+        speed_reward = np.exp(-2.0 * abs(speed_ms - target_speed_ms)) 
+        reward += speed_reward * 0.5
 
-
-        # -------------------------------------------------
-        # 2. Speed tracking reward
-        # -------------------------------------------------
-
-        speed_error = abs(speed - config.TARGET_SPEED)
-
-        reward -= speed_error * config.SPEED_REWARD
-
-
-        # -------------------------------------------------
-        # 3. Lane centering reward
-        # -------------------------------------------------
-
+        # 3. Lane Centering (Allow overtaking)
         waypoint = self.world.get_map().get_waypoint(self.vehicle.get_location())
         lane_center = waypoint.transform.location
         vehicle_loc = self.vehicle.get_location()
-
         lane_distance = vehicle_loc.distance(lane_center)
+        
+        # Exponential drop-off for lane distance. 
+        # If it changes lanes (overtakes), the penalty is bounded, not infinite.
+        lane_reward = np.exp(-0.5 * lane_distance)
+        reward += lane_reward * 0.5
 
-        reward -= lane_distance * config.LANE_CENTER_REWARD
-
-
-        # -------------------------------------------------
-        # 4. Smooth driving reward
-        # -------------------------------------------------
-
+        # 4. Smooth Driving (Bounded penalties)
         if not hasattr(self, "prev_steer"):
             self.prev_steer = self.control.steer
             self.prev_throttle = self.control.throttle
 
         steer_change = abs(self.control.steer - self.prev_steer)
         throttle_change = abs(self.control.throttle - self.prev_throttle)
-
-        reward -= steer_change * config.SMOOTH_STEER_PENALTY
-        reward -= throttle_change * config.SMOOTH_THROTTLE_PENALTY
+        reward -= np.clip(steer_change * 0.5, 0.0, 0.5)
+        reward -= np.clip(throttle_change * 0.2, 0.0, 0.2)
 
         self.prev_steer = self.control.steer
         self.prev_throttle = self.control.throttle
 
-
-        # -------------------------------------------------
-        # 5. Safety penalties
-        # -------------------------------------------------
-
-        if self.lane_invaded:
-            reward += config.LANE_INVASION_PENALTY
-
+        # 5. Safety and Terminals (CRITICAL)
         if self.collision_happened or self.vehicle.get_location().z <= -5:
-            reward += config.COLLISION_PENALTY
+            reward -= 10.0 # Bounded crash penalty. MUST TERMINATE EPISODE HERE.
+            
+        if self.lane_invaded:
+            # Small penalty for crossing lines, but don't make it too huge 
+            # otherwise it will be terrified to overtake.
+            reward -= 0.5 
 
-        if self.control.reverse:
-            reward += config.REVERSE_PENALTY
-
-        if speed < config.MIN_SPEED:
-            reward += config.STALL_PENALTY
-
+        if speed < 1.0: # Stalling
+            reward -= 0.5
 
         # reset sensors
         self.collision_happened = False
         self.lane_invaded = False
 
-
-        reward *= config.REWARD_SCALE
-
-        return float(reward)
+        # Keep total step reward roughly within [-5, 5]
+        return float(np.clip(reward, -10.0, 5.0))
 
 
     

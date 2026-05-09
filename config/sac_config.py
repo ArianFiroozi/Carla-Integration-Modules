@@ -12,7 +12,7 @@ TAU = 0.005                # target network soft update
 # =========================================================
 
 AUTO_ENTROPY = True        # learn alpha automatically
-INIT_ALPHA = 0.1           #  0.1 since BC gives good initialization
+INIT_ALPHA = 0.02           
 TARGET_ENTROPY_SCALE = 0.5 #  0.5 to reduce exploration with BC init
 
 # =========================================================
@@ -30,7 +30,12 @@ WEIGHT_DECAY = 1e-5        # ADD small regularization
 # =========================================================
 
 REPLAY_BUFFER_SIZE = 500_000  #  your grid isn't huge, 500k is plenty
-BATCH_SIZE = 128              #  128 works better for smaller networks
+BATCH_SIZE = 128             
+
+# How often to save the full replay buffer (in number of checkpoints)
+SAVE_BUFFER_EVERY = 10  
+# Only keep this many recent checkpoints on disk
+KEEP_CHECKPOINTS = 3
 
 # =========================================================
 # TRAINING SCHEDULE
@@ -39,7 +44,7 @@ BATCH_SIZE = 128              #  128 works better for smaller networks
 MAX_TRAIN_STEPS = 500_000     #  with BC init, 500k might be enough
 
 
-CRITIC_WARMUP_STEPS = 20_000 
+CRITIC_WARMUP_STEPS = 500_000 
 UPDATE_AFTER = 1_000          # START earlier since BC gives good data
 UPDATE_EVERY = 2              # Update every 2 steps to be more stable
 GRADIENT_UPDATES = 1       
@@ -55,7 +60,7 @@ TARGET_UPDATE_INTERVAL = 2    # Update target less frequently
 # =========================================================
 
 LOG_STD_MIN = -5 
-LOG_STD_MAX = 0     
+LOG_STD_MAX = -0.5     
 
 # =========================================================
 # EXPLORATION
@@ -84,4 +89,4 @@ LOG_EVERY = 1000
 
 LOAD_BC_WEIGHTS = True
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
-RESUME_CHECKPOINT = True     # Set to True only when you want to resume
+RESUME_CHECKPOINT = False     # Set to True only when you want to resume

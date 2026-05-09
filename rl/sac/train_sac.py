@@ -96,22 +96,19 @@ def find_checkpoint_state(exp_dir):
     state_files.sort(key=lambda x: int(x.stem.split("_")[-1]))
     return state_files[-1]
 
-
-def save_full_checkpoint(exp_dir, step, agent, replay_buffer, optimizer_states, extra_info):
-    """Save a comprehensive checkpoint including model, buffer, and training state."""
+def save_full_checkpoint(exp_dir, step, agent, replay_buffer=None, optimizer_states=None, extra_info=None):
     models_dir = exp_dir / "models"
     
-    # Save model checkpoint
+    # Always save model weights (small, ~10MB)
     model_path = models_dir / f"checkpoint_step_{step}.pt"
     agent.save(model_path)
     
-    # Save replay buffer and training state
+    # Build state dict
     state = {
         'step': step,
-        'replay_buffer': replay_buffer,
         'optimizer_states': optimizer_states,
         'extra_info': extra_info,
-        'log_alpha': agent.log_alpha.detach().cpu() if agent.auto_entropy else None,  # FIX #2: Save log_alpha
+        'log_alpha': agent.log_alpha.detach().cpu() if agent.auto_entropy else None,
         'rng_state': {
             'python': random.getstate(),
             'numpy': np.random.get_state(),
@@ -120,11 +117,16 @@ def save_full_checkpoint(exp_dir, step, agent, replay_buffer, optimizer_states, 
         }
     }
     
+    if replay_buffer is not None:
+        state['replay_buffer'] = replay_buffer
+        print("  Including replay buffer in this checkpoint")
+    
     state_path = models_dir / f"checkpoint_state_{step}.pkl"
     with open(state_path, 'wb') as f:
         pickle.dump(state, f)
     
-    print(f"Saved full checkpoint at step {step}: {model_path}")
+    size_mb = state_path.stat().st_size / (1024*1024)
+    print(f"Saved checkpoint at step {step} ({size_mb:.0f}MB)")
     return model_path, state_path
 
 
@@ -202,7 +204,29 @@ def evaluate(agent, env, wrapper, episodes, max_steps):
     }
 
 
-
+def cleanup_old_checkpoints(exp_dir, keep=3):
+    """Delete old checkpoints, keeping only the `keep` most recent."""
+    models_dir = Path(exp_dir) / "models"
+    
+    # Get all checkpoint files sorted by step number
+    ckpts = sorted(models_dir.glob("checkpoint_step_*.pt"), 
+                   key=lambda p: int(p.stem.split("_")[-1]))
+    states = sorted(models_dir.glob("checkpoint_state_*.pkl"),
+                    key=lambda p: int(p.stem.split("_")[-1]))
+    
+    # Keep best model
+    to_keep = {models_dir / "best_model.pt"}
+    
+    # Keep last N of each type
+    for f in ckpts[-keep:] + states[-keep:]:
+        to_keep.add(f)
+    
+    # Delete everything else
+    for pattern in ["checkpoint_step_*", "checkpoint_state_*"]:
+        for f in models_dir.glob(pattern):
+            if f not in to_keep:
+                f.unlink()
+                print(f"  Deleted old: {f.name}")
 
 
 
@@ -289,15 +313,12 @@ def log_policy_stats(tb_writer, agent, grid_t, scalars_t, step):
         tb_writer.add_scalar("policy/action_mean_brake", actions[:, 1].mean().item(), step)
         tb_writer.add_scalar("policy/action_mean_steer", actions[:, 2].mean().item(), step)
         
-        tb_writer.add_scalar("policy/action_std_throttle", actions[:, 0].std().item(), step)
-        tb_writer.add_scalar("policy/action_std_brake", actions[:, 1].std().item(), step)
-        tb_writer.add_scalar("policy/action_std_steer", actions[:, 2].std().item(), step)
         
         # Log deterministic action (for comparison)
-        tb_writer.add_scalar("policy/det_action_throttle", mean_actions[:, 0].mean().item(), step)
-        tb_writer.add_scalar("policy/det_action_brake", mean_actions[:, 1].mean().item(), step)
-        tb_writer.add_scalar("policy/det_action_steer", mean_actions[:, 2].mean().item(), step)
-        
+        tb_writer.add_scalar("policy/action_std_throttle", actions[:, 0].std(unbiased=False).item(), step)
+        tb_writer.add_scalar("policy/action_std_brake", actions[:, 1].std(unbiased=False).item(), step)
+        tb_writer.add_scalar("policy/action_std_steer", actions[:, 2].std(unbiased=False).item(), step)
+
         # Log entropy of current policy
         tb_writer.add_scalar("policy/entropy", -logp.mean().item(), step)
 
@@ -320,49 +341,20 @@ def log_critic_stats(tb_writer, agent, grid_t, scalars_t, actions_t, step):
         tb_writer.add_scalar("critic/q_diff_mean", (q1 - q2).abs().mean().item(), step)
 
 
-def log_replay_buffer_stats(tb_writer, replay_buffer, step):
+def log_replay_buffer_stats(tb_writer, replay_buffer, step, rewards=None):
     """
     Log replay buffer statistics.
     """
-    if len(replay_buffer) > 0:
-        # Sample a batch to get reward statistics
+    if len(replay_buffer) == 0:
+        return
+    if rewards is None:
         _, _, _, rewards, _, _, _ = replay_buffer.sample(min(1000, len(replay_buffer)))
         
-        tb_writer.add_scalar("replay/buffer_size", len(replay_buffer), step)
-        tb_writer.add_scalar("replay/reward_mean", rewards.mean().item(), step)
-        tb_writer.add_scalar("replay/reward_std", rewards.std().item(), step)
-        tb_writer.add_scalar("replay/reward_min", rewards.min().item(), step)
-        tb_writer.add_scalar("replay/reward_max", rewards.max().item(), step)
-
-
-def log_training_diagnostics(tb_writer, agent, replay_buffer, grid_t, scalars_t, 
-                             actions_t, losses, step, episode, episode_reward):
-    """
-    Comprehensive logging called periodically during training.
-    """
-    # Only log detailed stats every N steps to avoid overhead
-    LOG_DETAIL_EVERY = 1000  # Adjust based on your preference
-    
-    if step % LOG_DETAIL_EVERY == 0:
-        log_policy_stats(tb_writer, agent, grid_t, scalars_t, step)
-        log_critic_stats(tb_writer, agent, grid_t, scalars_t, actions_t, step)
-        log_replay_buffer_stats(tb_writer, replay_buffer, step)
-    
-    # Always log these (lightweight)
-    tb_writer.add_scalar("train/critic_loss", losses["critic_loss"], step)
-    tb_writer.add_scalar("train/actor_loss", losses["actor_loss"], step)
-    tb_writer.add_scalar("train/alpha_loss", losses["alpha_loss"], step)
-    tb_writer.add_scalar("train/alpha", losses["alpha"], step)
-    
-    # Log learning rates
-    tb_writer.add_scalar("train/actor_lr", agent.actor_opt.param_groups[0]['lr'], step)
-    tb_writer.add_scalar("train/critic_lr", agent.critic_opt.param_groups[0]['lr'], step)
-    if agent.auto_entropy:
-        tb_writer.add_scalar("train/alpha_lr", agent.alpha_opt.param_groups[0]['lr'], step)
-    
-    # Gradient norms (if you want to add - requires accessing after backward, before step)
-    # This would need to be added inside agent.update() itself
-
+    tb_writer.add_scalar("replay/buffer_size", len(replay_buffer), step)
+    tb_writer.add_scalar("replay/reward_mean", rewards.mean().item(), step)
+    tb_writer.add_scalar("replay/reward_std", rewards.std().item(), step)
+    tb_writer.add_scalar("replay/reward_min", rewards.min().item(), step)
+    tb_writer.add_scalar("replay/reward_max", rewards.max().item(), step)
 
 
 
@@ -556,22 +548,35 @@ def main():
             # Updates
             if total_steps >= cfg.UPDATE_AFTER and len(replay_buffer) >= cfg.BATCH_SIZE:
                 if total_steps % cfg.UPDATE_EVERY == 0:
+                    agg = {"critic_loss":0.0, "actor_loss":0.0, "alpha_loss":0.0,
+                        "critic_grad_norm":0.0, "actor_grad_norm":0.0, "alpha_grad_norm":0.0,
+                        "alpha":0.0}
+
+                    
                     for _ in range(cfg.GRADIENT_UPDATES):
                         losses = agent.update(replay_buffer)
-                        
-                        
-                        tb_writer.add_scalar("grad_norms/critic", losses.get("critic_grad_norm", 0), total_steps)
-                        tb_writer.add_scalar("grad_norms/actor", losses.get("actor_grad_norm", 0), total_steps)
-                        tb_writer.add_scalar("grad_norms/alpha", losses.get("alpha_grad_norm", 0), total_steps)
-                        
-                        if total_steps % cfg.LOG_EVERY == 0:
-                            log_policy_stats(tb_writer, agent, grid_t, scalars_t, total_steps)
-                            log_replay_buffer_stats(tb_writer, replay_buffer, total_steps)
+                        for k in agg:
+                            agg[k] += losses.get(k, 0)
 
-                        tb_writer.add_scalar("train/critic_loss", losses["critic_loss"], total_steps)
-                        tb_writer.add_scalar("train/actor_loss", losses["actor_loss"], total_steps)
-                        tb_writer.add_scalar("train/alpha_loss", losses["alpha_loss"], total_steps)
-                        tb_writer.add_scalar("train/alpha", losses["alpha"], total_steps)
+                    # average
+                    for k in agg:
+                        agg[k] /= cfg.GRADIENT_UPDATES
+
+                    # log ONCE
+                    tb_writer.add_scalar("train/critic_loss", agg["critic_loss"], total_steps)
+                    tb_writer.add_scalar("train/actor_loss",  agg["actor_loss"],  total_steps)
+                    tb_writer.add_scalar("train/alpha_loss",  agg["alpha_loss"],  total_steps)
+                    tb_writer.add_scalar("train/alpha",       agg["alpha"],       total_steps)
+
+                    tb_writer.add_scalar("grad_norms/critic", agg["critic_grad_norm"], total_steps)
+                    tb_writer.add_scalar("grad_norms/actor",  agg["actor_grad_norm"],  total_steps)
+                    tb_writer.add_scalar("grad_norms/alpha",  agg["alpha_grad_norm"],  total_steps)
+
+                    if total_steps % cfg.LOG_EVERY == 0:
+                        g, s, a, r, _, _, _ = replay_buffer.sample(cfg.BATCH_SIZE)
+                        log_policy_stats(tb_writer, agent, g, s, total_steps)
+                        log_critic_stats(tb_writer, agent, g, s, a, total_steps)
+                        log_replay_buffer_stats(tb_writer, replay_buffer, total_steps, rewards=r)
 
             # End of episode
             if done or episode_len >= args.max_steps:
@@ -620,14 +625,18 @@ def main():
                     'episode_len': episode_len,
                 }
                 
+                save_buffer_this_time = (total_steps % (cfg.CHECKPOINT_INTERVAL * cfg.SAVE_BUFFER_EVERY) == 0)
+    
+                
                 save_full_checkpoint(
                     exp_dir=exp_dir,
                     step=total_steps,
                     agent=agent,
-                    replay_buffer=replay_buffer,
+                    replay_buffer=replay_buffer if save_buffer_this_time else None, 
                     optimizer_states=optimizer_states,
                     extra_info=extra_info
                 )
+                cleanup_old_checkpoints(exp_dir, keep=cfg.KEEP_CHECKPOINTS)
 
         print("Training finished.")
 

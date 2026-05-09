@@ -1,7 +1,3 @@
-Of course! Here is the corrected version of your report. I've fixed grammar and spelling mistakes while keeping your friendly, informal tone.
-
-***
-
 Okay, so first I turned off every kind of flag that might affect the performance. BTW, all eval lengths I'm gonna tell you are an average of 10-20 eval runs (I think the experiments after the fifth one are 20 eval runs each). The runs have random spawn points, so bad luck can happen.
 
 Also, for every experiment I report on, I'll only state the change compared to the previous experiment. If a new kind of config was used, I'll mention the whole config. This was the config for the:
