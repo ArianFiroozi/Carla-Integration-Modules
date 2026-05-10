@@ -207,10 +207,10 @@ class CarlaEnv(gymnasium.Env):
             brake = 0.0
         
         # Steering smoothing (if enabled)
-        if self.smooth_steering:
-            steer = 0.7 * self.prev_steer + 0.3 * steer
-            steer = float(np.clip(steer, -1.0, 1.0))
-            self.prev_steer = steer
+        # if self.smooth_steering:
+        #     steer = 0.7 * self.prev_steer + 0.3 * steer
+        #     steer = float(np.clip(steer, -1.0, 1.0))
+        #     self.prev_steer = steer
         
         return np.array([throttle, brake, steer], dtype=np.float32)
         

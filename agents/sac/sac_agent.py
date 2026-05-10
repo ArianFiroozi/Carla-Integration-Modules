@@ -185,89 +185,111 @@ class SACAgent:
 
     def update(self, replay_buffer):
         """
-        One SAC update step
+        One SAC update step with configurable update frequencies
         """
         self.train_step += 1
 
         grid, scalars, actions, rewards, next_grid, next_scalars, dones = replay_buffer.sample(cfg.BATCH_SIZE)
-
+        rewards = rewards.view(-1, 1)
+        dones = dones.view(-1, 1)
+        
         # For storing gradient norms to return
         grad_norms = {}
+        
+        # Determine which components to update this step
+        update_critic = (self.train_step % cfg.CRITIC_UPDATE_EVERY == 0)
+        update_actor = (self.train_step % cfg.ACTOR_UPDATE_EVERY == 0) and (self.train_step >= cfg.CRITIC_WARMUP_STEPS)
+        update_alpha = (self.train_step % cfg.ALPHA_UPDATE_EVERY == 0) and (self.train_step >= cfg.CRITIC_WARMUP_STEPS)
 
         # ---------------------- Critic update ----------------------
-        with torch.no_grad():
-            next_action, next_logp, _ = self.actor.sample(next_grid, next_scalars)
-            q1_t, q2_t = self.critic_target(next_grid, next_scalars, next_action)
-            q_t = torch.min(q1_t, q2_t) - self.alpha * next_logp
-            target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
+        critic_loss = torch.tensor(0.0)
+        if update_critic:
+            with torch.no_grad():
+                next_action, next_logp, _ = self.actor.sample(next_grid, next_scalars)
+                q1_t, q2_t = self.critic_target(next_grid, next_scalars, next_action)
+                q_t = torch.min(q1_t, q2_t) - self.alpha * next_logp
+                target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
 
-        q1, q2 = self.critic(grid, scalars, actions)
-        critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
+            q1, q2 = self.critic(grid, scalars, actions)
+            critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
 
-        self.critic_opt.zero_grad()
-        critic_loss.backward()
-        
-        # Compute critic gradient norm BEFORE clipping
-        critic_grad_norm = self._compute_grad_norm(self.critic.parameters())
-        grad_norms["critic_grad_norm"] = critic_grad_norm
-        
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
-        self.critic_opt.step()
-        
-        # --- Critic Warm-up ---
+            self.critic_opt.zero_grad()
+            critic_loss.backward()
+            
+            # Compute critic gradient norm BEFORE clipping
+            critic_grad_norm = self._compute_grad_norm(self.critic.parameters())
+            grad_norms["critic_grad_norm"] = critic_grad_norm
+            
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+            self.critic_opt.step()
+        else:
+            grad_norms["critic_grad_norm"] = 0.0
+
+        # If still in warmup, return early (but after possible critic update)
         if self.train_step < cfg.CRITIC_WARMUP_STEPS:
             grad_norms["actor_grad_norm"] = 0.0
             grad_norms["alpha_grad_norm"] = 0.0
             return {
-                "critic_loss": critic_loss.item(),
+                "critic_loss": critic_loss.item() if isinstance(critic_loss, torch.Tensor) else critic_loss,
                 "actor_loss": 0.0,
                 "alpha_loss": 0.0,
                 "alpha": self.alpha.item(),
-                **grad_norms  # Include gradient norms in return dict
+                **grad_norms
             }
 
         # ---------------------- Actor update -----------------------
-        new_action, logp, _ = self.actor.sample(grid, scalars)
-        q1_pi, q2_pi = self.critic(grid, scalars, new_action)
-        q_pi = torch.min(q1_pi, q2_pi)
+        actor_loss = torch.tensor(0.0)
+        if update_actor:
+            new_action, logp, _ = self.actor.sample(grid, scalars)
+            
+            # Detach critic to prevent actor gradients from flowing into critic
+            q1_pi, q2_pi = self.critic(grid, scalars, new_action)
+            q_pi = torch.min(q1_pi, q2_pi)
 
-        actor_loss = (self.alpha * logp - q_pi).mean()
+            actor_loss = (self.alpha.detach() * logp - q_pi).mean()
 
-        self.actor_opt.zero_grad()
-        actor_loss.backward()
-        
-        # Compute actor gradient norm BEFORE clipping
-        actor_grad_norm = self._compute_grad_norm(self.actor.parameters())
-        grad_norms["actor_grad_norm"] = actor_grad_norm
-        
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
-        self.actor_opt.step()
+            self.actor_opt.zero_grad()
+            actor_loss.backward()
+            
+            # Compute actor gradient norm BEFORE clipping
+            actor_grad_norm = self._compute_grad_norm(self.actor.parameters())
+            grad_norms["actor_grad_norm"] = actor_grad_norm
+            
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
+            self.actor_opt.step()
+        else:
+            grad_norms["actor_grad_norm"] = 0.0
 
         # ---------------------- Alpha update -----------------------
-        if self.auto_entropy:
-            alpha_loss = -(self.log_alpha * (logp + self.target_entropy).detach()).mean()
+        alpha_loss = torch.tensor(0.0)
+        if update_alpha and self.auto_entropy:
+            # Need to recompute logp if we didn't do actor update
+            if not update_actor:
+                with torch.no_grad():
+                    _, logp, _ = self.actor.sample(grid, scalars)
+            
+            alpha_loss = -(self.log_alpha * (logp.detach() + self.target_entropy)).mean()
             self.alpha_opt.zero_grad()
             alpha_loss.backward()
             
-            # Compute alpha gradient norm (before step, though not clipped)
-            alpha_grad_norm = self.log_alpha.grad.abs().item()
+            # Compute alpha gradient norm
+            alpha_grad_norm = self.log_alpha.grad.abs().item() if self.log_alpha.grad is not None else 0.0
             grad_norms["alpha_grad_norm"] = alpha_grad_norm
             
             self.alpha_opt.step()
         else:
-            alpha_loss = torch.tensor(0.0)
             grad_norms["alpha_grad_norm"] = 0.0
 
         # ---------------------- Target update ----------------------
-        if self.train_step % cfg.TARGET_UPDATE_INTERVAL == 0:
+        if update_critic and self.train_step % cfg.TARGET_UPDATE_INTERVAL == 0:
             self.soft_update(self.critic, self.critic_target, cfg.TAU)
 
         return {
-            "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item(),
+            "critic_loss": critic_loss.item() if isinstance(critic_loss, torch.Tensor) else critic_loss,
+            "actor_loss": actor_loss.item() if isinstance(actor_loss, torch.Tensor) else actor_loss,
             "alpha_loss": alpha_loss.item() if isinstance(alpha_loss, torch.Tensor) else alpha_loss,
             "alpha": self.alpha.item(),
-            **grad_norms  # Include all gradient norms
+            **grad_norms
         }
 
     def _compute_grad_norm(self, parameters):
@@ -307,8 +329,6 @@ class SACAgent:
         self.actor_opt.load_state_dict(ckpt["actor_opt"])
         self.critic_opt.load_state_dict(ckpt["critic_opt"])
         if self.auto_entropy and ckpt.get("log_alpha") is not None:
-
-            
             # Copy data into existing tensor instead
             self.log_alpha.data.copy_(ckpt["log_alpha"].to(self.device))
             # Optimizer already exists and points to correct tensor
@@ -356,5 +376,3 @@ class SACAgent:
             print(f"[WARN] Missing keys during load (Usually safe if just log_std): {missing}")
         if unexpected:
             print(f"[WARN] Unexpected keys in BC checkpoint: {unexpected}\n")
-        
-        
