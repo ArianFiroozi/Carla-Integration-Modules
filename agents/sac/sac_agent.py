@@ -159,6 +159,25 @@ class SACAgent:
             self._alpha = cfg.INIT_ALPHA
 
         self.train_step = 0
+        
+        # =========================================================
+        # BC REGULARIZATION (TRAINING WHEELS)
+        # =========================================================
+        self.bc_actor = copy.deepcopy(self.actor).to(self.device)
+        # Freeze the BC actor completely
+        for p in self.bc_actor.parameters():
+            p.requires_grad = False
+
+        self.bc_penalty_init = cfg.BC_PENALTY_INIT  
+        self.bc_penalty_steps = cfg.BC_PENALTY_STEPS  # Steps until weight hits 0
+
+        # NEW: State variables to fix TensorBoard zigzags
+        self.last_actor_loss = 0.0
+        self.last_alpha_loss = 0.0
+        self.last_bc_mse = 0.0
+        self.last_beta = self.bc_penalty_init
+        self.last_actor_grad_norm = 0.0
+        self.last_alpha_grad_norm = 0.0
 
     @property
     def alpha(self):
@@ -234,34 +253,60 @@ class SACAgent:
                 "actor_loss": 0.0,
                 "alpha_loss": 0.0,
                 "alpha": self.alpha.item(),
+                "bc_mse": 0.0,
+                "beta": self.bc_penalty_init,
                 **grad_norms
             }
 
         # ---------------------- Actor update -----------------------
-        actor_loss = torch.tensor(0.0)
         if update_actor:
-            new_action, logp, _ = self.actor.sample(grid, scalars)
+            new_action, logp, mean_action = self.actor.sample(grid, scalars)
             
             # Detach critic to prevent actor gradients from flowing into critic
             q1_pi, q2_pi = self.critic(grid, scalars, new_action)
             q_pi = torch.min(q1_pi, q2_pi)
 
-            actor_loss = (self.alpha.detach() * logp - q_pi).mean()
+            # 1. Standard SAC RL Loss
+            actor_rl_loss = (self.alpha.detach() * logp - q_pi).mean()
+
+            # 2. Decaying BC Penalty
+            with torch.no_grad():
+                # Get the expert's deterministic action
+                _, _, bc_mean_action = self.bc_actor.sample(grid, scalars)
+            
+            # Calculate MSE between RL mean and BC mean
+            bc_mse = torch.nn.functional.mse_loss(mean_action, bc_mean_action)
+            
+            # Calculate current beta (decays linearly to 0)
+            beta = max(0.0, self.bc_penalty_init * (1.0 - self.train_step / self.bc_penalty_steps))
+            
+            # Q-Normalization
+            # Normalizes the RL loss so it doesn't overpower the BC penalty
+            q_norm = torch.max(q_pi.abs().mean().detach() , torch.tensor(1.0,device=self.device))
+            normalized_rl_loss = actor_rl_loss / q_norm
+            
+            # 3. Combine Losses using the normalized RL loss
+            actor_loss = normalized_rl_loss + beta * bc_mse
 
             self.actor_opt.zero_grad()
             actor_loss.backward()
             
             # Compute actor gradient norm BEFORE clipping
             actor_grad_norm = self._compute_grad_norm(self.actor.parameters())
-            grad_norms["actor_grad_norm"] = actor_grad_norm
-            
             torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
             self.actor_opt.step()
-        else:
-            grad_norms["actor_grad_norm"] = 0.0
 
+            # Save state for logging
+            self.last_actor_loss = actor_loss.item()
+            self.last_bc_mse = bc_mse.item()
+            self.last_beta = beta
+            self.last_actor_grad_norm = actor_grad_norm
+            grad_norms["actor_grad_norm"] = actor_grad_norm
+        else:
+            # Keep previous values for clean TensorBoard logs
+            grad_norms["actor_grad_norm"] = self.last_actor_grad_norm
+        
         # ---------------------- Alpha update -----------------------
-        alpha_loss = torch.tensor(0.0)
         if update_alpha and self.auto_entropy:
             # Need to recompute logp if we didn't do actor update
             if not update_actor:
@@ -274,11 +319,14 @@ class SACAgent:
             
             # Compute alpha gradient norm
             alpha_grad_norm = self.log_alpha.grad.abs().item() if self.log_alpha.grad is not None else 0.0
-            grad_norms["alpha_grad_norm"] = alpha_grad_norm
-            
             self.alpha_opt.step()
+
+            # Save state for logging
+            self.last_alpha_loss = alpha_loss.item()
+            self.last_alpha_grad_norm = alpha_grad_norm
+            grad_norms["alpha_grad_norm"] = alpha_grad_norm
         else:
-            grad_norms["alpha_grad_norm"] = 0.0
+            grad_norms["alpha_grad_norm"] = self.last_alpha_grad_norm
 
         # ---------------------- Target update ----------------------
         if update_critic and self.train_step % cfg.TARGET_UPDATE_INTERVAL == 0:
@@ -286,9 +334,11 @@ class SACAgent:
 
         return {
             "critic_loss": critic_loss.item() if isinstance(critic_loss, torch.Tensor) else critic_loss,
-            "actor_loss": actor_loss.item() if isinstance(actor_loss, torch.Tensor) else actor_loss,
-            "alpha_loss": alpha_loss.item() if isinstance(alpha_loss, torch.Tensor) else alpha_loss,
+            "actor_loss": self.last_actor_loss,
+            "alpha_loss": self.last_alpha_loss,
             "alpha": self.alpha.item(),
+            "bc_mse": self.last_bc_mse,  
+            "beta": self.last_beta,      
             **grad_norms
         }
 

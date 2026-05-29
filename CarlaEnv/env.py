@@ -222,6 +222,7 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
+
         if action is not None:
             if self.action_mode == "discrete":
                 speed_action = int(action[0])
@@ -242,7 +243,10 @@ class CarlaEnv(gymnasium.Env):
         except Exception as e:
             print(f"tick fail: {e}")
             self.reset()
-            return prev_obs, 0, False, False, {}
+            # We must return a valid info dict even on failure. 
+            # Easiest way is to just call get_reward once to generate a baseline info dict.
+            reward, info = self.vehicle_controller.get_reward(prev_obs)
+            return prev_obs, reward, False, False, info
 
         step_peds(self.world, self.walkers)
 
@@ -254,12 +258,10 @@ class CarlaEnv(gymnasium.Env):
             terminated = True
             
         # 3. Calculate reward
-        reward = self.vehicle_controller.get_reward(prev_obs)
+        reward,info = self.vehicle_controller.get_reward(prev_obs)
         if terminated:
             self.vehicle_controller.collision_happened = False
             
-        # traffic_signs = self._get_nearby_traffic_signs()
-        # reward += self._process_traffic_signs(traffic_signs)
 
         obs = self._get_observation()
         self.current_step += 1
@@ -275,7 +277,7 @@ class CarlaEnv(gymnasium.Env):
         if self.current_step >= self.max_steps:
             truncated = True
             
-        return obs, reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, info
 
     def _get_observation(self):
         x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = get_speed_matrices(self.ego_vehicle)

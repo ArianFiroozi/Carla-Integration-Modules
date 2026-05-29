@@ -189,3 +189,8 @@ imitation/data
 experiments/rl/**/*.pt
 experiments/rl/**/*.pkl
 offline_rl/**/*.npz
+test
+# Ignore RL experiment logs and datasets
+*.tfevents.*
+*.zip
+*.npz

@@ -8,12 +8,13 @@ import torch
 from CarlaEnv.env import CarlaEnv
 from agents.bc.imitation_policy import ImitationPolicy
 from config import bc_config
+from config import general_config # <--- ADDED: Needed for the reward compiler
 import datetime
 from torch.utils.tensorboard import SummaryWriter
 import carla
 import cv2
-
 from utils.obs_wrapper import CarlaObsWrapper, speed_map, turn_map
+from utils.reward_compiler import compile_reward 
 
 ACTION_MODE = bc_config.ACTION_MODE
 DEVICE = bc_config.DEVICE
@@ -150,7 +151,10 @@ def run_episode(env, policy, wrapper, max_steps=2000, render_log_every=200, vide
     t0 = time.time()
     for t in range(max_steps):
         env_action, action_log = predict_action(policy, obs, wrapper)
-        obs, reward, terminated, truncated, info = env.step(env_action)
+        obs, _, terminated, truncated, info = env.step(env_action)
+        
+        
+        reward, _ = compile_reward(info, general_config, is_tensor=False)
 
         if action_log is not None:
             action_counts[action_log] += 1
@@ -178,7 +182,7 @@ def run_episode(env, policy, wrapper, max_steps=2000, render_log_every=200, vide
 
     return {
         "return": float(np.sum(rewards)),
-        "mean_reward": float(np.mean(rewards)),
+        "mean_reward": float(np.mean(rewards)) if len(rewards) > 0 else 0.0, # Added safety check for empty episodes
         "length": ep_len,
         "end_reason": "terminated" if terminated_flag else ("truncated" if truncated_flag else "max_steps"),
         "action_counts": action_counts,
@@ -420,7 +424,6 @@ def main():
             env.close()
         except Exception:
             pass
-
 
 if __name__ == "__main__":
     main()

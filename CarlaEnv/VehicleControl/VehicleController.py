@@ -1,22 +1,33 @@
 import carla
-import enum
 import json
 import numpy as np
 from pathlib import Path
 from config import general_config as config
-class Command(enum.Enum):
-    SPEED_UP = 0
-    SPEED_DOWN = 1
-    TURN_RIGHT = 2
-    REVERSE = 7
-    CONSTANT_SPEED = 8
+from utils.reward_compiler import compile_reward
+# The Progress Engine
+TARGET_SPEED_MS = config.TARGET_SPEED_MS       
+WEIGHT_PROGRESS = config.WEIGHT_PROGRESS         
 
-    TURN_LEFT = 3
-    STOP = 4
-    DO_NOT_TURN = 5
-    GO_STRAIGHT=6
+# The Alignment Engine
+WEIGHT_CENTERING = config.WEIGHT_CENTERING
+LANE_ALPHA = config.LANE_ALPHA             
+WEIGHT_HEADING = config.WEIGHT_HEADING         
 
-    
+# The Control Penalty (Shock Absorbers)
+PENALTY_STEER_DELTA = config.PENALTY_STEER_DELTA     
+PENALTY_THROTTLE_DELTA = config.PENALTY_THROTTLE_DELTA  
+PENALTY_PEDAL_OVERLAP = config.PENALTY_PEDAL_OVERLAP  
+
+# Terminals and Violations (Safety Net)
+PENALTY_TERMINAL_CRASH =config.PENALTY_TERMINAL_CRASH
+PENALTY_LANE_INVASION = config.PENALTY_LANE_INVASION
+PENALTY_ROLLING_BACKWARD = config.PENALTY_ROLLING_BACKWARD
+STALL_SPEED_THRESHOLD = config.STALL_SPEED_THRESHOLD
+PENALTY_STALLING = config.PENALTY_STALLING
+
+# ==============================================================================
+# ACTION SPACE CONSTANTS
+# ==============================================================================
 SPEED_UP = 0
 SPEED_DOWN = 1
 STOP = 2
@@ -28,18 +39,19 @@ TURN_LEFT = 1
 DO_NOT_TURN = 2
 GO_STRAIGHT = 3
 
-THROTTLE_STEP = 0.05        # was 0.3 (too aggressive)
-MAX_THROTTLE = 1         # cap forward throttle (prevents crazy speed)
-BRAKE_TAP = 0.10            # light brake for SPEED_DOWN
-BRAKE_FULL = 1.00           # STOP brake
-REVERSE_THROTTLE = 0.30     # was 0.5 (reverse was too strong)
+THROTTLE_STEP = 0.05        
+MAX_THROTTLE = 1.0         
+BRAKE_TAP = 0.10            
+BRAKE_FULL = 1.00           
+REVERSE_THROTTLE = 0.30     
 
-STEER_STEP = 0.05           # was 0.2 (too jerky)
-MAX_STEER = 1         # cap steering magnitude
+STEER_STEP = 0.05           
+MAX_STEER = 1.0         
+
 
 class VehicleController():
     def __init__(self, world, vehicle=None):
-        self.world=world
+        self.world = world
         self.blueprint_library = world.get_blueprint_library()
         self.vehicle = vehicle
         if vehicle is not None:
@@ -47,6 +59,10 @@ class VehicleController():
         else:
             self.__spawn_vehicle()
         self.__init_reward_sensors()
+
+        # State trackers for smoothness penalties
+        self.prev_steer = 0.0
+        self.prev_throttle = 0.0
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -62,7 +78,7 @@ class VehicleController():
             self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
             self.__init_control()
         except:
-            print("Unknown error occured")
+            print("Unknown error occured during spawn")
 
     def __init_reward_sensors(self):
         blueprint_library = self.world.get_blueprint_library()
@@ -87,99 +103,90 @@ class VehicleController():
 
 
     def get_reward(self, observation=None):
-        reward = 0.0
+        info = {}
 
+        # --- TELEMETRY GATHERING ---
         velocity = self.vehicle.get_velocity()
-        speed = 3.6 * np.sqrt(velocity.x**2 + velocity.y**2)
         transform = self.vehicle.get_transform()
-        forward = transform.get_forward_vector()
-
-        # 1. Forward progress (Bounded)
-        vel_vec = np.array([velocity.x, velocity.y])
-        forward_vec = np.array([forward.x, forward.y])
-        progress = np.dot(vel_vec, forward_vec)
-        # Cap progress reward so it doesn't overpower safety
-        reward += np.clip(progress * 0.05, -1.0, 2.0)
-
-        # 2. Speed Tracking (Gaussian/Exponential drop-off)
-        # Instead of linear penalty, give a positive reward that peaks at TARGET_SPEED
-        # This prevents huge negative numbers.
-        speed_ms = np.sqrt(velocity.x**2 + velocity.y**2)   # m/s
-        target_speed_ms = 6.0  
-        speed_reward = np.exp(-2.0 * abs(speed_ms - target_speed_ms)) 
-        reward += speed_reward * 0.5
-
-        # 3. Lane Centering (Allow overtaking)
+        car_forward = transform.get_forward_vector()
+        
         waypoint = self.world.get_map().get_waypoint(self.vehicle.get_location())
+        wp_forward = waypoint.transform.get_forward_vector()
         lane_center = waypoint.transform.location
         vehicle_loc = self.vehicle.get_location()
-        lane_distance = vehicle_loc.distance(lane_center)
+
+        # --- POPULATE RAW FACTS  ---
+        # Terminals & Violations
+        info['is_terminal_crash'] = int(self.collision_happened or vehicle_loc.z <= -5)
+        info['is_lane_invaded'] = int(self.lane_invaded)
+        info['is_pedal_overlap'] = int(self.control.throttle > 0.1 and self.control.brake > 0.1)
         
-        # Exponential drop-off for lane distance. 
-        # If it changes lanes (overtakes), the penalty is bounded, not infinite.
-        lane_reward = np.exp(-0.5 * lane_distance)
-        reward += lane_reward * 0.5
+        # Vectors (Saved as raw lists/arrays)
+        info['velocity_x'] = float(velocity.x)
+        info['velocity_y'] = float(velocity.y)
+        info['velocity_z'] = float(velocity.z)
+        
+        info['car_forward_x'] = float(car_forward.x)
+        info['car_forward_y'] = float(car_forward.y)
+        info['car_forward_z'] = float(car_forward.z)
+        
+        info['road_forward_x'] = float(wp_forward.x)
+        info['road_forward_y'] = float(wp_forward.y)
+        
+        # Positions
+        info['vehicle_loc_x'] = float(vehicle_loc.x)
+        info['vehicle_loc_y'] = float(vehicle_loc.y)
+        info['lane_center_x'] = float(lane_center.x)
+        info['lane_center_y'] = float(lane_center.y)
+        
+        # Controls
+        info['steer_change'] = float(abs(self.control.steer - self.prev_steer))
+        info['throttle_change'] = float(abs(self.control.throttle - self.prev_throttle))
 
-        # 4. Smooth Driving (Bounded penalties)
-        if not hasattr(self, "prev_steer"):
-            self.prev_steer = self.control.steer
-            self.prev_throttle = self.control.throttle
-
-        steer_change = abs(self.control.steer - self.prev_steer)
-        throttle_change = abs(self.control.throttle - self.prev_throttle)
-        reward -= np.clip(steer_change * 0.5, 0.0, 0.5)
-        reward -= np.clip(throttle_change * 0.2, 0.0, 0.2)
-
+        # --- RESET SENSORS & STATE ---
+        if info['is_terminal_crash'] == 1:
+            self.collision_happened = False
+            self.lane_invaded = False
+        if info['is_lane_invaded'] == 1:
+            self.lane_invaded = False
+            
         self.prev_steer = self.control.steer
         self.prev_throttle = self.control.throttle
 
-        # 5. Safety and Terminals (CRITICAL)
-        if self.collision_happened or self.vehicle.get_location().z <= -5:
-            reward -= 10.0 # Bounded crash penalty. MUST TERMINATE EPISODE HERE.
-            
-        if self.lane_invaded:
-            # Small penalty for crossing lines, but don't make it too huge 
-            # otherwise it will be terrified to overtake.
-            reward -= 0.5 
+        # --- CALL THE COMPILER ---
+        reward , _ = compile_reward(info, config, is_tensor=False)
+        
+        return reward, info
+    # ==============================================================================
+    # ACTION EXECUTION METHODS
+    # ==============================================================================
 
-        if speed < 1.0: # Stalling
-            reward -= 0.5
-
-        # reset sensors
-        self.collision_happened = False
-        self.lane_invaded = False
-
-        # Keep total step reward roughly within [-5, 5]
-        return float(np.clip(reward, -10.0, 5.0))
-
-
-    
     def speed_action_convertor(self, speed_action):
         if speed_action == SPEED_UP:
-            return Command.SPEED_UP.value
+            return 0
         elif speed_action == SPEED_DOWN:
-            return Command.SPEED_DOWN.value
-        elif speed_action==STOP:
-            return Command.STOP.value
-        elif speed_action==REVERSE:
-            return Command.REVERSE.value
-        elif speed_action==CONSTANT:
-            return Command.CONSTANT_SPEED.value
+            return 1
+        elif speed_action == STOP:
+            return 4
+        elif speed_action == REVERSE:
+            return 7
+        elif speed_action == CONSTANT:
+            return 8
         else:
-            print(f"speed_action : {speed_action}")
+            print(f"speed_action unknown: {speed_action}")
             return -1
         
     def turn_action_convertor(self, turn_action):
         if turn_action == TURN_RIGHT:
-            return Command.TURN_RIGHT.value
+            return 2
         elif turn_action == TURN_LEFT:
-            return Command.TURN_LEFT.value
+            return 3
         elif turn_action == DO_NOT_TURN:
-            return Command.DO_NOT_TURN.value
+            return 5
         elif turn_action == GO_STRAIGHT:
-            return Command.GO_STRAIGHT.value
+            return 6
         else:
-            print(f"turn_action : {turn_action}")
+            print(f"turn_action unknown: {turn_action}")
             return -1
 
     def exec_command(self, command):
@@ -219,15 +226,14 @@ class VehicleController():
         self.control.throttle = float(np.clip(throttle, 0.0, 1.0))
         self.control.brake = float(np.clip(brake, 0.0, 1.0))
         self.control.steer = float(np.clip(steer, -1.0, 1.0))
-        self.control.reverse = False  # Or add logic here if you want reverse in continuous
+        self.control.reverse = False  
         
-        # Apply the updated internal control state to the vehicle
         self.vehicle.apply_control(self.control)
-
         
     def exec_delta_command(self, throttle_action, steer_action):
         throttle = self.control.throttle
         throttle_change = throttle_action * 0.092
+        
         if (not self.control.reverse and throttle + throttle_change < 0):
             self.control.throttle = -(throttle + throttle_change)
             self.control.reverse = True 
@@ -237,19 +243,14 @@ class VehicleController():
             if (throttle_change >= throttle):
                 self.control.throttle = throttle_change - throttle
                 self.control.reverse = False
-            else : 
+            else: 
                 self.control.throttle = throttle - throttle_change
         elif (self.control.reverse and throttle_change < 0):
             throttle = throttle - throttle_change
-        else : 
-            pass
+            
+        self.control.throttle = min(self.control.throttle, 0.92)
         
-        self.control.throttle = min(throttle, 0.92)
-        
-        new_steer =  self.control.steer + steer_action * 0.04
-        if (new_steer < 0):
-            self.control.steer = max(new_steer, -0.4)
-        else: 
-            self.control.steer = min(new_steer, 0.4)
+        new_steer = self.control.steer + steer_action * 0.04
+        self.control.steer = max(min(new_steer, 0.4), -0.4)
         
         self.vehicle.apply_control(self.control)

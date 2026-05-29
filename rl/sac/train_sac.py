@@ -545,38 +545,45 @@ def main():
             episode_len += 1
             total_steps += 1
 
-            # Updates
+            # Updates   
             if total_steps >= cfg.UPDATE_AFTER and len(replay_buffer) >= cfg.BATCH_SIZE:
-                if total_steps % cfg.UPDATE_EVERY == 0:
-                    agg = {"critic_loss":0.0, "actor_loss":0.0, "alpha_loss":0.0,
-                        "critic_grad_norm":0.0, "actor_grad_norm":0.0, "alpha_grad_norm":0.0,
-                        "alpha":0.0}
+                
+                # NEW: Add bc_mse and beta to the aggregator
+                agg = {"critic_loss":0.0, "actor_loss":0.0, "alpha_loss":0.0,
+                    "critic_grad_norm":0.0, "actor_grad_norm":0.0, "alpha_grad_norm":0.0,
+                    "alpha":0.0, "bc_mse": 0.0, "beta": 0.0}
 
-                    
-                    for _ in range(cfg.GRADIENT_UPDATES):
-                        losses = agent.update(replay_buffer)
-                        for k in agg:
-                            agg[k] += losses.get(k, 0)
-
-                    # average
+                
+                for _ in range(cfg.GRADIENT_UPDATES):
+                    losses = agent.update(replay_buffer)
                     for k in agg:
-                        agg[k] /= cfg.GRADIENT_UPDATES
+                        agg[k] += losses.get(k, 0)
 
-                    # log ONCE
-                    tb_writer.add_scalar("train/critic_loss", agg["critic_loss"], total_steps)
-                    tb_writer.add_scalar("train/actor_loss",  agg["actor_loss"],  total_steps)
-                    tb_writer.add_scalar("train/alpha_loss",  agg["alpha_loss"],  total_steps)
-                    tb_writer.add_scalar("train/alpha",       agg["alpha"],       total_steps)
+                # average
+                for k in agg:
+                    agg[k] /= cfg.GRADIENT_UPDATES
 
-                    tb_writer.add_scalar("grad_norms/critic", agg["critic_grad_norm"], total_steps)
-                    tb_writer.add_scalar("grad_norms/actor",  agg["actor_grad_norm"],  total_steps)
-                    tb_writer.add_scalar("grad_norms/alpha",  agg["alpha_grad_norm"],  total_steps)
+                # log ONCE
+                tb_writer.add_scalar("train/critic_loss", agg["critic_loss"], total_steps)
+                tb_writer.add_scalar("train/actor_loss",  agg["actor_loss"],  total_steps)
+                tb_writer.add_scalar("train/alpha_loss",  agg["alpha_loss"],  total_steps)
+                tb_writer.add_scalar("train/alpha",       agg["alpha"],       total_steps)
+                
+                # Log BC regularization stats
+                tb_writer.add_scalar("train/bc_mse",      agg["bc_mse"],      total_steps)
+                tb_writer.add_scalar("train/beta",        agg["beta"],        total_steps)
 
-                    if total_steps % cfg.LOG_EVERY == 0:
-                        g, s, a, r, _, _, _ = replay_buffer.sample(cfg.BATCH_SIZE)
-                        log_policy_stats(tb_writer, agent, g, s, total_steps)
-                        log_critic_stats(tb_writer, agent, g, s, a, total_steps)
-                        log_replay_buffer_stats(tb_writer, replay_buffer, total_steps, rewards=r)
+                tb_writer.add_scalar("grad_norms/critic", agg["critic_grad_norm"], total_steps)
+
+                tb_writer.add_scalar("grad_norms/critic", agg["critic_grad_norm"], total_steps)
+                tb_writer.add_scalar("grad_norms/actor",  agg["actor_grad_norm"],  total_steps)
+                tb_writer.add_scalar("grad_norms/alpha",  agg["alpha_grad_norm"],  total_steps)
+
+                if total_steps % cfg.LOG_EVERY == 0:
+                    g, s, a, r, _, _, _ = replay_buffer.sample(cfg.BATCH_SIZE)
+                    log_policy_stats(tb_writer, agent, g, s, total_steps)
+                    log_critic_stats(tb_writer, agent, g, s, a, total_steps)
+                    log_replay_buffer_stats(tb_writer, replay_buffer, total_steps, rewards=r)
 
             # End of episode
             if done or episode_len >= args.max_steps:

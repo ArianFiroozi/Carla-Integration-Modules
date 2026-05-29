@@ -108,7 +108,6 @@ class AutopilotController:
                 control = ego.get_control()
 
                 if record:
-
                     obs_copy = self._npify_obs(obs)
 
                     # store control signals inside observations (same structure as manual)
@@ -124,6 +123,7 @@ class AutopilotController:
                         "truncated": bool(truncated),
                         "done": bool(done),
                         "t": int(t),
+                        "info": info,  # <--- ADD THIS LINE
                     })
 
                 obs = next_obs
@@ -151,6 +151,18 @@ class AutopilotController:
         for key in obs_keys:
             stacked = np.stack([s["obs"][key] for s in steps], axis=0)
             arrays[f"obs_{key}"] = stacked.astype(np.float32)
+
+        # SAVE THE RAW PHYSICS
+        if "info" in steps[0] and steps[0]["info"]:
+            info_keys = steps[0]["info"].keys()
+            for key in info_keys:
+                arrays[f"info_{key}"] = np.array(
+                    [s["info"][key] for s in steps], 
+                    dtype=np.float32
+                )
+
+        # Keep dummy actions to match manual dataset format
+        dummy_action = np.array([DUMMY_SPEED, DUMMY_TURN], dtype=np.int64)
 
         # Keep dummy actions to match manual dataset format
         dummy_action = np.array([DUMMY_SPEED, DUMMY_TURN], dtype=np.int64)

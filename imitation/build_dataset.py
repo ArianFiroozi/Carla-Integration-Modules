@@ -9,7 +9,8 @@ from config import bc_config
 from .utils.viz import *
 from .utils.stats import *
 from utils.seed_utils import seed_everything
-
+from config import general_config
+from utils.reward_compiler import compile_reward
 seed_everything(bc_config.GLOBAL_SEED)
 
 ROOT = Path(__file__).resolve().parents[0]
@@ -477,6 +478,7 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
             out_obs[k] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32)
 
     out_actions = np.empty((total_kept, 2), dtype=np.int64)
+    out_rewards = np.empty((total_kept,), dtype=np.float32) # NEW: Array for compiled rewards
 
     idx = 0
 
@@ -498,7 +500,6 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         window_starts = valid_indices - (WINDOW_SIZE - 1)
 
         # Build (n, WINDOW_SIZE) table of indices
-        # Example for W=3: [[0,1,2], [1,2,3], [2,3,4], ...]
         index_table = window_starts[:, None] + np.arange(WINDOW_SIZE)
 
         # 1. Batch copy GRID KEYS
@@ -513,11 +514,29 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
 
         # 3. Actions
         out_actions[idx:idx+n] = d["actions"][scalar_src]
+        
+        # 4. COMPILE REWARDS
+        # We must extract the info dict for each step and compile the reward
+        for i, src_idx in enumerate(scalar_src):
+            step_info = {}
+            # Reconstruct the info dictionary from the saved arrays
+            for k in d.keys():
+                if k.startswith("info_"):
+                    # Remove the "info_" prefix to match what the compiler expects
+                    original_key = k[5:] 
+                    step_info[original_key] = d[k][src_idx]
+            
+            # If the dataset was collected before we added info_ keys, default to 0.0
+            if not step_info:
+                 out_rewards[idx + i] = 0.0
+            else:
+                 # Compile the reward using the physics
+                 compiled_reward, _ = compile_reward(step_info, general_config, is_tensor=False)
+                 out_rewards[idx + i] = compiled_reward
 
         idx += n
 
-    return out_obs, out_actions
-
+    return out_obs, out_actions, out_rewards
 
 # ==============================================================================
 # 4. MAIN ORCHESTRATOR
@@ -591,7 +610,9 @@ def run_pipeline(mode, visualize=False):
 
     # --- PASS 2 ---
     print(f"[{mode.upper()}] Building temporal windows...")
-    out_obs, out_actions = pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes)
+    # --- PASS 2 ---
+    print(f"[{mode.upper()}] Building temporal windows...")
+    out_obs, out_actions, out_rewards = pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes)
     print_minmax_summary(out_obs)
     # --- Post Processing ---
     out_obs = remap_presence_grid(out_obs)
@@ -623,7 +644,10 @@ def run_pipeline(mode, visualize=False):
         if k in out_obs:
             out_obs[f"target_{k[4:]}"] = out_obs.pop(k)
 
-    save_dict = {**out_obs, "actions": out_actions}
+    # We strip out the "info_" keys so they don't bloat the final training dataset
+    final_obs = {k: v for k, v in out_obs.items() if not k.startswith("info_")}
+    
+    save_dict = {**final_obs, "actions": out_actions, "rewards": out_rewards}
     np.savez_compressed(OUT_PATH, **save_dict)
     
     save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode=mode, norm_stats=norm_stats)

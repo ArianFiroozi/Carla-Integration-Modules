@@ -129,7 +129,13 @@ class ManualController:
         data["truncated"] = np.array([s["truncated"] for s in steps], dtype=np.bool_)
         data["dones"] = np.array([s["done"] for s in steps], dtype=np.bool_)
         data["t"] = np.array([s["t"] for s in steps], dtype=np.int32)
-
+        if "info" in steps[0] and steps[0]["info"]:
+            info_keys = steps[0]["info"].keys()
+            for k in info_keys:
+                data[f"info_{k}"] = np.array(
+                    [s["info"][k] for s in steps], 
+                    dtype=np.float32
+                )
         ts = time.strftime("%Y%m%d_%H%M%S")
         out_path = self.demo_dir / f"{base_name}_{ts}_ep{ep_idx:04d}.npz"
         np.savez_compressed(out_path, **data)
@@ -190,6 +196,7 @@ class ManualController:
                         "truncated": bool(truncated),
                         "done": bool(done),
                         "t": int(t),
+                        "info": info
                     })
 
                 obs = next_obs

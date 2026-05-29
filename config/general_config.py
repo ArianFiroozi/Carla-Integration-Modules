@@ -125,4 +125,28 @@ RANDOM_EGO_START_POS = True
 
 
 
+# ==============================================================================
+# RL REWARD EXPERIMENTATION HUB
+# ==============================================================================
+
+# 1. The Progress Engine
+TARGET_SPEED_MS = 6.0         
+WEIGHT_PROGRESS = 0.5          # Reward for moving forward along the road
+
+# 2. The Alignment Engine
+WEIGHT_CENTERING = 0.3         # Reward for staying dead-center in the lane
+LANE_ALPHA = 0.5               # Steepness of the centering curve
+WEIGHT_HEADING = 0.2           # Reward for facing parallel to the road
+
+# 3. The Control Penalty (Shock Absorbers)
+PENALTY_STEER_DELTA = 0.1      # Tax for violently jerking the steering wheel
+PENALTY_THROTTLE_DELTA = 0.1   # Tax for slamming on/off the gas
+PENALTY_PEDAL_OVERLAP = -2.0   # Tax for pressing brake and gas at the same time
+
+# 4. Terminals and Violations
+PENALTY_TERMINAL_CRASH = -200.0  
+PENALTY_LANE_INVASION = -0.5   # Tax for crossing the solid white line
+PENALTY_ROLLING_BACKWARD = -3.0 # Tax for sliding backwards down a hill or post-crash
+STALL_SPEED_THRESHOLD = 1.0    # Speed below which we consider the car "stalling"
+PENALTY_STALLING = -0.5        # Tax for sitting still to avoid driving
 

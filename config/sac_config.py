@@ -11,8 +11,8 @@ TAU = 0.005                # target network soft update
 # ENTROPY / TEMPERATURE
 # =========================================================
 
-AUTO_ENTROPY = True        
-INIT_ALPHA = 0.02           
+AUTO_ENTROPY = False        
+INIT_ALPHA = 0.005           
 TARGET_ENTROPY_SCALE = 0.2  
 
 # =========================================================
@@ -25,6 +25,9 @@ ALPHA_LR = 1e-4
 
 WEIGHT_DECAY = 0           
 
+
+BC_PENALTY_INIT = 0      # Starting MSE weight
+BC_PENALTY_STEPS = 0  # Steps until weight hits 0
 # =========================================================
 # REPLAY BUFFER
 # =========================================================
@@ -32,7 +35,7 @@ WEIGHT_DECAY = 0
 REPLAY_BUFFER_SIZE = 500_000
 BATCH_SIZE = 256             
 
-SAVE_BUFFER_EVERY = 10  
+SAVE_BUFFER_EVERY = 4  
 KEEP_CHECKPOINTS = 3
 
 # =========================================================
@@ -41,7 +44,7 @@ KEEP_CHECKPOINTS = 3
 
 MAX_TRAIN_STEPS = 500_000     
 
-CRITIC_WARMUP_STEPS = 100_000 
+CRITIC_WARMUP_STEPS = 100_000
 UPDATE_AFTER = 1_000          
 GRADIENT_UPDATES = 1
 

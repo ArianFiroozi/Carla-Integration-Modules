@@ -12,7 +12,7 @@ MANUAL_DIR = DATA_DIR / "demos"
 PROCESSED_DIR = DATA_DIR / "processed"
 
 AUTOPILOT_RECORD_DIR = EXPERT_DIR / "map1_0car"
-MANUAL_RECORD_DIR =  MANUAL_DIR / "map1_30car"
+MANUAL_RECORD_DIR =  MANUAL_DIR / "test"
 
 DISCRETE_DATASET_PATH = PROCESSED_DIR / "dataset_bc_discrete.npz"
 CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
@@ -28,7 +28,7 @@ DEMO_LIST= [
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
     MANUAL_DIR / "map1_30car",
-    # REPO_ROOT / "offline_rl" / "data"
+    # MANUAL_DIR / "old" /"map1_30car",
 ]
 
 
@@ -151,7 +151,7 @@ MANUAL_SLEEP_SECONDS = 0.001
 MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = False
 
-MANUAL_RECORD = False
+MANUAL_RECORD = True
 MANUAL_BASE_NAME = "map1"
 
 RECORD_DRIVE_MODE = "manual" # "manual" or "autopilot"
