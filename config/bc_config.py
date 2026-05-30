@@ -28,7 +28,7 @@ DEMO_LIST= [
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
     MANUAL_DIR / "map1_30car",
-    # MANUAL_DIR / "old" /"map1_30car",
+    MANUAL_DIR / "old" /"map1_30car",
 ]
 
 

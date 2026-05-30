@@ -10,7 +10,8 @@ from utils.seed_utils import seed_everything
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
-
+from config import general_config
+from utils.reward_compiler import compile_reward
 from CarlaEnv.env import CarlaEnv
 from agents.sac.sac_agent import SACAgent
 from rl.sac.replay_buffer import SACReplayBuffer
@@ -523,8 +524,12 @@ def main():
             
 
             # Env step
-            next_obs, reward, terminated, truncated, info = env.step(raw_action)
+            next_obs, raw_reward, terminated, truncated, info = env.step(raw_action)
             done = terminated or truncated
+
+            
+            # Use the info dictionary to calculate the true reward
+            reward, _ = compile_reward(info, general_config, is_tensor=False)
 
             # Preprocess next obs
             next_grid, next_scalars = wrapper.preprocess(next_obs)
@@ -534,12 +539,11 @@ def main():
                 grid_obs=grid,
                 scalar_obs=scalars,
                 action=raw_action,
-                reward=reward,
+                reward=reward, # the compiled reward
                 next_grid_obs=next_grid,
                 next_scalar_obs=next_scalars,
                 done=done
             )
-
             obs = next_obs
             episode_reward += float(reward)
             episode_len += 1

@@ -516,23 +516,36 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         out_actions[idx:idx+n] = d["actions"][scalar_src]
         
         # 4. COMPILE REWARDS
-        # We must extract the info dict for each step and compile the reward
         for i, src_idx in enumerate(scalar_src):
-            step_info = {}
-            # Reconstruct the info dictionary from the saved arrays
-            for k in d.keys():
-                if k.startswith("info_"):
-                    # Remove the "info_" prefix to match what the compiler expects
-                    original_key = k[5:] 
-                    step_info[original_key] = d[k][src_idx]
+            # Attempt to extract the rich info dict
+            step_info = {k[5:]: d[k][src_idx] for k in d.keys() if k.startswith("info_")}
             
-            # If the dataset was collected before we added info_ keys, default to 0.0
-            if not step_info:
-                 out_rewards[idx + i] = 0.0
+            if step_info:
+                # We have the new data format!
+                compiled_reward, _ = compile_reward(step_info, general_config, mode="info", is_tensor=False)
             else:
-                 # Compile the reward using the physics
-                 compiled_reward, _ = compile_reward(step_info, general_config, is_tensor=False)
-                 out_rewards[idx + i] = compiled_reward
+                # We have the old data format! Calculate smoothness manually.
+                # Use max(0, src_idx - 1) to safely look backward without array out-of-bounds
+                steer_curr = float(d["obs_steering_angle"][src_idx])
+                steer_prev = float(d["obs_steering_angle"][max(0, src_idx - 1)])
+                throttle_curr = float(d["obs_throttle"][src_idx])
+                throttle_prev = float(d["obs_throttle"][max(0, src_idx - 1)])
+
+                step_obs = {
+                    'obs_ego_speed_x': float(d["obs_ego_speed_x"][src_idx]),
+                    'obs_ego_speed_y': float(d["obs_ego_speed_y"][src_idx]),
+                    'obs_lane_angle': float(d["obs_lane_angle"][src_idx]),
+                    'obs_ego_in_lane_position_x': float(d["obs_ego_in_lane_position_x"][src_idx]),
+                    'obs_throttle': throttle_curr,
+                    'obs_brake': float(d["obs_brake"][src_idx]),
+                    'obs_reverse': float(d["obs_reverse"][src_idx]),
+                    'terminated': float(d["terminated"][src_idx]),
+                    'steer_change': abs(steer_curr - steer_prev),
+                    'throttle_change': abs(throttle_curr - throttle_prev)
+                }
+                compiled_reward, _ = compile_reward(step_obs, general_config, mode="obs", is_tensor=False)
+                
+            out_rewards[idx + i] = compiled_reward
 
         idx += n
 

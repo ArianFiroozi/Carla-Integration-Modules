@@ -230,6 +230,7 @@ class SACAgent:
                 target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
 
             q1, q2 = self.critic(grid, scalars, actions)
+            # TODO: add huber loss later , to fix -200 issue 
             critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
 
             self.critic_opt.zero_grad()

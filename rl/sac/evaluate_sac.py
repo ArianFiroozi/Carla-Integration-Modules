@@ -15,7 +15,8 @@ import datetime
 from torch.utils.tensorboard import SummaryWriter
 import carla
 import cv2
-
+from config import general_config
+from utils.reward_compiler import compile_reward
 from utils.obs_wrapper import CarlaObsWrapper
 
 DEVICE = cfg.DEVICE
@@ -211,7 +212,8 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
             "env_action": action if isinstance(action, list) else action.tolist()
         })
 
-        obs, reward, terminated, truncated, info = env.step(action)
+        obs, raw_reward, terminated, truncated, info = env.step(action)
+        reward, _ = compile_reward(info, general_config, is_tensor=False)
         rewards.append(float(reward))
 
         # Update spectator camera in CARLA window
