@@ -16,7 +16,7 @@ MANUAL_RECORD_DIR =  MANUAL_DIR / "test"
 
 DISCRETE_DATASET_PATH = PROCESSED_DIR / "dataset_bc_discrete.npz"
 CONTINUOUS_DATASET_PATH = PROCESSED_DIR / "dataset_bc_continuous.npz"
-
+RL_REPLAY_BUFFER_PATH =  PROCESSED_DIR / "dataset_rl_buffer.npz"
 
 BC_EXPERIMENT_FOLDER = REPO_ROOT / "experiments" / "bc"
 

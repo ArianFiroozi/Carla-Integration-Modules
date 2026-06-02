@@ -485,6 +485,8 @@ def main():
     else:
         # Fresh start
         replay_buffer = SACReplayBuffer(capacity=cfg.REPLAY_BUFFER_SIZE, device=args.device)
+        if cfg.PRELOAD_EXPERT_DATA:
+            replay_buffer.load_offline_dataset(cfg.COMPILED_DATASET_PATH)
         
         # Load BC weights if configured
         if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():

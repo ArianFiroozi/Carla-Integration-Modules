@@ -1,0 +1,9 @@
+carla==0.9.15
+gymnasium==1.0.0
+keyboard==0.13.5
+matplotlib==3.7.5
+numpy==1.24.4
+opencv_python==4.11.0.86
+scikit_learn==1.3.2
+torch==2.4.1+cu124
+tqdm==4.67.3

@@ -230,8 +230,18 @@ class SACAgent:
                 target_q = rewards + (1.0 - dones) * cfg.GAMMA * q_t
 
             q1, q2 = self.critic(grid, scalars, actions)
-            # TODO: add huber loss later , to fix -200 issue 
-            critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
+            
+            
+
+            if cfg.USE_HUBER_LOSS: 
+                critic1_loss = torch.nn.functional.smooth_l1_loss(q1, target_q, beta=1.0)
+                critic2_loss = torch.nn.functional.smooth_l1_loss(q2, target_q, beta=1.0)
+                critic_loss = critic1_loss + critic2_loss
+            else:
+                
+                critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
+
+            self.critic_opt.zero_grad()
 
             self.critic_opt.zero_grad()
             critic_loss.backward()

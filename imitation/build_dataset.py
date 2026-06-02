@@ -18,11 +18,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 DEMO_DIRS = bc_config.DEMO_LIST
 if bc_config.ACTION_MODE == "discrete":
-    OUT_PATH = bc_config.DISCRETE_DATASET_PATH
+    BC_OUT_PATH = bc_config.DISCRETE_DATASET_PATH
 else:
-    OUT_PATH = bc_config.CONTINUOUS_DATASET_PATH
+    BC_OUT_PATH = bc_config.CONTINUOUS_DATASET_PATH
 RNG_SEED = bc_config.BUILD_RNG_SEED
-
+RL_OUT_PATH = bc_config.RL_REPLAY_BUFFER_PATH
 # Window Size configuration 
 WINDOW_SIZE = bc_config.WINDOW_SIZE
 
@@ -108,7 +108,7 @@ def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode, norm
 
     meta = {
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "dataset_path": str(OUT_PATH.resolve().relative_to(PROJECT_ROOT)),
+        "dataset_path": str(BC_OUT_PATH.resolve().relative_to(PROJECT_ROOT)),
         "source_files": [str(Path(f).resolve().relative_to(PROJECT_ROOT)) for f in files],
         "total_samples": int(total_kept),
         "observation_keys": list(obs_keys),
@@ -120,7 +120,7 @@ def save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode, norm
     if norm_stats is not None:
         meta["normalization_stats"] = norm_stats
 
-    meta_path = OUT_PATH.with_suffix(".meta.json")
+    meta_path = BC_OUT_PATH.with_suffix(".meta.json")
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
     print(f"[META] saved → {meta_path}")
@@ -343,7 +343,8 @@ def remap_presence_grid(out_obs, mapping=None, verify=True):
     if mapping is None:
         mapping = {0: 0, 1: 1, 2: 2, 9: 3}
 
-    grid = out_obs["obs_presence"]
+    target_key = "next_obs_presence" if "next_obs_presence" in out_obs else "obs_presence"
+    grid = out_obs[target_key]
 
     if verify:
         values, counts = np.unique(grid, return_counts=True)
@@ -355,7 +356,7 @@ def remap_presence_grid(out_obs, mapping=None, verify=True):
     for old, new in mapping.items():
         remapped[grid == old] = new
 
-    out_obs["obs_presence"] = remapped.astype(np.float32)
+    out_obs[target_key] = remapped.astype(np.float32)
 
     if verify:
         values, counts = np.unique(remapped, return_counts=True)
@@ -466,19 +467,31 @@ def pass_1_compute_masks(files, stats, mode, rng):
     stats["kept"] = total_kept
     return keep_masks, total_kept, obs_keys, obs_shapes
 
+
+
+
 def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
     out_obs = {}
+    out_next_obs = {} # NEW: Track next observation states (s') for RL algorithms
 
     # Pre-allocate arrays
     for k in obs_keys:
         if k in GRID_KEYS:
             H, W = obs_shapes[k]
             out_obs[k] = np.empty((total_kept, WINDOW_SIZE, H, W), dtype=np.float32)
+            out_next_obs[f"next_{k}"] = np.empty((total_kept, WINDOW_SIZE, H, W), dtype=np.float32) # Allocate s' spatial tracking
         else:
             out_obs[k] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32)
+            out_next_obs[f"next_{k}"] = np.empty((total_kept, *obs_shapes[k]), dtype=np.float32) # Allocate s' scalar tracking
 
-    out_actions = np.empty((total_kept, 2), dtype=np.int64)
-    out_rewards = np.empty((total_kept,), dtype=np.float32) # NEW: Array for compiled rewards
+    # Ensure correct action dimensions based on the action space mode
+    if bc_config.ACTION_MODE == "discrete":
+        out_actions = np.empty((total_kept, 2), dtype=np.int64)
+    else:
+        out_actions = np.empty((total_kept, 3), dtype=np.float32)
+
+    out_rewards = np.empty((total_kept,), dtype=np.float32) # Array for compiled rewards
+    out_dones = np.zeros((total_kept,), dtype=np.float32) # Explicit terminal flags tracking for RL
 
     idx = 0
 
@@ -490,7 +503,8 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         add_spatial_features(d)
 
         valid_indices = np.where(mask)[0]
-        valid_indices = valid_indices[valid_indices >= (WINDOW_SIZE - 1)]
+        # Ensure we clamp boundaries so src_idx + 1 can look ahead cleanly into history sequences
+        valid_indices = valid_indices[(valid_indices >= (WINDOW_SIZE - 1)) & (valid_indices < len(mask) - 1)]
         n = len(valid_indices)
 
         if n == 0:
@@ -501,20 +515,36 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
 
         # Build (n, WINDOW_SIZE) table of indices
         index_table = window_starts[:, None] + np.arange(WINDOW_SIZE)
+        
+        # Shift temporal indexing look-ahead step forward to map next_states cleanly
+        next_index_table = index_table + 1
 
         # 1. Batch copy GRID KEYS
         for k in GRID_KEYS:
             out_obs[k][idx:idx+n] = d[k][index_table]
+            out_next_obs[f"next_{k}"][idx:idx+n] = d[k][next_index_table] # Copy next state grids
 
         # 2. Batch copy scalars
         scalar_src = valid_indices
+        scalar_next_src = valid_indices + 1 # Target indices for s' tracking
         for k in obs_keys:
             if k not in GRID_KEYS:
                 out_obs[k][idx:idx+n] = d[k][scalar_src]
+                out_next_obs[f"next_{k}"][idx:idx+n] = d[k][scalar_next_src] # Copy next state scalars
 
         # 3. Actions
-        out_actions[idx:idx+n] = d["actions"][scalar_src]
-        
+        if bc_config.ACTION_MODE == "discrete":
+            out_actions[idx:idx+n] = d["actions"][scalar_src]
+        else:
+            # Safely grab the continuous floats (checking both 'obs_' and 'target_' prefixes)
+            t = d.get("obs_throttle", d.get("target_throttle"))[scalar_src].flatten()
+            b = d.get("obs_brake", d.get("target_brake"))[scalar_src].flatten()
+            s = d.get("obs_steering_angle", d.get("target_steering_angle"))[scalar_src].flatten()
+            
+            # Stack them into the 3-column array [throttle, brake, steer]
+            out_actions[idx:idx+n] = np.column_stack([t, b, s])
+            
+        out_dones[idx:idx+n] = d["terminated"][scalar_src].astype(np.float32) # Extract clean terminal boundaries
         # 4. COMPILE REWARDS
         for i, src_idx in enumerate(scalar_src):
             # Attempt to extract the rich info dict
@@ -549,7 +579,7 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
 
         idx += n
 
-    return out_obs, out_actions, out_rewards
+    return out_obs, out_actions, out_rewards, out_next_obs, out_dones
 
 # ==============================================================================
 # 4. MAIN ORCHESTRATOR
@@ -608,65 +638,119 @@ def compute_normalization_stats(out_obs):
             
     return norm_stats
 
-
 def run_pipeline(mode, visualize=False):
     print(f"[{mode.upper()}] Starting dataset pipeline with Window Size {WINDOW_SIZE}...")
     rng = np.random.default_rng(RNG_SEED)
     stats = init_stats()
     files = gather_demo_files(DEMO_DIRS)
 
-    # --- PASS 1 ---
-    print(f"[{mode.upper()}] Computing filtering masks...")
-    keep_masks, total_kept, obs_keys, obs_shapes = pass_1_compute_masks(files, stats, mode, rng)
-    assert total_kept > 0, "No samples kept! Check filtering/sampling rules."
-    print(f"[{mode.upper()}] Total windows kept for dataset: {total_kept}")
-
-    # --- PASS 2 ---
-    print(f"[{mode.upper()}] Building temporal windows...")
-    # --- PASS 2 ---
-    print(f"[{mode.upper()}] Building temporal windows...")
-    out_obs, out_actions, out_rewards = pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes)
-    print_minmax_summary(out_obs)
-    # --- Post Processing ---
-    out_obs = remap_presence_grid(out_obs)
-
+    # =========================================================================
+    # PASS A: RUN SUPERVISED LEARNING COMPILATION (BC POLICY FORMAT)
+    # =========================================================================
+    print(f"\n--- [PASS A] Generating BC Policy Dataset (Filtering Crashes) ---")
+    keep_masks_bc, total_kept_bc, obs_keys_bc, obs_shapes_bc = pass_1_compute_masks(files, stats, mode, rng)
+    assert total_kept_bc > 0, "No samples kept for BC! Check filtering/sampling rules."
+    
+    out_obs_bc, out_actions_bc, out_rewards_bc, _, _ = pass_2_build_dataset(
+        files, keep_masks_bc, total_kept_bc, obs_keys_bc, obs_shapes_bc
+    )
+    
+    out_obs_bc = remap_presence_grid(out_obs_bc, verify=False)
     if MIRROR_DATASET:
-        out_obs, out_actions = apply_mirror_augmentation(out_obs, out_actions, mode)
-
+        out_obs_bc, out_actions_bc = apply_mirror_augmentation(out_obs_bc, out_actions_bc, mode)
     if mode == "discrete" and SIMPLIFY_ACTIONS:
-        out_obs, out_actions = simplify_actions(out_obs, out_actions)
+        out_obs_bc, out_actions_bc = simplify_actions(out_obs_bc, out_actions_bc)
 
+    # =========================================================================
+    # PASS B: RUN REINFORCEMENT LEARNING COMPILATION (SAC REPLAY BUFFER FORMAT)
+    # =========================================================================
+    print(f"\n--- [PASS B] Generating RL Replay Dataset (Retaining Crash History) ---")
+    # Temporarily override configuration rules to capture the complete crash sequences
+    global DROP_TERMINATED, DROP_LAST_N_BEFORE_TERMINATION
+    old_drop_term = DROP_TERMINATED
+    old_drop_n = DROP_LAST_N_BEFORE_TERMINATION
+    
+    DROP_TERMINATED = False
+    DROP_LAST_N_BEFORE_TERMINATION = 0
+    
+    stats_rl = init_stats()
+    keep_masks_rl, total_kept_rl, obs_keys_rl, obs_shapes_rl = pass_1_compute_masks(files, stats_rl, mode, rng)
+    
+    out_obs_rl, out_actions_rl, out_rewards_rl, out_next_rl, out_dones_rl = pass_2_build_dataset(
+        files, keep_masks_rl, total_kept_rl, obs_keys_rl, obs_shapes_rl
+    )
+    
+    out_obs_rl = remap_presence_grid(out_obs_rl, verify=False)
+    out_next_rl = remap_presence_grid(out_next_rl, verify=False) # Ensure next state keys mirror processing updates
+    
+    if MIRROR_DATASET:
+        out_obs_rl, out_actions_rl = apply_mirror_augmentation(out_obs_rl, out_actions_rl, mode)
+        # Re-run mirror logic over next-states so augmentation tracks are completely synchronous
+        out_next_rl, _ = apply_mirror_augmentation(out_next_rl, out_actions_rl, mode) 
+        
+    # Revert tracking boundaries back to safety baselines
+    DROP_TERMINATED = old_drop_term
+    DROP_LAST_N_BEFORE_TERMINATION = old_drop_n
 
+    # Print summary information using Pass A metrics
+    print_minmax_summary(out_obs_bc)
     print_trim_statistics(stats)
+    
     if mode == "discrete":
-        print_distribution_summary(out_actions, files)
+        print_distribution_summary(out_actions_bc, files)
         if visualize:
-            visualize_discrete(out_actions, out_obs)
-            pass
+            visualize_discrete(out_actions_bc, out_obs_bc)
     else:
-        print_obs_continuous_stats(out_obs)
+        print_obs_continuous_stats(out_obs_bc)
         if visualize:
-            visualize_continuous(out_obs)
-            pass
+            visualize_continuous(out_obs_bc)
 
     # --- Compute Normalization Stats ---
-    norm_stats = compute_normalization_stats(out_obs)
+    norm_stats = compute_normalization_stats(out_obs_bc)
 
-    # --- Rename targets & Save ---
+    # --- Save Pass A: BC Policy Dataset ---
+    # Rename target trackers to keep consistency with the supervised loader
     for k in TARGET_RENAME_KEYS:
-        if k in out_obs:
-            out_obs[f"target_{k[4:]}"] = out_obs.pop(k)
+        if k in out_obs_bc:
+            out_obs_bc[f"target_{k[4:]}"] = out_obs_bc.pop(k)
 
-    # We strip out the "info_" keys so they don't bloat the final training dataset
-    final_obs = {k: v for k, v in out_obs.items() if not k.startswith("info_")}
+    final_obs_bc = {k: v for k, v in out_obs_bc.items() if not k.startswith("info_")}
+    save_dict_bc = {**final_obs_bc, "actions": out_actions_bc, "rewards": out_rewards_bc}
+    np.savez_compressed(BC_OUT_PATH, **save_dict_bc)
+    print(f"\n[BC DATASET] ✅ Saved Supervised Targets to: {BC_OUT_PATH.resolve()}")
+    save_dataset_meta(stats, obs_keys_bc, obs_shapes_bc, total_kept_bc, files, mode=mode, norm_stats=norm_stats)
+
+    # --- Save Pass B: RL Buffer Preloading Dataset ---
+    # Strip any internal logging maps out to isolate pure numpy matrices
+    final_obs_rl = {k: v for k, v in out_obs_rl.items() if not k.startswith("info_")}
+    final_next_rl = {k: v for k, v in out_next_rl.items() if not k.startswith("info_")}
     
-    save_dict = {**final_obs, "actions": out_actions, "rewards": out_rewards}
-    np.savez_compressed(OUT_PATH, **save_dict)
+
+    save_dict_rl = {
+        **final_obs_rl, 
+        **final_next_rl, 
+        "actions": out_actions_rl, 
+        "rewards": out_rewards_rl, 
+        "dones": out_dones_rl
+    }
+    np.savez_compressed(RL_OUT_PATH, **save_dict_rl)
+    print(f"[RL DATASET] ✅ Saved Complete Sequence Transitions to: {RL_OUT_PATH.resolve()}")
     
-    save_dataset_meta(stats, obs_keys, obs_shapes, total_kept, files, mode=mode, norm_stats=norm_stats)
-    print(f"[{mode.upper()}] ✅ Successfully saved to: {OUT_PATH.resolve()}")
 
-
+    # NEW: Clone the metadata to the RL output path so the buffer loader finds it
+    rl_meta_path = RL_OUT_PATH.with_suffix(".meta.json")
+    with open(rl_meta_path, "w") as f:
+        meta = {
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "dataset_path": str(RL_OUT_PATH.resolve().relative_to(PROJECT_ROOT)),
+            "source_files": [str(Path(f).resolve().relative_to(PROJECT_ROOT)) for f in files],
+            "total_samples": int(total_kept_rl),
+            "observation_keys": list(obs_keys_rl),
+            "observation_shapes": {k: list(v) for k, v in obs_shapes_rl.items()},
+            "normalization_stats": norm_stats
+        }
+        json.dump(meta, f, indent=2)
+    print(f"[META] cloned for RL buffer → {rl_meta_path}")
 
 
 
@@ -726,6 +810,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.out_path:
-        OUT_PATH = Path(args.out_path)
+        BC_OUT_PATH = Path(args.BC_OUT_PATH)
 
     run_pipeline(mode=args.action_mode, visualize=args.visualize or bc_config.BUILD_VISUALIZE)

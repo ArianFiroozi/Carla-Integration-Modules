@@ -18,7 +18,7 @@ TARGET_ENTROPY_SCALE = 0.2
 # =========================================================
 # OPTIMIZATION  
 # =========================================================
-
+USE_HUBER_LOSS = True
 ACTOR_LR = 1e-6           
 CRITIC_LR = 1e-4          
 ALPHA_LR = 1e-4           
@@ -27,7 +27,7 @@ WEIGHT_DECAY = 0
 
 
 BC_PENALTY_INIT = 0      # Starting MSE weight
-BC_PENALTY_STEPS = 0  # Steps until weight hits 0
+BC_PENALTY_STEPS = 1  # Steps until weight hits 0
 # =========================================================
 # REPLAY BUFFER
 # =========================================================
@@ -98,5 +98,7 @@ LOG_EVERY = 1000
 
 LOAD_BC_WEIGHTS = True
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
-RESUME_CHECKPOINT = False
+RESUME_CHECKPOINT = True    
 RECORD_SAC_EVAL_VID = True
+PRELOAD_EXPERT_DATA = True
+COMPILED_DATASET_PATH = REPO_ROOT / "imitation" / "data" / "processed" / "dataset_rl_buffer.npz"
