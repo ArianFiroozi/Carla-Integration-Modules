@@ -359,7 +359,26 @@ def log_replay_buffer_stats(tb_writer, replay_buffer, step, rewards=None):
 
 
 
-
+def load_specific_checkpoint(pkl_path, device):
+    """Load a specific checkpoint to branch a new experiment from."""
+    state_path = Path(pkl_path)
+    step = state_path.stem.split("_")[-1]
+    model_path = state_path.parent / f"checkpoint_step_{step}.pt"
+    
+    if not state_path.exists() or not model_path.exists():
+        print(f"Error: Missing files for {state_path}")
+        return None
+        
+    print(f"Branching from model: {model_path}")
+    print(f"Branching from state: {state_path}")
+    
+    with open(state_path, 'rb') as f:
+        checkpoint_state = pickle.load(f)
+        
+    return {
+        'model_path': model_path,
+        'checkpoint_state': checkpoint_state
+    }
 
 def main():
     parser = argparse.ArgumentParser()
@@ -369,6 +388,7 @@ def main():
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
     parser.add_argument("--resume", action="store_true",default=cfg.RESUME_CHECKPOINT, help="Resume from latest checkpoint")
     parser.add_argument("--resume-dir", type=str, default=None, help="Specific experiment directory to resume from")
+    parser.add_argument("--branch-from", type=str, default=None, help="Path to a specific .pkl state to branch a NEW experiment from")
     args = parser.parse_args()
 
     # --------------------------- Assumptions ---------------------------
@@ -379,7 +399,11 @@ def main():
     seed_everything(args.seed)
 
     # Determine experiment directory
-    if args.resume and args.resume_dir:
+    if args.branch_from:
+        print("Branching experiment...")
+        exp_dir = make_experiment_dir() # Forces a NEW directory
+        save_config(exp_dir)
+    elif args.resume and args.resume_dir:
         exp_dir = make_experiment_dir(resume_dir=args.resume_dir)
     elif args.resume:
         # Try to find the latest experiment directory
@@ -426,65 +450,69 @@ def main():
     episode = 0
     best_eval_return = -1e9
     
-    # Handle resume vs fresh start
-    if args.resume:
+    # Handle resume vs fresh start vs branch
+    checkpoint_data = None
+    if args.branch_from:
+        checkpoint_data = load_specific_checkpoint(args.branch_from, args.device)
+    elif args.resume:
         checkpoint_data = load_full_checkpoint(exp_dir, args.device)
         
-        if checkpoint_data is not None:
-            # Load model
-            agent.load(checkpoint_data['model_path'])
-            
-            # Load state
-            state = checkpoint_data['checkpoint_state']
-            total_steps = state['step']
-            replay_buffer = state['replay_buffer']
-            
-    
-            # Restore optimizer states
-            opt_states = state.get('optimizer_states', {})
-            if 'actor_opt' in opt_states:
-                agent.actor_opt.load_state_dict(opt_states['actor_opt'])
-                print("Restored actor optimizer state")
-            if 'critic_opt' in opt_states:
-                agent.critic_opt.load_state_dict(opt_states['critic_opt'])
-                print("Restored critic optimizer state")
-            if agent.auto_entropy and 'alpha_opt' in opt_states:
-                agent.alpha_opt.load_state_dict(opt_states['alpha_opt'])
-                print("Restored alpha optimizer state")
-            
-            # Restore log_alpha (SAC entropy temperature) 
-            if agent.auto_entropy and state.get('log_alpha') is not None:
-                agent.log_alpha.data.copy_(state['log_alpha'].to(agent.device))
-                print(f"Restored log_alpha: {agent.log_alpha.exp().item():.4f}")
-            
-            # Restore episode info if available
-            extra_info = state.get('extra_info', {})
-            episode = extra_info.get('episode', 0)
-            best_eval_return = extra_info.get('best_eval_return', -1e9)
-            
-            # Restore RNG states
-            rng_state = state.get('rng_state', {})
-            if rng_state:
-                random.setstate(rng_state['python'])
-                np.random.set_state(rng_state['numpy'])
-                torch.set_rng_state(rng_state['torch'])
-                if rng_state['torch_cuda'] is not None and torch.cuda.is_available():
-                    torch.cuda.set_rng_state(rng_state['torch_cuda'])
-            
-            print(f"Resumed training from step {total_steps}, episode {episode}")
-        else:
-            print("No checkpoint found to resume. Starting fresh.")
+    if checkpoint_data is not None:
+        # Load model
+        agent.load(checkpoint_data['model_path'])
+        
+        # Load state
+        state = checkpoint_data['checkpoint_state']
+        total_steps = state['step']
+        
+        # Safe buffer loading 
+        replay_buffer = state.get('replay_buffer')
+        if replay_buffer is None:
+            print("[WARN] Replay buffer not found in this checkpoint. Initializing a fresh one.")
             replay_buffer = SACReplayBuffer(capacity=cfg.REPLAY_BUFFER_SIZE, device=args.device)
+            if cfg.PRELOAD_EXPERT_DATA:
+                replay_buffer.load_offline_dataset(cfg.COMPILED_DATASET_PATH)
+        else:
+            print(f"Restored replay buffer with {len(replay_buffer)} transitions.")
             
-            # Load BC weights if configured
-            if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():
-                print(f"Loading BC weights from: {cfg.BC_CHECKPOINT_PATH}")
-                agent.load_actor_from_bc(cfg.BC_CHECKPOINT_PATH, strict=False)
-            elif cfg.LOAD_BC_WEIGHTS:
-                print(f"[WARN] BC checkpoint not found at: {cfg.BC_CHECKPOINT_PATH}")
+        # Restore optimizer states
+        opt_states = state.get('optimizer_states', {})
+        if 'actor_opt' in opt_states:
+            agent.actor_opt.load_state_dict(opt_states['actor_opt'])
+            print("Restored actor optimizer state")
+        if 'critic_opt' in opt_states:
+            agent.critic_opt.load_state_dict(opt_states['critic_opt'])
+            print("Restored critic optimizer state")
+        if agent.auto_entropy and 'alpha_opt' in opt_states:
+            agent.alpha_opt.load_state_dict(opt_states['alpha_opt'])
+            print("Restored alpha optimizer state")
+        
+        # Restore log_alpha (SAC entropy temperature) 
+        if agent.auto_entropy and state.get('log_alpha') is not None:
+            agent.log_alpha.data.copy_(state['log_alpha'].to(agent.device))
+            print(f"Restored log_alpha: {agent.log_alpha.exp().item():.4f}")
+        
+        # Restore episode info if available
+        extra_info = state.get('extra_info', {})
+        episode = extra_info.get('episode', 0)
+        best_eval_return = extra_info.get('best_eval_return', -1e9)
+        
+        # Restore RNG states
+        rng_state = state.get('rng_state', {})
+        if rng_state:
+            random.setstate(rng_state['python'])
+            np.random.set_state(rng_state['numpy'])
+            torch.set_rng_state(rng_state['torch'])
+            if rng_state['torch_cuda'] is not None and torch.cuda.is_available():
+                torch.cuda.set_rng_state(rng_state['torch_cuda'])
+        
+        print(f"Resumed training from step {total_steps}, episode {episode}")
+
     else:
-        # Fresh start
+        # Fresh start (or no valid checkpoint found)
+        print("Starting fresh.")
         replay_buffer = SACReplayBuffer(capacity=cfg.REPLAY_BUFFER_SIZE, device=args.device)
+        
         if cfg.PRELOAD_EXPERT_DATA:
             replay_buffer.load_offline_dataset(cfg.COMPILED_DATASET_PATH)
         

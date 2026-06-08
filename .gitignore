@@ -172,9 +172,7 @@ cython_debug/
 
 
 *.mp4
-imitation/data/processed
-expert_demos
-LoadOpenDrive2
+CarlaEnv/LoadOpenDrive2/towns
 build_dataset.md
 explaination.md
 
@@ -185,7 +183,7 @@ explaination.md
 __pycache__/
 experiments_archive/**/*.pt
 report.txt
-imitation/data
+
 experiments/rl/**/*.pt
 experiments/rl/**/*.pkl
 offline_rl/**/*.npz
@@ -193,4 +191,6 @@ test
 # Ignore RL experiment logs and datasets
 *.tfevents.*
 *.zip
-*.npz
+
+imitation/data/archive
+imitation/data/processed

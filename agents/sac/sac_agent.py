@@ -216,10 +216,12 @@ class SACAgent:
         grad_norms = {}
         
         # Determine which components to update this step
-        update_critic = (self.train_step % cfg.CRITIC_UPDATE_EVERY == 0)
-        update_actor = (self.train_step % cfg.ACTOR_UPDATE_EVERY == 0) and (self.train_step >= cfg.CRITIC_WARMUP_STEPS)
-        update_alpha = (self.train_step % cfg.ALPHA_UPDATE_EVERY == 0) and (self.train_step >= cfg.CRITIC_WARMUP_STEPS)
 
+        is_warmed_up = (self.train_step >= cfg.CRITIC_WARMUP_STEPS) or getattr(cfg, 'FORCE_SKIP_WARMUP', False)        
+        update_critic = (self.train_step % cfg.CRITIC_UPDATE_EVERY == 0)
+        update_actor = (self.train_step % cfg.ACTOR_UPDATE_EVERY == 0) and is_warmed_up
+        update_alpha = (self.train_step % cfg.ALPHA_UPDATE_EVERY == 0) and is_warmed_up
+        
         # ---------------------- Critic update ----------------------
         critic_loss = torch.tensor(0.0)
         if update_critic:
@@ -256,7 +258,7 @@ class SACAgent:
             grad_norms["critic_grad_norm"] = 0.0
 
         # If still in warmup, return early (but after possible critic update)
-        if self.train_step < cfg.CRITIC_WARMUP_STEPS:
+        if not is_warmed_up:
             grad_norms["actor_grad_norm"] = 0.0
             grad_norms["alpha_grad_norm"] = 0.0
             return {

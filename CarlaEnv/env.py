@@ -1,3 +1,5 @@
+from multiprocessing.util import info
+
 from gymnasium import spaces
 import gymnasium
 import numpy as np
@@ -26,7 +28,7 @@ CHECKPOINTS_DIR.mkdir(exist_ok=True)
 
 MAX_ITER_IN_EPISODE=5000
 SUPPORTED_SIGNS_COUNT = 5
-LEAST_HEIGHT = -10
+LEAST_HEIGHT = -5
 
 with open(PID_PATH, "w") as f:
     f.write(str(os.getpid()))
@@ -259,9 +261,9 @@ class CarlaEnv(gymnasium.Env):
             
         # 3. Calculate reward
         reward,info = self.vehicle_controller.get_reward(prev_obs)
-        if terminated:
+        if info.get('is_terminal_crash', 0) == 1:
+            terminated = True
             self.vehicle_controller.collision_happened = False
-            
 
         obs = self._get_observation()
         self.current_step += 1

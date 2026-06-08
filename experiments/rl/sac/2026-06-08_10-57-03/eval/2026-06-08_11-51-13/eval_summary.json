@@ -1,0 +1,17 @@
+{
+  "model_path": "C:\\carla\\Carla-Integration-Modules\\experiments\\rl\\sac\\2026-06-08_10-57-03\\models\\checkpoint_step_115752.pt",
+  "episodes": 10,
+  "avg_return": -141.26039213089123,
+  "std_return": 50.66823450358393,
+  "min_return": -194.8035476500487,
+  "max_return": -30.460511082905818,
+  "avg_length": 94.6,
+  "std_length": 58.95116623104246,
+  "end_reasons": {
+    "terminated": 10
+  },
+  "wall_time_sec": 25.41312885284424,
+  "carla_vehicles": 30,
+  "carla_walkers": 0,
+  "video_recorded": true
+}

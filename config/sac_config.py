@@ -26,8 +26,8 @@ ALPHA_LR = 1e-4
 WEIGHT_DECAY = 0           
 
 
-BC_PENALTY_INIT = 0      # Starting MSE weight
-BC_PENALTY_STEPS = 1  # Steps until weight hits 0
+BC_PENALTY_INIT = 10      # Starting MSE weight
+BC_PENALTY_STEPS = 300_000  # Steps until weight hits 0
 # =========================================================
 # REPLAY BUFFER
 # =========================================================
@@ -75,7 +75,7 @@ LOG_STD_MAX = -3
 
 USE_RANDOM_POLICY_WARMUP = False
 WARMUP_STEPS = 5_000 
-
+FORCE_SKIP_WARMUP = False  # Set to True to bypass the actor for when critic is already warmupped
 # =========================================================
 # EVALUATION
 # =========================================================
@@ -98,7 +98,7 @@ LOG_EVERY = 1000
 
 LOAD_BC_WEIGHTS = True
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
-RESUME_CHECKPOINT = True    
+RESUME_CHECKPOINT = False    
 RECORD_SAC_EVAL_VID = True
 PRELOAD_EXPERT_DATA = True
 COMPILED_DATASET_PATH = REPO_ROOT / "imitation" / "data" / "processed" / "dataset_rl_buffer.npz"
