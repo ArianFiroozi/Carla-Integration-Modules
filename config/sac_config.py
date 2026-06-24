@@ -19,14 +19,14 @@ TARGET_ENTROPY_SCALE = 0.2
 # OPTIMIZATION  
 # =========================================================
 USE_HUBER_LOSS = True
-ACTOR_LR = 1e-6           
+ACTOR_LR = 1e-6         
 CRITIC_LR = 1e-4          
 ALPHA_LR = 1e-4           
 
 WEIGHT_DECAY = 0           
 
 
-BC_PENALTY_INIT = 10      # Starting MSE weight
+BC_PENALTY_INIT = 0      # Starting MSE weight
 BC_PENALTY_STEPS = 300_000  # Steps until weight hits 0
 # =========================================================
 # REPLAY BUFFER
@@ -74,7 +74,7 @@ LOG_STD_MAX = -3
 # =========================================================
 
 USE_RANDOM_POLICY_WARMUP = False
-WARMUP_STEPS = 5_000 
+WARMUP_STEPS = 10_000 
 FORCE_SKIP_WARMUP = False  # Set to True to bypass the actor for when critic is already warmupped
 # =========================================================
 # EVALUATION
@@ -102,3 +102,4 @@ RESUME_CHECKPOINT = False
 RECORD_SAC_EVAL_VID = True
 PRELOAD_EXPERT_DATA = True
 COMPILED_DATASET_PATH = REPO_ROOT / "imitation" / "data" / "processed" / "dataset_rl_buffer.npz"
+BRANCH_FROM = None # this is a path for which checkpoint to resume

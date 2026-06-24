@@ -149,4 +149,4 @@ PENALTY_LANE_INVASION = 0.0   # Tax for crossing the solid white line
 PENALTY_ROLLING_BACKWARD = -3.0 # Tax for sliding backwards down a hill or post-crash
 STALL_SPEED_THRESHOLD = 1.0    # Speed below which we consider the car "stalling"
 PENALTY_STALLING = -0.5        # Tax for sitting still to avoid driving
-
+REWARD_SCALE_FACTOR = 100.0

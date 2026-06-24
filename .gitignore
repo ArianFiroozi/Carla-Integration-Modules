@@ -184,8 +184,8 @@ __pycache__/
 experiments_archive/**/*.pt
 report.txt
 
-experiments/rl/**/*.pt
-experiments/rl/**/*.pkl
+experiments/**/*.pt
+experiments/**/*.pkl
 offline_rl/**/*.npz
 test
 # Ignore RL experiment logs and datasets
@@ -194,3 +194,6 @@ test
 
 imitation/data/archive
 imitation/data/processed
+
+
+experiments_tb_only

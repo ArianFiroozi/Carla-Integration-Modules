@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from config import offline_rl_config as cfg
-from rl.sac.replay_buffer import SACReplayBuffer
+from utils.replay_buffer import SACReplayBuffer
 from utils.obs_wrapper import CarlaObsWrapper
 from offline_rl.iql.iql_agent import IQLAgent
 
