@@ -1,0 +1,8 @@
+kill:
+taskkill /F /IM CarlaUE4.exe /T
+resume:
+python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-26_22-06-10"
+new:
+python -m rl.sac.train_sac
+plot:
+python plot_run.py "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-26_22-06-10"

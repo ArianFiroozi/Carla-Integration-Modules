@@ -391,6 +391,11 @@ def main():
     parser.add_argument("--branch-from", type=str, default=None, help="Path to a specific .pkl state to branch a NEW experiment from")
     args = parser.parse_args()
 
+    # Passing --resume-dir clearly means "resume", so don't also require the separate
+    # --resume flag (previously --resume-dir alone was silently ignored -> fresh start).
+    if args.resume_dir:
+        args.resume = True
+
     # --------------------------- Assumptions ---------------------------
     # We assume CONTINUOUS ACTIONS ONLY (no discrete mode).
     # We use CarlaObsWrapper for preprocessing.
@@ -554,26 +559,28 @@ def main():
             
 
             # Env step
-            next_obs, raw_reward, terminated, truncated, info = env.step(raw_action)
-            done = terminated or truncated
-
+            next_obs, reward, terminated, truncated, info = env.step(raw_action)
             
-            # Use the info dictionary to calculate the true reward
-            reward, _ = compile_reward(info, general_config, is_tensor=False)
+            done = terminated 
+            episode_done = terminated or truncated
 
             # Preprocess next obs
             next_grid, next_scalars = wrapper.preprocess(next_obs)
 
-            # Store transition (store ENV action, because that is what executed)
+            # Store the RAW policy action. The actor proposes raw actions, so the critic must be
+            # trained on raw actions (actor/critic consistency) AND so the raw pedal-overlap
+            # penalty actually teaches the policy not to hedge. The env's exclusivity/floor are
+            # part of the deterministic dynamics that produced `reward` and `next_obs`.
             replay_buffer.add(
                 grid_obs=grid,
                 scalar_obs=scalars,
                 action=raw_action,
-                reward=reward, # the compiled reward
+                reward=reward,
                 next_grid_obs=next_grid,
                 next_scalar_obs=next_scalars,
                 done=done
             )
+
             obs = next_obs
             episode_reward += float(reward)
             episode_len += 1
@@ -620,7 +627,7 @@ def main():
                     log_replay_buffer_stats(tb_writer, replay_buffer, total_steps, rewards=r)
 
             # End of episode
-            if done or episode_len >= args.max_steps:
+            if episode_done or episode_len >= args.max_steps:
                 ep_time = time.time() - episode_start
                 print(f"[Episode {episode+1}] return={episode_reward:.2f} len={episode_len} time={ep_time:.1f}s")
                 tb_writer.add_scalar("train/episode_return", episode_reward, episode + 1)
@@ -707,6 +714,37 @@ def main():
             extra_info=extra_info
         )
         print("Final checkpoint saved.")
+
+    except Exception:
+        # CARLA server crash / SSH drop / any runtime error: don't lose the run.
+        import traceback
+        print("\n[ERROR] Training crashed. Saving emergency checkpoint so you can --resume...")
+        traceback.print_exc()
+        try:
+            optimizer_states = {
+                'actor_opt': agent.actor_opt.state_dict(),
+                'critic_opt': agent.critic_opt.state_dict(),
+            }
+            if agent.auto_entropy:
+                optimizer_states['alpha_opt'] = agent.alpha_opt.state_dict()
+            extra_info = {
+                'episode': episode,
+                'best_eval_return': best_eval_return,
+                'episode_reward': episode_reward,
+                'episode_len': episode_len,
+            }
+            save_full_checkpoint(
+                exp_dir=exp_dir,
+                step=total_steps,
+                agent=agent,
+                replay_buffer=replay_buffer,
+                optimizer_states=optimizer_states,
+                extra_info=extra_info
+            )
+            print(f"Emergency checkpoint saved at step {total_steps}.")
+            print(f"Resume with: python -m rl.sac.train_sac --resume-dir \"{exp_dir}\"")
+        except Exception as save_err:
+            print(f"[ERROR] Could not save emergency checkpoint: {save_err}")
 
     finally:
         tb_writer.flush()

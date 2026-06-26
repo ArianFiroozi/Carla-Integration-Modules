@@ -112,7 +112,8 @@ ACTION_HIGH = [1.0, 1.0, 1.0]
 # =========================================================
 CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 CARLA_WALKERS = 0
-CARLA_VEHICLES = 30
+CARLA_VEHICLES = 0      # STAGE 0 stability test: no NPC traffic (lightest load, no spawn deadlocks).
+                       # Raise to ~8-10 (with hybrid physics now enabled) once runs are stable.
 CARLA_MAX_STEPS = 2000
 CARLA_INIT_SPEED = 0
 
@@ -131,7 +132,7 @@ RANDOM_EGO_START_POS = True
 
 # 1. The Progress Engine
 TARGET_SPEED_MS = 6.0         
-WEIGHT_PROGRESS = 0.5          # Reward for moving forward along the road
+WEIGHT_PROGRESS = 1.0          # STAGE 1c: was 0.5; make actual driving clearly more valuable than idling
 
 # 2. The Alignment Engine
 WEIGHT_CENTERING = 0.3         # Reward for staying dead-center in the lane
@@ -141,12 +142,13 @@ WEIGHT_HEADING = 0.2           # Reward for facing parallel to the road
 # 3. The Control Penalty (Shock Absorbers)
 PENALTY_STEER_DELTA = 0.1      # Tax for violently jerking the steering wheel
 PENALTY_THROTTLE_DELTA = 0.1   # Tax for slamming on/off the gas
-PENALTY_PEDAL_OVERLAP = -2.0   # Tax for pressing brake and gas at the same time
+PENALTY_PEDAL_OVERLAP = -0.5   # STAGE 1c-v2: was -2.0; per-step penalty, amplified x100 by gamma
 
 # 4. Terminals and Violations
-PENALTY_TERMINAL_CRASH = -200.0  
+PENALTY_TERMINAL_CRASH = -15.0   # STAGE 1b: was -200; 200x per-step scale collapsed the critic (Q->-200
+                                 # everywhere) and made the agent stall to avoid crashing. ~10x is enough.
 PENALTY_LANE_INVASION = 0.0   # Tax for crossing the solid white line
-PENALTY_ROLLING_BACKWARD = -3.0 # Tax for sliding backwards down a hill or post-crash
+PENALTY_ROLLING_BACKWARD = -0.5 # STAGE 1c-v2: was -3.0; per-step penalty landmine (x100 by gamma)
 STALL_SPEED_THRESHOLD = 1.0    # Speed below which we consider the car "stalling"
-PENALTY_STALLING = -0.5        # Tax for sitting still to avoid driving
+PENALTY_STALLING = -0.5        # STAGE 1c-v2: was -2.0 (->-200 value floor); small + dominant progress instead
 

@@ -176,10 +176,7 @@ CarlaEnv/LoadOpenDrive2/towns
 build_dataset.md
 explaination.md
 
-
 # Ignore datasets and logs
-# *.npz
-
 __pycache__/
 experiments_archive/**/*.pt
 report.txt
@@ -188,9 +185,16 @@ experiments/rl/**/*.pt
 experiments/rl/**/*.pkl
 offline_rl/**/*.npz
 test
+
 # Ignore RL experiment logs and datasets
 *.tfevents.*
 *.zip
 
+# Merged changes (Mani + Yours)
 imitation/data/archive
 imitation/data/processed
+*.npz
+carla_env
+
+# Ignore all experiment folders completely
+experiments/

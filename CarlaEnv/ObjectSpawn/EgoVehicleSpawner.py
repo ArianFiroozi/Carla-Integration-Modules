@@ -25,7 +25,8 @@ def spawn_ego_vehicle(world,
 
             spawn_point = spawn_points[i]
 
-            lateral_offset = random.uniform(-3.0, 3.0)
+            lateral_offset = random.uniform(-0.5, 0.5)  # CURRICULUM: was +-3.0; start lane-aligned
+                                                          # so the agent can experience crash-free driving
 
             right_vec = spawn_point.get_right_vector()
             spawn_point.location.x += right_vec.x * lateral_offset
