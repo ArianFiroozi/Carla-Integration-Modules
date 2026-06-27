@@ -216,7 +216,7 @@ class CarlaEnv(gymnasium.Env):
         
         return np.array([throttle, brake, steer], dtype=np.float32)
         
-    def step(self, action=None): 
+    def step(self, action=None , new_action_mode =None): 
         prev_obs = self._get_observation()        
         # 1. Define end-of-episode variables
         terminated = False  
@@ -224,14 +224,21 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
+        
+        action_mode = None
 
+        if new_action_mode is not None:
+            action_mode = new_action_mode
+        else:
+            action_mode = self.action_mode
+            
         if action is not None:
-            if self.action_mode == "discrete":
+            if action_mode == "discrete":
                 speed_action = int(action[0])
                 turn_action = int(action[1])
                 self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
                 self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-            elif self.action_mode == "continuous":
+            elif action_mode == "continuous":
                 # Apply post-processing to raw action
                 action = self._process_action(action)
                 
