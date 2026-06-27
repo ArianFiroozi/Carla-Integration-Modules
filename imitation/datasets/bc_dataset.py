@@ -168,6 +168,8 @@ class BCDataset(BaseDataset):
 
 
 def _process_actions_np(targets):
+
+    # TODO: fix this simliar to how it is done it env.py
     # targets: (N,3) [throttle, brake, steer]
     t = np.clip(targets[:, 0], 0.0, 1.0)
     b = np.clip(targets[:, 1], 0.0, 1.0)

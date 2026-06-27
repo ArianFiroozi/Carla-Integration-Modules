@@ -63,6 +63,10 @@ class VehicleController():
         # State trackers for smoothness penalties
         self.prev_steer = 0.0
         self.prev_throttle = 0.0
+        # Raw (pre-exclusivity) policy pedals; env.step sets these each tick so the reward can
+        # punish a throttle+brake hedge before the env zeroes the throttle.
+        self.raw_throttle = 0.0
+        self.raw_brake = 0.0
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -119,7 +123,9 @@ class VehicleController():
         # Terminals & Violations
         info['is_terminal_crash'] = int(self.collision_happened or vehicle_loc.z <= -5)
         info['is_lane_invaded'] = int(self.lane_invaded)
-        info['is_pedal_overlap'] = int(self.control.throttle > 0.1 and self.control.brake > 0.1)
+        # Judge pedal overlap on the RAW policy action (before the env zeroed the throttle), so
+        # the agent is punished for the throttle+brake hedge instead of escaping it for free.
+        info['is_pedal_overlap'] = int(self.raw_throttle > 0.1 and self.raw_brake > 0.1)
         
         # Vectors (Saved as raw lists/arrays)
         info['velocity_x'] = float(velocity.x)

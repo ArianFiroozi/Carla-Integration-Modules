@@ -37,16 +37,20 @@ class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete",
-                 random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False):
+                 random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False, no_rendering=True):
         super(CarlaEnv, self).__init__()
-        
+
         self.walkers_count = walkers_count
         self.vehicles_count = vehicles_count
         self.init_speed = init_speed
         self.action_mode = action_mode  # "discrete" or "continuous"
         self.smooth_steering = smooth_steering
+        # The observation is built entirely from actor states + map queries (only collision &
+        # lane-invasion sensors, no cameras), so we can run the server WITHOUT rendering.
+        # This massively reduces GPU load and is the main fix for RDP/virtual-GPU freezes.
+        self.no_rendering = no_rendering
         self.client = carla.Client("localhost", 2000)
-        self.client.set_timeout(10.0)  
+        self.client.set_timeout(20.0)  # was 10.0; tolerate occasional slow ticks before erroring
 
         self.random_ego_spawn = random_ego_spawn
         self.random_vehicle_spawn = random_vehicle_spawn
@@ -75,6 +79,7 @@ class CarlaEnv(gymnasium.Env):
         
         self.max_steps = max_steps
         self.current_step = 0
+        self._tick_fail_count = 0   # consecutive world.tick() failures (wedged-server guard)
         self.map = self.world.get_map()
         
         # Steering smoothing state
@@ -112,6 +117,29 @@ class CarlaEnv(gymnasium.Env):
         with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
                 
+    def _cleanup_world_actors(self):
+        """
+        Destroy ALL vehicles, sensors and walkers currently on the server — including 'zombie'
+        actors left behind by a previously force-killed run. A fresh process has no handle to
+        those zombies, so destroying only self-tracked actors is not enough; this clears them
+        and frees occupied spawn points / orphaned listening sensors.
+        """
+        try:
+            actors = self.world.get_actors()
+            victims = (list(actors.filter("sensor.*")) +
+                       list(actors.filter("walker.*")) +
+                       list(actors.filter("vehicle.*")))
+            for a in victims:
+                try:
+                    if a.type_id.startswith("sensor.") and a.is_listening:
+                        a.stop()
+                except Exception:
+                    pass
+            if victims:
+                self.client.apply_batch([carla.command.DestroyActor(a.id) for a in victims])
+        except Exception as e:
+            print(f"[WARN] world actor cleanup failed: {e}")
+
     def reset(self, seed=None):
         self.current_step = 0
         self.prev_steer = 0.0
@@ -120,37 +148,22 @@ class CarlaEnv(gymnasium.Env):
         if seed is not None:
             random.seed(seed)
 
-        # Check for None to safely destroy actors on the first reset
+        # Stop our own sensor callbacks first (so they don't fire mid-teardown), then do a
+        # GLOBAL cleanup that also removes zombie actors orphaned by a previous force-killed run.
         if self.vehicle_controller is not None:
-            if hasattr(self.vehicle_controller, 'sensor_c') and self.vehicle_controller.sensor_c is not None:
-                self.vehicle_controller.sensor_c.destroy()
-            if hasattr(self.vehicle_controller, 'sensor_l') and self.vehicle_controller.sensor_l is not None:
-                self.vehicle_controller.sensor_l.destroy()
+            for s in ("sensor_c", "sensor_l"):
+                sensor = getattr(self.vehicle_controller, s, None)
+                if sensor is not None:
+                    try:
+                        if sensor.is_listening:
+                            sensor.stop()
+                    except Exception:
+                        pass
 
-        if self.ego_vehicle is not None:
-            if hasattr(self.ego_vehicle, 'is_listening') and self.ego_vehicle.is_listening:
-                self.ego_vehicle.stop()
-            if self.ego_vehicle.is_alive:
-                self.ego_vehicle.destroy()
-            
-            # Tick the world to properly flush the destroy commands from the server    
-            self.world.tick()
-
-        if hasattr(self, "vehicles") and self.vehicles:
-            for v in self.vehicles:
-                try:
-                    v.destroy()
-                except:
-                    pass
-            self.vehicles = []
-
-        if hasattr(self, "walkers") and self.walkers:
-            for w in self.walkers:
-                try:
-                    w.destroy()
-                except:
-                    pass
-            self.walkers = []
+        self._cleanup_world_actors()
+        self.vehicles = []
+        self.walkers = []
+        self.ego_vehicle = None
         # Tick so CARLA actually removes them
         self.world.tick()
 
@@ -160,11 +173,15 @@ class CarlaEnv(gymnasium.Env):
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed, random_spawn=self.random_ego_spawn)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-        
+        print("[reset] controller+sensors created", flush=True)   # DEBUG: remove once hang is localized
+
         # Tick again so ego sensors + physics start stable
         self.world.tick()
+        print("[reset] post-spawn tick done", flush=True)         # DEBUG
 
-        return self._get_observation(), {}
+        obs = self._get_observation()
+        print("[reset] observation built; reset complete", flush=True)  # DEBUG
+        return obs, {}
 
     def _apply_sync(self, fixed_dt=0.05):
         # always grab the current world (after map load)
@@ -172,6 +189,7 @@ class CarlaEnv(gymnasium.Env):
         settings = self.world.get_settings()
         settings.synchronous_mode = True
         settings.fixed_delta_seconds = fixed_dt
+        settings.no_rendering_mode = self.no_rendering   # kill GPU rendering (no cameras are used)
         settings.substepping = True
         settings.max_substep_delta_time = 0.01   # 100 Hz physics
         settings.max_substeps = int(fixed_dt / settings.max_substep_delta_time) + 1
@@ -179,6 +197,13 @@ class CarlaEnv(gymnasium.Env):
 
         tm = self.client.get_trafficmanager()
         tm.set_synchronous_mode(True)
+        # Hybrid physics: NPCs far from the ego get cheap kinematic updates instead of full
+        # physics -> large CPU/GPU savings and far fewer sync-mode deadlocks with traffic.
+        try:
+            tm.set_hybrid_physics_mode(True)
+            tm.set_hybrid_physics_radius(70.0)
+        except Exception as e:
+            print(f"[WARN] Could not enable TM hybrid physics: {e}")
     
 
     def _process_action(self, action):
@@ -197,23 +222,21 @@ class CarlaEnv(gymnasium.Env):
         throttle = float(np.clip(action[0], 0.0, 1.0))
         brake = float(np.clip(action[1], 0.0, 1.0))
         steer = float(np.clip(action[2], -1.0, 1.0))
-        
-        # Throttle floor: very small throttle values don't move the vehicle
-        if 0.05 < throttle < 0.13:
-            throttle = 0.13
-        
-        # Brake/throttle exclusivity: if braking, cut throttle
-        if brake > 0.1:
-            throttle = 0.0
+
+        # NET LONGITUDINAL CONTROL (replaces brake-over-throttle exclusivity).
+        # The old rule (brake>0.1 -> throttle=0) turned a throttle+brake hedge into a FREE,
+        # crash-proof full brake, which the agent kept rediscovering as a safe haven. Now the
+        # pedals combine into a net command, so a hedge resolves to its (weak) net effect and is
+        # no longer a free stop. Genuine braking still works; committing to throttle still drives.
+        net = throttle - brake
+        if net >= 0.0:
+            throttle, brake = net, 0.0
+            # Throttle floor: very small throttle doesn't overcome CARLA's dead-zone.
+            if 0.05 < throttle < 0.13:
+                throttle = 0.13
         else:
-            brake = 0.0
-        
-        # Steering smoothing (if enabled)
-        # if self.smooth_steering:
-        #     steer = 0.7 * self.prev_steer + 0.3 * steer
-        #     steer = float(np.clip(steer, -1.0, 1.0))
-        #     self.prev_steer = steer
-        
+            throttle, brake = 0.0, -net
+
         return np.array([throttle, brake, steer], dtype=np.float32)
         
     def step(self, action=None , new_action_mode =None): 
@@ -238,22 +261,42 @@ class CarlaEnv(gymnasium.Env):
                 turn_action = int(action[1])
                 self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
                 self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
+<<<<<<< HEAD
             elif action_mode == "continuous":
+=======
+            elif self.action_mode == "continuous":
+                # Capture the RAW agent pedals BEFORE exclusivity zeroes the throttle, so the
+                # reward can punish a throttle+brake hedge the env would otherwise hide for free.
+                self.vehicle_controller.raw_throttle = float(np.clip(action[0], 0.0, 1.0))
+                self.vehicle_controller.raw_brake = float(np.clip(action[1], 0.0, 1.0))
+
+>>>>>>> 86ea478373cee64213995b0e2545d3c031d91ccf
                 # Apply post-processing to raw action
                 action = self._process_action(action)
-                
+
                 throttle = float(action[0])
                 brake = float(action[1])
-                steer = float(action[2]) 
+                steer = float(action[2])
                 self.vehicle_controller.exec_continuous_command(throttle, brake, steer)
         
+        if self.current_step == 0:
+            print("[step] first world.tick() of episode...", flush=True)   # DEBUG: remove once localized
         try:
             self.world.tick()
+            self._tick_fail_count = 0
         except Exception as e:
-            print(f"tick fail: {e}")
+            self._tick_fail_count += 1
+            print(f"[WARN] world.tick() failed ({self._tick_fail_count}/3): {e}")
+            # Repeated failures mean the server is wedged (typically after a force-kill left it
+            # in synchronous mode). No client-side reset can recover that, so stop cleanly: the
+            # trainer saves an emergency checkpoint and you restart CARLA + --resume-dir.
+            if self._tick_fail_count >= 3:
+                raise RuntimeError(
+                    "world.tick() failed 3x in a row — the CARLA server is likely wedged. "
+                    "Restart CarlaUE4.exe, then resume with --resume-dir."
+                )
+            # One transient failure: try a clean reset (now also clears zombie actors).
             self.reset()
-            # We must return a valid info dict even on failure. 
-            # Easiest way is to just call get_reward once to generate a baseline info dict.
             reward, info = self.vehicle_controller.get_reward(prev_obs)
             return prev_obs, reward, False, False, info
 
@@ -271,6 +314,12 @@ class CarlaEnv(gymnasium.Env):
         if info.get('is_terminal_crash', 0) == 1:
             terminated = True
             self.vehicle_controller.collision_happened = False
+
+        # Record the ACTUAL executed action (post throttle-floor/exclusivity) so the
+        # replay buffer can store what was executed instead of the raw agent output.
+        # In continuous mode `action` was reassigned by _process_action above.
+        if action is not None and self.action_mode == "continuous":
+            info['executed_action'] = np.asarray(action, dtype=np.float32)
 
         obs = self._get_observation()
         self.current_step += 1
@@ -346,4 +395,16 @@ class CarlaEnv(gymnasium.Env):
         pass
 
     def close(self):
-        pass
+        # Revert the server to ASYNCHRONOUS mode on exit. A sync-mode server with no client is
+        # a prime cause of the next run deadlocking, so always undo it on a clean shutdown.
+        try:
+            settings = self.world.get_settings()
+            settings.synchronous_mode = False
+            self.world.apply_settings(settings)
+        except Exception:
+            pass
+        try:
+            tm = self.client.get_trafficmanager()
+            tm.set_synchronous_mode(False)
+        except Exception:
+            pass

@@ -131,7 +131,7 @@ RANDOM_EGO_START_POS = True
 
 # 1. The Progress Engine
 TARGET_SPEED_MS = 6.0         
-WEIGHT_PROGRESS = 0.5          # Reward for moving forward along the road
+WEIGHT_PROGRESS = 1.0     
 
 # 2. The Alignment Engine
 WEIGHT_CENTERING = 0.3         # Reward for staying dead-center in the lane
@@ -141,12 +141,12 @@ WEIGHT_HEADING = 0.2           # Reward for facing parallel to the road
 # 3. The Control Penalty (Shock Absorbers)
 PENALTY_STEER_DELTA = 0.1      # Tax for violently jerking the steering wheel
 PENALTY_THROTTLE_DELTA = 0.1   # Tax for slamming on/off the gas
-PENALTY_PEDAL_OVERLAP = -2.0   # Tax for pressing brake and gas at the same time
+PENALTY_PEDAL_OVERLAP = -0.5   
 
 # 4. Terminals and Violations
 PENALTY_TERMINAL_CRASH = -200.0  
 PENALTY_LANE_INVASION = 0.0   # Tax for crossing the solid white line
-PENALTY_ROLLING_BACKWARD = -3.0 # Tax for sliding backwards down a hill or post-crash
+PENALTY_ROLLING_BACKWARD = -0.5 # STAGE 1c-v2: was -3.0; per-step penalty landmine (x100 by gamma)
 STALL_SPEED_THRESHOLD = 1.0    # Speed below which we consider the car "stalling"
 PENALTY_STALLING = -0.5        # Tax for sitting still to avoid driving
 REWARD_SCALE_FACTOR = 100.0
