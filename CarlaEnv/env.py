@@ -261,16 +261,12 @@ class CarlaEnv(gymnasium.Env):
                 turn_action = int(action[1])
                 self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
                 self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-<<<<<<< HEAD
-            elif action_mode == "continuous":
-=======
             elif self.action_mode == "continuous":
                 # Capture the RAW agent pedals BEFORE exclusivity zeroes the throttle, so the
                 # reward can punish a throttle+brake hedge the env would otherwise hide for free.
                 self.vehicle_controller.raw_throttle = float(np.clip(action[0], 0.0, 1.0))
                 self.vehicle_controller.raw_brake = float(np.clip(action[1], 0.0, 1.0))
 
->>>>>>> 86ea478373cee64213995b0e2545d3c031d91ccf
                 # Apply post-processing to raw action
                 action = self._process_action(action)
 
