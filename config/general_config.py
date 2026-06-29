@@ -110,7 +110,10 @@ ACTION_HIGH = [1.0, 1.0, 1.0]
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
 # =========================================================
-CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
+# Machine-independent path to the repo's own copy of the map. The old hardcoded absolute path
+# did not exist on the lab machine, so the env silently fell back to Town10HD for every run --
+# while the BC was trained on map1. This points to map1 = the SAME map the BC knows (no mismatch).
+CARLA_MAP_PATH = str(REPO_ROOT / "CarlaEnv" / "LoadOpenDrive2" / "map1.xodr")
 CARLA_WALKERS = 0
 CARLA_VEHICLES = 0      # STAGE 0 stability test: no NPC traffic (lightest load, no spawn deadlocks).
                        # Raise to ~8-10 (with hybrid physics now enabled) once runs are stable.

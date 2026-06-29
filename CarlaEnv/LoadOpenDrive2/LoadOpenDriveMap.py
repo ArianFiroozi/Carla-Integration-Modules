@@ -20,17 +20,24 @@ def load_opendrive_map(xodr_file_path, _client=None):
     with open(xodr_file_path, 'r') as file:
         xodr_data = file.read()
     print(f'generating world')
-    world = client.generate_opendrive_world(
-        xodr_data,
-        carla.OpendriveGenerationParameters(
-            vertex_distance=2.0,
-            max_road_length=50.0,
-            wall_height=1.0,
-            additional_width=0.6,
-            smooth_junctions=True,
-            enable_mesh_visibility=True
+    # Generating the OpenDRIVE mesh (especially a ~1km map like map1) takes far longer than the
+    # default client timeout, so raise it for the generation call only, then restore a normal
+    # timeout so transient tick failures during training are still caught promptly.
+    client.set_timeout(120.0)
+    try:
+        world = client.generate_opendrive_world(
+            xodr_data,
+            carla.OpendriveGenerationParameters(
+                vertex_distance=2.0,
+                max_road_length=50.0,
+                wall_height=1.0,
+                additional_width=0.6,
+                smooth_junctions=True,
+                enable_mesh_visibility=True
+            )
         )
-    )
+    finally:
+        client.set_timeout(20.0)
     print("Map successfully loaded into CARLA.")
     return world
 

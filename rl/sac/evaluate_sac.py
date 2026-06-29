@@ -254,7 +254,8 @@ def main():
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
     parser.add_argument("--record", action="store_true", default=cfg.RECORD_SAC_EVAL_VID,help="Record video of evaluation episodes")
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
-    
+    parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
+
     args = parser.parse_args()
 
     # Set device
@@ -306,7 +307,8 @@ def main():
         init_speed=cfg.CARLA_INIT_SPEED,
         action_mode="continuous",
         random_ego_spawn=cfg.RANDOM_EGO_START_POS,
-        random_vehicle_spawn=cfg.RANDOM_VEHICLE_START_POS
+        random_vehicle_spawn=cfg.RANDOM_VEHICLE_START_POS,
+        no_rendering=not (args.watch or args.record),  # watching/recording needs the server to render
     )
 
     all_returns = []

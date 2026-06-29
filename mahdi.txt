@@ -1,8 +1,21 @@
 kill:
 taskkill /F /IM CarlaUE4.exe /T
 resume:
-python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-26_22-06-10"
+python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-28_19-12-01"
 new:
 python -m rl.sac.train_sac
 plot:
-python plot_run.py "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-26_22-06-10"
+python plot_run.py "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-28_19-12-01" 
+
+carla:
+.\CarlaUE4.exe -quality-level=Low -carla-rpc-port=2000    
+dagger:
+python -m imitation.train_interactive_dagger
+run after dagger:
+python -m imitation.build_dataset --extra-dirs imitation/data/interventions_raw --upweight 3
+
+
+
+python -m imitation.evaluate_imitation --model_path experiments/bc/2026_06_28_03_20_04_bc_continuous/models/best_model.pt
+
+python -m imitation.train_interactive_dagger

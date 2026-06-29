@@ -286,6 +286,9 @@ def main():
     parser.add_argument("--exp_id", type=str, default=None)
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--experiments_root", type=str, default=bc_config.BC_EXPERIMENT_FOLDER)
+    parser.add_argument("--watch", action="store_true",
+                        help="Render the sim so you can WATCH (no_rendering=False). Default is headless "
+                             "(faster, lower VRAM, reliable numbers). Launch CARLA WINDOWED for this.")
 
     args = parser.parse_args()
 
@@ -322,7 +325,9 @@ def main():
         init_speed=bc_config.CARLA_INIT_SPEED,
         action_mode=ACTION_MODE,
         random_ego_spawn=bc_config.RANDOM_EGO_START_POS,
-        random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS
+        random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS,
+        no_rendering=not args.watch,   # default headless; --watch keeps the server rendering so the
+                                       # spectator cam (update_spectator) actually shows the car.
     )
     print("Action mode:", ACTION_MODE)
     print("Device:", DEVICE)

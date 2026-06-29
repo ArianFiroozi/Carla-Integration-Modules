@@ -48,7 +48,12 @@ def populate_buffer(buffer, wrapper, data_dir):
             
             terminated = d["terminated"][t]
             truncated = d["truncated"][t]
-            done = float(terminated or truncated)
+            # Bootstrap mask must be 1 ONLY at true terminations (crashes), NOT timeouts.
+            # A truncated episode (hit max_steps) is not a terminal state -- its value should
+            # still bootstrap r + gamma*V(s'). Using (terminated or truncated) zeroed the
+            # bootstrap for the final transition of all 130/247 truncated episodes, which
+            # systematically underestimates the value of good, long (survived) episodes.
+            done = float(terminated)
             
             next_obs = {k.replace("obs_", ""): d[k][t+1] for k in obs_keys}
             next_grid, next_scalars = wrapper.preprocess(next_obs)

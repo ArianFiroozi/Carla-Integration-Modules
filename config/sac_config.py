@@ -19,7 +19,7 @@ TARGET_ENTROPY_SCALE = 1.0   # STAGE 1a: standard target_entropy = -ACTION_DIM =
 # OPTIMIZATION  
 # =========================================================
 USE_HUBER_LOSS = True
-ACTOR_LR = 1e-4           # STAGE 1a: was 1e-6 (froze the policy & log_std head). Coupled with LOG_STD_MAX
+ACTOR_LR = 3e-5           # CONSERVATIVE FT: was 1e-4; nudge the already-good (1629) policy slowly
 CRITIC_LR = 1e-4          # STAGE 0: Mani's restricted value (reverted)
 ALPHA_LR = 1e-4           # STAGE 0: Mani's restricted value (reverted)
 
@@ -46,7 +46,9 @@ KEEP_CHECKPOINTS = 3
 
 MAX_TRAIN_STEPS = 500_000     
 
-CRITIC_WARMUP_STEPS = 5_000     # STAGE 0 TESTABILITY: with 100_000 the actor never engages before
+CRITIC_WARMUP_STEPS = 20_000    # CONSERVATIVE FT: was 5_000; let the critic deeply value the BC policy
+                                # (which spots are safe vs crash-prone) BEFORE the actor starts moving.
+# (orig note) STAGE 0 TESTABILITY: with 100_000 the actor never engages before
                                 # CARLA crashes (~17k), so the ablation can't reach the actor phase.
                                 # 5_000 lets the actor turn on early so we can actually observe it.
 UPDATE_AFTER = 1_000          
@@ -71,7 +73,7 @@ TARGET_UPDATE_INTERVAL = 2    # Update target every 2 CRITIC updates
 # =========================================================
 
 LOG_STD_MIN = -5
-LOG_STD_MAX = 2      # STAGE 1a: raise the ceiling so the policy can actually explore (was -3 = std 0.05)
+LOG_STD_MAX = 0      # CONSERVATIVE FT: was 2; cap exploration (std<=1) so noise can't crash a good policy
 
 # =========================================================
 # EXPLORATION
@@ -102,7 +104,7 @@ LOG_EVERY = 1000
 # =========================================================
 
 LOAD_BC_WEIGHTS = True
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"  # base BC (eval 1629 vs DAgger-r1 966 -> base is stronger)
 RESUME_CHECKPOINT = False    
 RECORD_SAC_EVAL_VID = True
 PRELOAD_EXPERT_DATA = False   # was True; disable 50/50 expert mixing until vanilla SAC is proven stable

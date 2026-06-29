@@ -173,15 +173,11 @@ class CarlaEnv(gymnasium.Env):
 
         self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed, random_spawn=self.random_ego_spawn)
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-        print("[reset] controller+sensors created", flush=True)   # DEBUG: remove once hang is localized
 
         # Tick again so ego sensors + physics start stable
         self.world.tick()
-        print("[reset] post-spawn tick done", flush=True)         # DEBUG
 
-        obs = self._get_observation()
-        print("[reset] observation built; reset complete", flush=True)  # DEBUG
-        return obs, {}
+        return self._get_observation(), {}
 
     def _apply_sync(self, fixed_dt=0.05):
         # always grab the current world (after map load)
@@ -223,11 +219,9 @@ class CarlaEnv(gymnasium.Env):
         brake = float(np.clip(action[1], 0.0, 1.0))
         steer = float(np.clip(action[2], -1.0, 1.0))
 
-        # NET LONGITUDINAL CONTROL (replaces brake-over-throttle exclusivity).
-        # The old rule (brake>0.1 -> throttle=0) turned a throttle+brake hedge into a FREE,
-        # crash-proof full brake, which the agent kept rediscovering as a safe haven. Now the
-        # pedals combine into a net command, so a hedge resolves to its (weak) net effect and is
-        # no longer a free stop. Genuine braking still works; committing to throttle still drives.
+        # NET LONGITUDINAL CONTROL: the pedals combine into a net command, so a throttle+brake
+        # hedge resolves to its (weak) net effect instead of a free stop. Genuine braking still
+        # works (needed for map1's junctions); committing to throttle still drives.
         net = throttle - brake
         if net >= 0.0:
             throttle, brake = net, 0.0
@@ -239,24 +233,27 @@ class CarlaEnv(gymnasium.Env):
 
         return np.array([throttle, brake, steer], dtype=np.float32)
         
-    def step(self, action=None): 
-        prev_obs = self._get_observation()        
+    def step(self, action=None, new_action_mode=None):
+        prev_obs = self._get_observation()
         # 1. Define end-of-episode variables
-        terminated = False  
-        truncated = False   
+        terminated = False
+        truncated = False
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
+        # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
+        # continuous AI control normally, but discrete keyboard during a human takeover).
+        action_mode = new_action_mode if new_action_mode is not None else self.action_mode
 
         if action is not None:
-            if self.action_mode == "discrete":
+            if action_mode == "discrete":
                 speed_action = int(action[0])
                 turn_action = int(action[1])
                 self.vehicle_controller.exec_command(self.vehicle_controller.speed_action_convertor(speed_action))
                 self.vehicle_controller.exec_command(self.vehicle_controller.turn_action_convertor(turn_action))
-            elif self.action_mode == "continuous":
-                # Capture the RAW agent pedals BEFORE exclusivity zeroes the throttle, so the
-                # reward can punish a throttle+brake hedge the env would otherwise hide for free.
+            elif action_mode == "continuous":
+                # Capture the RAW agent pedals so the reward can punish a throttle+brake hedge
+                # (overlap penalty) before the net mapping combines them.
                 self.vehicle_controller.raw_throttle = float(np.clip(action[0], 0.0, 1.0))
                 self.vehicle_controller.raw_brake = float(np.clip(action[1], 0.0, 1.0))
 
@@ -268,8 +265,6 @@ class CarlaEnv(gymnasium.Env):
                 steer = float(action[2])
                 self.vehicle_controller.exec_continuous_command(throttle, brake, steer)
         
-        if self.current_step == 0:
-            print("[step] first world.tick() of episode...", flush=True)   # DEBUG: remove once localized
         try:
             self.world.tick()
             self._tick_fail_count = 0

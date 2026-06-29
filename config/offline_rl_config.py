@@ -11,9 +11,12 @@ MAX_STEPS = 2000              # max steps per episode (same as env)
 
 # ---------- Paths ----------
 BC_CHECKPOINTS_ROOT = REPO_ROOT / "experiments" / "bc" 
-SAVE_DIR = REPO_ROOT / "offline_rl" / "data"
+# NOTE: the original offline_noisy_data is gone (offline_rl/data is empty after the lab sync).
+# Point IQL/AWAC at the BC demos, which have the same npz format incl. a 'rewards' key (178 eps).
+# (To do offline RL *properly* later, re-record diverse/noisy rollouts via offline_rl/record_demos.py.)
+SAVE_DIR = REPO_ROOT / "imitation" / "data" / "demos" / "map1_30car"
 COLLECT_EPISODES = 500
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # choose the bc path manually
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # base BC (stronger than DAgger round 1)
 
 # =========================================================
 # AWAC & RL HYPERPARAMETERS
