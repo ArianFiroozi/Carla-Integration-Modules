@@ -197,3 +197,7 @@ imitation/data/processed
 
 
 experiments_tb_only
+
+
+.gitignore
+imitation\DAGGER_LOOP.md

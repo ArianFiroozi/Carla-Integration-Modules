@@ -24,18 +24,12 @@ TARGET_ENTROPY_SCALE = 0.3
 # =========================================================
 # True to use Huber loss instead of MSE for Q-value updates (protects gradients from huge gradients when crashing)
 USE_HUBER_LOSS = True
-<<<<<<< HEAD
-ACTOR_LR = 3e-5           # CONSERVATIVE FT: was 1e-4; nudge the already-good (1629) policy slowly
-CRITIC_LR = 1e-4          # STAGE 0: Mani's restricted value (reverted)
-ALPHA_LR = 1e-4           # STAGE 0: Mani's restricted value (reverted)
-=======
 # Learning rate for the actor network parameter optimizer
 ACTOR_LR = 5e-7           
 # Learning rate for the critic network parameter optimizer
 CRITIC_LR = 3e-4         
 # Learning rate for the entropy temperature alpha parameter optimizer
 ALPHA_LR = 1e-4          
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 
 # L2 regularization weight decay penalty factor applied during optimizer steps
 WEIGHT_DECAY = 1e-6          
@@ -66,17 +60,9 @@ KEEP_CHECKPOINTS = 2
 # Maximum total environment simulation steps allowed for the training run
 MAX_TRAIN_STEPS = 500_000     
 
-<<<<<<< HEAD
-CRITIC_WARMUP_STEPS = 20_000    # CONSERVATIVE FT: was 5_000; let the critic deeply value the BC policy
-                                # (which spots are safe vs crash-prone) BEFORE the actor starts moving.
-# (orig note) STAGE 0 TESTABILITY: with 100_000 the actor never engages before
-                                # CARLA crashes (~17k), so the ablation can't reach the actor phase.
-                                # 5_000 lets the actor turn on early so we can actually observe it.
-=======
 # Environment steps to collect before starting optimization updates on the actor network
 CRITIC_WARMUP_STEPS = 100_000    
 # Minimum transitions that must accumulate in replay buffer before training updates begin
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 UPDATE_AFTER = 1_000          
 # Number of gradient update steps performed per environment interaction step
 GRADIENT_UPDATES = 1
@@ -105,12 +91,8 @@ TARGET_UPDATE_INTERVAL = 2    # Update target every 2 CRITIC updates
 
 # Lower bound limit constraint for the log standard deviation output of the policy
 LOG_STD_MIN = -5
-<<<<<<< HEAD
-LOG_STD_MAX = 0      # CONSERVATIVE FT: was 2; cap exploration (std<=1) so noise can't crash a good policy
-=======
 # Upper bound limit constraint for the log standard deviation output of the policy
 LOG_STD_MAX = 2      
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 
 # =========================================================
 # EXPLORATION
@@ -149,13 +131,9 @@ LOG_EVERY = 1000
 
 # True to initialize policy network parameters using a pretrained behavior cloning model
 LOAD_BC_WEIGHTS = True
-<<<<<<< HEAD
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"  # base BC (eval 1629 vs DAgger-r1 966 -> base is stronger)
-=======
 # Path to the pretrained Behavior Cloning model checkpoint file
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
 # True to resume training from an existing SAC checkpoint found in SAVE_DIR
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 RESUME_CHECKPOINT = False    
 # True to record video capture files of evaluation rollout episodes
 RECORD_SAC_EVAL_VID = True

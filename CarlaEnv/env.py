@@ -241,14 +241,9 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
-<<<<<<< HEAD
         # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
         # continuous AI control normally, but discrete keyboard during a human takeover).
         action_mode = new_action_mode if new_action_mode is not None else self.action_mode
-=======
-        
-        action_mode = None
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 
         if new_action_mode is not None:
             action_mode = new_action_mode

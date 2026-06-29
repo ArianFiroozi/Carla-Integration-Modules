@@ -132,16 +132,10 @@ ACTION_HIGH = [1.0, 1.0, 1.0]
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
 # =========================================================
-<<<<<<< HEAD
 # Machine-independent path to the repo's own copy of the map. The old hardcoded absolute path
 # did not exist on the lab machine, so the env silently fell back to Town10HD for every run --
 # while the BC was trained on map1. This points to map1 = the SAME map the BC knows (no mismatch).
 CARLA_MAP_PATH = str(REPO_ROOT / "CarlaEnv" / "LoadOpenDrive2" / "map1.xodr")
-=======
-# Absolute path to the OpenDrive format road map file for the simulation environment
-CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
-# Number of pedestrian/walker entities to spawn in the environment simulation
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 CARLA_WALKERS = 0
 # Number of autonomous vehicle traffic obstacles to spawn in the environment simulation
 CARLA_VEHICLES = 30
