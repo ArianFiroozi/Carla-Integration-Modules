@@ -14,7 +14,7 @@ from config import general_config
 from utils.reward_compiler import compile_reward
 from CarlaEnv.env import CarlaEnv
 from agents.sac.sac_agent import SACAgent
-from rl.sac.replay_buffer import SACReplayBuffer
+from utils.replay_buffer import SACReplayBuffer
 from utils.obs_wrapper import CarlaObsWrapper
 from config import sac_config as cfg
 from config import bc_config  # for wrapper settings
@@ -388,7 +388,7 @@ def main():
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
     parser.add_argument("--resume", action="store_true",default=cfg.RESUME_CHECKPOINT, help="Resume from latest checkpoint")
     parser.add_argument("--resume-dir", type=str, default=None, help="Specific experiment directory to resume from")
-    parser.add_argument("--branch-from", type=str, default=None, help="Path to a specific .pkl state to branch a NEW experiment from")
+    parser.add_argument("--branch-from", type=str, default=cfg.BRANCH_FROM, help="Path to a specific .pkl state to branch a NEW experiment from")
     args = parser.parse_args()
 
     # Passing --resume-dir clearly means "resume", so don't also require the separate
@@ -575,7 +575,7 @@ def main():
                 grid_obs=grid,
                 scalar_obs=scalars,
                 action=raw_action,
-                reward=reward,
+                reward=reward, # reward is already compiled before so no worries
                 next_grid_obs=next_grid,
                 next_scalar_obs=next_scalars,
                 done=done

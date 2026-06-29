@@ -145,6 +145,7 @@ class EnsembleDAgger:
 
 
     # ==============================================================================
+<<<<<<< HEAD
     # PERSISTENCE: save / load the warmed ensemble, and export a single SAC-ready BC
     # ==============================================================================
     def save_ensemble(self, out_dir, norm_stats=None):
@@ -195,6 +196,8 @@ class EnsembleDAgger:
         print(f"         (set sac_config.BC_CHECKPOINT_PATH to that path to warm-start SAC)")
 
     # ==============================================================================
+=======
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
     # PHASE 4 & 5: IN-MEMORY FINE-TUNING & PERSISTENT STORAGE
     # ==============================================================================
     def finetune_and_store(self, buffer):
@@ -419,8 +422,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=str, default=bc_config.CARLA_MAP_PATH)
     parser.add_argument("--device", default=bc_config.DEVICE)
+<<<<<<< HEAD
     parser.add_argument("--load-ensemble", type=str, default=None,
                         help="Dir of a previously-saved ensemble to resume (skips the warmup phase).")
+=======
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
     args = parser.parse_args()
 
     env = CarlaEnv(
@@ -429,12 +435,18 @@ if __name__ == "__main__":
         vehicles_count=bc_config.CARLA_VEHICLES,
         max_steps=bc_config.CARLA_MAX_STEPS,
         init_speed=bc_config.CARLA_INIT_SPEED,
+<<<<<<< HEAD
         action_mode="continuous",
         random_ego_spawn=bc_config.RANDOM_EGO_START_POS,
         random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS,
         no_rendering=False,   # DAgger REQUIRES rendering: the human watches the spectator cam to drive.
                               # (Our SAC default is no_rendering=True for headless speed.) Launch CARLA
                               # WINDOWED for this run -- NOT with -RenderOffScreen.
+=======
+        action_mode="continuous", 
+        random_ego_spawn=bc_config.RANDOM_EGO_START_POS,
+        random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
     )
 
     print("[INIT] Loading metadata to extract dimensions and norm_stats...")
@@ -456,6 +468,7 @@ if __name__ == "__main__":
     scalar_dim = scalars0.numel()
     
     dagger_system = EnsembleDAgger(env, wrapper, args.device, grid_channels, scalar_dim)
+<<<<<<< HEAD
 
     # Persist the warmed ensemble (so re-runs don't re-warm) and drop a SAC-testable BC export.
     dagger_exp_dir = Path(bc_config.REPO_ROOT) / "experiments" / "dagger" / time.strftime("%Y%m%d_%H%M%S")
@@ -466,6 +479,10 @@ if __name__ == "__main__":
         dagger_system.save_ensemble(dagger_exp_dir, norm_stats=norm_stats)
         dagger_system.export_for_sac(dagger_exp_dir, norm_stats=norm_stats)
 
+=======
+    dagger_system.warmup(dataset)
+    
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
     try:
         dagger_system.run_live_dagger()
     finally:

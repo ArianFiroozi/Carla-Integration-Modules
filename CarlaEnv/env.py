@@ -233,18 +233,28 @@ class CarlaEnv(gymnasium.Env):
 
         return np.array([throttle, brake, steer], dtype=np.float32)
         
-    def step(self, action=None, new_action_mode=None):
-        prev_obs = self._get_observation()
+    def step(self, action=None , new_action_mode =None): 
+        prev_obs = self._get_observation()        
         # 1. Define end-of-episode variables
         terminated = False
         truncated = False
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
+<<<<<<< HEAD
         # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
         # continuous AI control normally, but discrete keyboard during a human takeover).
         action_mode = new_action_mode if new_action_mode is not None else self.action_mode
+=======
+        
+        action_mode = None
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 
+        if new_action_mode is not None:
+            action_mode = new_action_mode
+        else:
+            action_mode = self.action_mode
+            
         if action is not None:
             if action_mode == "discrete":
                 speed_action = int(action[0])

@@ -53,6 +53,45 @@ class AutopilotController:
             out[k] = arr
 
         return out
+        
+    def _draw_lane(self):
+        """Draws a green line along the lane center for debugging."""
+        world = self.env.world
+        ego = self.env.ego_vehicle
+        waypoint = world.get_map().get_waypoint(ego.get_location())
+
+        prev = waypoint.transform.location
+
+        for i in range(30):
+            next_wps = waypoint.next(2.0)
+            if not next_wps:
+                break
+            waypoint = next_wps[0]
+            cur = waypoint.transform.location
+
+            world.debug.draw_line(
+                prev,
+                cur,
+                thickness=0.1,
+                color=carla.Color(0,255,0),
+                life_time=0.1
+            )
+            prev = cur
+
+    def _update_spectator(self):
+        """Moves the CARLA spectator camera to follow the ego vehicle."""
+        world = self.env.world
+        ego_vehicle = self.env.ego_vehicle
+
+        spectator = world.get_spectator()
+        tr = ego_vehicle.get_transform()
+        forward = tr.get_forward_vector()
+
+        cam_loc = tr.location - forward * 8.0 + carla.Location(z=3.0)
+        cam_rot = carla.Rotation(pitch=-12.0, yaw=tr.rotation.yaw, roll=0.0)
+        spectator.set_transform(carla.Transform(cam_loc, cam_rot))
+        
+        self._draw_lane()
 
     def run(self, episodes=50, record=True):
 
@@ -70,20 +109,11 @@ class AutopilotController:
             self.tm.distance_to_leading_vehicle(ego, 3.0)
             self.tm.ignore_lights_percentage(ego, 100)
             
-
-
-
             # Make ego speed slightly random
             self.tm.vehicle_percentage_speed_difference(
                 ego,
                 np.random.randint(-10, 10)
             )
-            
-            # p = np.random.randint(5, 20)
-
-            # self.tm.random_left_lanechange_percentage(ego, p)
-            # self.tm.random_right_lanechange_percentage(ego, p)
-
 
             steps = []
             done = False
@@ -97,8 +127,6 @@ class AutopilotController:
                 if t % 200 == 0:
                     new_offset = np.random.uniform(-1.2, 1.2)
                     self.tm.vehicle_lane_offset(ego, new_offset)
-                
-                
                 
                 next_obs, reward, terminated, truncated, info = self.env.step(None)
 
@@ -128,6 +156,9 @@ class AutopilotController:
 
                 obs = next_obs
                 t += 1
+                
+                # Update camera position
+                self._update_spectator()
 
                 if self.sleep > 0:
                     time.sleep(self.sleep)
@@ -164,8 +195,6 @@ class AutopilotController:
         # Keep dummy actions to match manual dataset format
         dummy_action = np.array([DUMMY_SPEED, DUMMY_TURN], dtype=np.int64)
 
-        # Keep dummy actions to match manual dataset format
-        dummy_action = np.array([DUMMY_SPEED, DUMMY_TURN], dtype=np.int64)
         arrays["actions"] = np.tile(dummy_action, (T, 1))
 
         arrays["rewards"] = np.array(

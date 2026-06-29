@@ -122,5 +122,6 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
             'penalty_stall': float(stall_penalty),
             'terminal_crash': float(crash_mask * cfg.PENALTY_TERMINAL_CRASH)
         }
-
-    return float(final_reward) if not is_tensor else final_reward, metrics
+        
+    scaled_final_reward = final_reward / cfg.REWARD_SCALE_FACTOR
+    return float(scaled_final_reward) if not is_tensor else scaled_final_reward, metrics
