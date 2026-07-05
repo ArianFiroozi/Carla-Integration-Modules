@@ -1,0 +1,311 @@
+{
+    "mode": "continuous",
+    "epochs": 30,
+    "batch_size": 512,
+    "lr": 0.0003,
+    "val_split": 0.1,
+    "patience": 10,
+    "device": "cuda",
+    "is_gaussian": false,
+    "use_continuous_undersampling": false,
+    "undersampling_threshold_continuous": 0.05,
+    "undersampling_probability_continuous": 0.6,
+    "use_weighted_loss": false,
+    "steer_loss_weight_continuous": 3.0,
+    "throttle_loss_weight_continuous": 1.0,
+    "brake_loss_weight_continuous": 1.0,
+    "weighted_loss_threshold_continuous": 0.1,
+    "min_std": 0.05,
+    "max_std": 1,
+    "weight_sampling": "none",
+    "cnn_channels": [
+        16,
+        32,
+        64
+    ],
+    "head_n_mlp_layers": 2,
+    "head_mlp_hidden_size": 64,
+    "scalar_n_mlp_layers": 2,
+    "scalar_mlp_hidden_size": 32,
+    "latent_dim": 128,
+    "use_one_hot_grid": true,
+    "scaling": "z_score",
+    "decoupled": false,
+    "dataset_meta": {
+        "created_at": "2026-04-27 12:16:54",
+        "dataset_path": "data\\processed\\dataset_bc_continuous.npz",
+        "source_files": [
+            "data\\demos\\map1_30car\\map1_20260422_172747_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260422_172906_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260422_173005_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260422_173113_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260422_173912_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174016_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174128_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174233_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174418_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174538_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174642_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174747_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174851_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260422_174955_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260422_175059_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260422_182749_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260422_182853_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260422_182913_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183018_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183122_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183226_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183330_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183434_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183608_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183713_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183817_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260422_183855_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260422_184000_ep0012.npz",
+            "data\\demos\\map1_30car\\map1_20260422_184123_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260422_184228_ep0014.npz",
+            "data\\demos\\map1_30car\\map1_20260422_184340_ep0015.npz",
+            "data\\demos\\map1_30car\\map1_20260422_184445_ep0016.npz",
+            "data\\demos\\map1_30car\\map1_20260423_095503_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260423_095607_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260423_095711_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260423_095824_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260423_095928_ep0004.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100032_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100136_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100209_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100333_ep0009.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100602_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100855_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260423_100959_ep0014.npz",
+            "data\\demos\\map1_30car\\map1_20260423_101203_ep0016.npz",
+            "data\\demos\\map1_30car\\map1_20260423_101326_ep0017.npz",
+            "data\\demos\\map1_30car\\map1_20260423_101440_ep0018.npz",
+            "data\\demos\\map1_30car\\map1_20260423_102325_ep0019.npz",
+            "data\\demos\\map1_30car\\map1_20260423_102440_ep0020.npz",
+            "data\\demos\\map1_30car\\map1_20260423_102546_ep0021.npz",
+            "data\\demos\\map1_30car\\map1_20260423_102650_ep0022.npz",
+            "data\\demos\\map1_30car\\map1_20260423_102805_ep0023.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103014_ep0000.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103146_ep0001.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103307_ep0002.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103411_ep0003.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103607_ep0005.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103711_ep0006.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103759_ep0007.npz",
+            "data\\demos\\map1_30car\\map1_20260423_103905_ep0008.npz",
+            "data\\demos\\map1_30car\\map1_20260423_104957_ep0010.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105018_ep0011.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105134_ep0013.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105239_ep0014.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105348_ep0015.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105512_ep0016.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105616_ep0017.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105736_ep0018.npz",
+            "data\\demos\\map1_30car\\map1_20260423_105932_ep0020.npz"
+        ],
+        "total_samples": 130815,
+        "observation_keys": [
+            "obs_speed_x",
+            "obs_speed_y",
+            "obs_presence",
+            "obs_lane_angle",
+            "obs_traffic_signs",
+            "obs_max_speed",
+            "obs_ego_speed_x",
+            "obs_ego_speed_y",
+            "obs_ego_in_lane_position_x",
+            "obs_throttle",
+            "obs_brake",
+            "obs_steering_angle",
+            "obs_reverse",
+            "obs_dist_front",
+            "obs_dist_back",
+            "obs_dist_left",
+            "obs_dist_right"
+        ],
+        "observation_shapes": {
+            "obs_speed_x": [
+                25,
+                11
+            ],
+            "obs_speed_y": [
+                25,
+                11
+            ],
+            "obs_presence": [
+                25,
+                11
+            ],
+            "obs_lane_angle": [
+                1
+            ],
+            "obs_traffic_signs": [
+                5
+            ],
+            "obs_max_speed": [
+                1
+            ],
+            "obs_ego_speed_x": [
+                1
+            ],
+            "obs_ego_speed_y": [
+                1
+            ],
+            "obs_ego_in_lane_position_x": [
+                1
+            ],
+            "obs_throttle": [
+                1
+            ],
+            "obs_brake": [
+                1
+            ],
+            "obs_steering_angle": [
+                1
+            ],
+            "obs_reverse": [
+                1
+            ],
+            "obs_dist_front": [
+                1
+            ],
+            "obs_dist_back": [
+                1
+            ],
+            "obs_dist_left": [
+                1
+            ],
+            "obs_dist_right": [
+                1
+            ]
+        },
+        "stats": {
+            "total_frames": 131684,
+            "obs_violations": {},
+            "obs_violation_frames": 0,
+            "idle_frames_trimmed": 0,
+            "terminated_dropped": 8,
+            "truncated_dropped": 61,
+            "pre_termination_dropped": 800,
+            "sampling_dropped": 0,
+            "kept": 130815
+        },
+        "pipeline_config": {
+            "mode": "continuous",
+            "window_size": 1,
+            "simplify_actions": true,
+            "remove_reverse": true,
+            "remove_no_turn": true,
+            "idle_trim_enabled": false,
+            "idle_speed_threshold": 0.3,
+            "idle_throttle_threshold": 0.05,
+            "mirror_enabled": false,
+            "mirror_steering_threshold": 0.04,
+            "use_spatial_features": true
+        },
+        "normalization_stats": {
+            "obs_speed_x": {
+                "min": -0.3607772886753082,
+                "max": 6.753504753112793,
+                "mean": 2.794755697250366,
+                "std": 1.7170217037200928
+            },
+            "obs_speed_y": {
+                "min": -6.038890838623047,
+                "max": 6.1182661056518555,
+                "mean": 0.051326509565114975,
+                "std": 1.1075520515441895
+            },
+            "obs_lane_angle": {
+                "min": -1.0988423824310303,
+                "max": 0.8291690349578857,
+                "mean": -0.004700040444731712,
+                "std": 0.12399468570947647
+            },
+            "obs_traffic_signs": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "obs_max_speed": {
+                "min": 100.0,
+                "max": 100.0,
+                "mean": 100.0,
+                "std": 0.0
+            },
+            "obs_ego_speed_x": {
+                "min": -0.06665882468223572,
+                "max": 15.763839721679688,
+                "mean": 6.177043437957764,
+                "std": 2.549842119216919
+            },
+            "obs_ego_speed_y": {
+                "min": -2.479363203048706,
+                "max": 2.5604782104492188,
+                "mean": 0.05122879520058632,
+                "std": 0.3349739611148834
+            },
+            "obs_ego_in_lane_position_x": {
+                "min": -1.8049930334091187,
+                "max": 1.6032496690750122,
+                "mean": -0.030374471098184586,
+                "std": 0.5865986943244934
+            },
+            "obs_throttle": {
+                "min": 0.0,
+                "max": 0.8000001311302185,
+                "mean": 0.3372613787651062,
+                "std": 0.12868571281433105
+            },
+            "obs_brake": {
+                "min": 0.0,
+                "max": 1.0,
+                "mean": 0.004286970477551222,
+                "std": 0.050971969962120056
+            },
+            "obs_steering_angle": {
+                "min": -1.0,
+                "max": 1.0,
+                "mean": 0.020991094410419464,
+                "std": 0.15709854662418365
+            },
+            "obs_reverse": {
+                "min": 0.0,
+                "max": 0.0,
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "obs_dist_front": {
+                "min": 1.0,
+                "max": 12.0,
+                "mean": 8.999754905700684,
+                "std": 2.2094128131866455
+            },
+            "obs_dist_back": {
+                "min": 1.0,
+                "max": 12.0,
+                "mean": 9.54903507232666,
+                "std": 1.6847413778305054
+            },
+            "obs_dist_left": {
+                "min": 1.0,
+                "max": 5.0,
+                "mean": 3.330183744430542,
+                "std": 0.9884296655654907
+            },
+            "obs_dist_right": {
+                "min": 1.0,
+                "max": 5.0,
+                "mean": 3.8438329696655273,
+                "std": 1.0804247856140137
+            }
+        }
+    },
+    "metadata": {
+        "timestamp": "2026-04-27T12:16:57.011628",
+        "git_commit": "4d5e84df2fe670e3914bb08822c48f8feb9925ad"
+    }
+}

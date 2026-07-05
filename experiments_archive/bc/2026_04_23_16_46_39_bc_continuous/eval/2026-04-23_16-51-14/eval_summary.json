@@ -1,0 +1,15 @@
+{
+  "episodes": 20,
+  "avg_return": 1036.496841759562,
+  "std_return": 1325.1720913043741,
+  "avg_length": 897.85,
+  "std_length": 631.1426364143053,
+  "end_reasons": {
+    "truncated": 2,
+    "terminated": 18
+  },
+  "wall_time_sec": 391.77768325805664,
+  "action_mode": "continuous",
+  "smooth_steering": false,
+  "number of cars": 0
+}

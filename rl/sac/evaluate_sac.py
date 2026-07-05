@@ -18,6 +18,8 @@ import cv2
 from config import general_config
 from utils.reward_compiler import compile_reward
 from utils.obs_wrapper import CarlaObsWrapper
+from utils.seed_utils import seed_everything
+
 
 DEVICE = cfg.DEVICE
 
@@ -245,7 +247,7 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
 def main():
     parser = argparse.ArgumentParser(description="Evaluate SAC agent")
     parser.add_argument("--map", type=str, default=cfg.CARLA_MAP_PATH)
-    parser.add_argument("--episodes", type=int, default=10, help="Number of evaluation episodes")
+    parser.add_argument("--episodes", type=int, default=30, help="Number of evaluation episodes")
     parser.add_argument("--max-steps", type=int, default=cfg.CARLA_MAX_STEPS)
     parser.add_argument("--device", default=cfg.DEVICE)
     parser.add_argument("--exp_id", type=str, default=None, help="Specific experiment ID to evaluate")
@@ -255,6 +257,8 @@ def main():
     parser.add_argument("--record", action="store_true", default=cfg.RECORD_SAC_EVAL_VID,help="Record video of evaluation episodes")
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
     parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
+
+    seed_everything(bc_config.GLOBAL_SEED)
 
     args = parser.parse_args()
 

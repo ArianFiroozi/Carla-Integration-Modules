@@ -1,0 +1,7 @@
+{
+  "return": 1330.8140903426593,
+  "mean_reward": 2.0133344785819354,
+  "length": 661,
+  "end_reason": "terminated",
+  "action_counts": {}
+}

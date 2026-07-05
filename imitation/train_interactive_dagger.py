@@ -36,7 +36,6 @@ FINETUNE_LR = 1e-4
 DAGGER_DATA_DIR = Path(bc_config.DATA_DIR) / "interventions_raw"
 DAGGER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-
 class EnsembleDAgger:
     def __init__(self, env, wrapper, device, grid_channels, scalar_dim):
         self.env = env
@@ -413,12 +412,43 @@ class EnsembleDAgger:
         cam_loc = tr.location - forward * 8.0 + carla.Location(z=3.0)
         cam_rot = carla.Rotation(pitch=-12.0, yaw=tr.rotation.yaw, roll=0.0)
         spectator.set_transform(carla.Transform(cam_loc, cam_rot))           
+        self._draw_lane()
+
+
+    def _draw_lane(self):
+        """Draws a green line along the lane center for debugging."""
+        world = self.env.world
+        ego = self.env.ego_vehicle
+        waypoint = world.get_map().get_waypoint(ego.get_location())
+
+        prev = waypoint.transform.location
+
+        for i in range(30):
+            next_wps = waypoint.next(2.0)
+            if not next_wps:
+                break
+            waypoint = next_wps[0]
+            cur = waypoint.transform.location
+
+            world.debug.draw_line(
+                prev,
+                cur,
+                thickness=0.1,
+                color=carla.Color(0,255,0),
+                life_time=0.1
+            )
+            prev = cur
+
+
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=str, default=bc_config.CARLA_MAP_PATH)
     parser.add_argument("--device", default=bc_config.DEVICE)
-    parser.add_argument("--load-ensemble", type=str, default=None,
+    parser.add_argument("--load-ensemble", type=str, default=bc_config.ENSEMBLE_PATH,
                         help="Dir of a previously-saved ensemble to resume (skips the warmup phase).")
     args = parser.parse_args()
 
@@ -431,9 +461,7 @@ if __name__ == "__main__":
         action_mode="continuous",
         random_ego_spawn=bc_config.RANDOM_EGO_START_POS,
         random_vehicle_spawn=bc_config.RANDOM_VEHICLE_START_POS,
-        no_rendering=False,   # DAgger REQUIRES rendering: the human watches the spectator cam to drive.
-                              # (Our SAC default is no_rendering=True for headless speed.) Launch CARLA
-                              # WINDOWED for this run -- NOT with -RenderOffScreen.
+        no_rendering=False,   
     )
 
     print("[INIT] Loading metadata to extract dimensions and norm_stats...")
@@ -473,8 +501,7 @@ if __name__ == "__main__":
 
 
 
-
-#  TODO: use std instead of varaince for better understanding, add logging specially saving the 5 models(maybe add a flag to know it should lload the 5 models or train right now and then load and save) ,  add replay buffer , tune the var , add draw line function from the manual controller file so we know where we are suppsoed to go
+#  TODO: use std instead of varaince for better understanding,  add replay buffer , tune the var , add draw line function from the manual controller file so we know where we are suppsoed to go
 
 
 

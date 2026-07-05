@@ -1,0 +1,8 @@
+$adapterName = "LoopbackAdapter"
+$adapter = Add-VmNetworkAdapter -ComputerName $env:COMPUTERNAME -AdapterName $adapterName
+
+$adapterId = (Get-NetAdapter -Name $adapterName).InterfaceIndex
+New-NetIPAddress -InterfaceIndex $adapterId -IPAddress 127.0.0.1 -PrefixLength 24
+
+Enable-NetAdapter -Name $adapterName
+Write-Host "Loopback adapter $adapterName created and configured successfully."
