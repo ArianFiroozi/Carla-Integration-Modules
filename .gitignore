@@ -181,7 +181,7 @@ explaination.md
 # *.npz
 
 __pycache__/
-experiments_archive/**/*.pt
+
 report.txt
 
 experiments/**/*.pt
@@ -197,7 +197,7 @@ imitation/data/processed
 
 
 experiments_tb_only
-
+experiments_archive
 
 .gitignore
 imitation\DAGGER_LOOP.md
