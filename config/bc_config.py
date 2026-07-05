@@ -31,6 +31,11 @@ RL_REPLAY_BUFFER_PATH =  PROCESSED_DIR / "dataset_rl_buffer.npz"
 BC_EXPERIMENT_FOLDER = REPO_ROOT / "experiments" / "bc"
 
 
+ENSEMBLE_PATH = REPO_ROOT / "experiments" / "dagger" / "20260701_094519"
+
+
+
+
 # input of build dataset and inspect demo
 # List of demonstration directories included when building the dataset
 DEMO_LIST= [
@@ -38,8 +43,8 @@ DEMO_LIST= [
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
-    MANUAL_DIR / "map1_30car",
-    MANUAL_DIR / "old" /"map1_30car",
+    DATA_DIR/ "interventions_raw",
+    # MANUAL_DIR / "map1_30car",
 ]
 
 
@@ -204,7 +209,7 @@ MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = False
 
 # True to record dataset trajectories during manual drive sessions
-MANUAL_RECORD = True
+MANUAL_RECORD = False
 # Prefix basename for manual demonstration run directories
 MANUAL_BASE_NAME = "map1"
 
