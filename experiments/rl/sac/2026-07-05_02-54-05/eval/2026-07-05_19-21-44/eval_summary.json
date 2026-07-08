@@ -1,0 +1,18 @@
+{
+  "model_path": "experiments\\rl\\sac\\2026-07-05_02-54-05\\models\\checkpoint_step_300000.pt",
+  "episodes": 30,
+  "avg_return": 1153.5671235994296,
+  "std_return": 845.3067308895327,
+  "min_return": -10.018317261958638,
+  "max_return": 2645.958276726285,
+  "avg_length": 1021.8,
+  "std_length": 675.1653328383105,
+  "end_reasons": {
+    "terminated": 24,
+    "truncated": 6
+  },
+  "wall_time_sec": 910.2628316879272,
+  "carla_vehicles": 30,
+  "carla_walkers": 0,
+  "video_recorded": true
+}

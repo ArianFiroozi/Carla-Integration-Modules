@@ -37,7 +37,11 @@ class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete",
+<<<<<<< HEAD
                  random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False, no_rendering=True):
+=======
+                 random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False, no_rendering=False):
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         super(CarlaEnv, self).__init__()
 
         self.walkers_count = walkers_count
@@ -116,6 +120,11 @@ class CarlaEnv(gymnasium.Env):
         self.last_heartbeat_time = time.time()
         with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
+
+
+        self._env_seed = None
+        self._rng = random.Random()  
+           
                 
     def _cleanup_world_actors(self):
         """
@@ -140,16 +149,36 @@ class CarlaEnv(gymnasium.Env):
         except Exception as e:
             print(f"[WARN] world actor cleanup failed: {e}")
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
     def reset(self, seed=None):
+        super().reset(seed=seed)
         self.current_step = 0
         self.prev_steer = 0.0
 
-        # RANDOMIZE SEED (so NPC spawns differ each episode)
+        # --- EPISODE SEED & RNG ---
         if seed is not None:
-            random.seed(seed)
+            self._env_seed = seed
+        else:
+            # Use global random (already seeded by seed_everything) to generate a seed.
+            # Because global random is deterministic, the sequence of seeds will be the same
+            # every time you run the script with the same GLOBAL_SEED.
+            self._env_seed = random.randint(0, 2**32 - 1)
 
+<<<<<<< HEAD
         # Stop our own sensor callbacks first (so they don't fire mid-teardown), then do a
         # GLOBAL cleanup that also removes zombie actors orphaned by a previous force-killed run.
+=======
+        # Create a private RNG that controls ALL randomness for this episode
+        self._rng = random.Random(self._env_seed)
+
+
+        # --- CLEANUP PREVIOUS ACTORS ---
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         if self.vehicle_controller is not None:
             for s in ("sensor_c", "sensor_l"):
                 sensor = getattr(self.vehicle_controller, s, None)
@@ -164,19 +193,38 @@ class CarlaEnv(gymnasium.Env):
         self.vehicles = []
         self.walkers = []
         self.ego_vehicle = None
+<<<<<<< HEAD
         # Tick so CARLA actually removes them
+=======
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         self.world.tick()
 
-        self.vehicles = spawn_vehicles(self.client, self.vehicles_count, random_spawn=self.random_vehicle_spawn)
-        self.walkers = spawn_pedestrians(self.world, self.walkers_count)
+        self.vehicles = spawn_vehicles(
+            self.client,
+            self.vehicles_count,
+            random_spawn=self.random_vehicle_spawn,
+            rng=self._rng               
+        )
+        self.walkers = spawn_pedestrians(
+            self.world,
+            self.walkers_count,
+            seed=self._env_seed          # spawn_pedestrians expects seed, not rng
+        )
         self.world.tick()
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed, random_spawn=self.random_ego_spawn)
+        self.ego_vehicle = spawn_ego_vehicle(
+            self.world,
+            self.init_speed,
+            random_spawn=self.random_ego_spawn,
+            rng=self._rng                # <-- pass the RNG object!
+        )
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
+<<<<<<< HEAD
 
         # Tick again so ego sensors + physics start stable
+=======
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         self.world.tick()
-
         return self._get_observation(), {}
 
     def _apply_sync(self, fixed_dt=0.05):
@@ -200,7 +248,11 @@ class CarlaEnv(gymnasium.Env):
             tm.set_hybrid_physics_radius(70.0)
         except Exception as e:
             print(f"[WARN] Could not enable TM hybrid physics: {e}")
+<<<<<<< HEAD
     
+=======
+        
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 
     def _process_action(self, action):
         """
@@ -241,8 +293,14 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
+<<<<<<< HEAD
         
         action_mode = None
+=======
+        # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
+        # continuous AI control normally, but discrete keyboard during a human takeover).
+        action_mode = new_action_mode if new_action_mode is not None else self.action_mode
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 
         if new_action_mode is not None:
             action_mode = new_action_mode
@@ -288,7 +346,7 @@ class CarlaEnv(gymnasium.Env):
             reward, info = self.vehicle_controller.get_reward(prev_obs)
             return prev_obs, reward, False, False, info
 
-        step_peds(self.world, self.walkers)
+        step_peds(self.world, self.walkers,self._rng )
 
         # 2. Check for failure (Terminated)
         if self.vehicle_controller.collision_happened:
@@ -323,6 +381,11 @@ class CarlaEnv(gymnasium.Env):
         if self.current_step >= self.max_steps:
             truncated = True
             
+        if not self.no_rendering:
+            self.render_hud(action=action)
+
+
+
         return obs, reward, terminated, truncated, info
 
     def _get_observation(self):
@@ -395,4 +458,103 @@ class CarlaEnv(gymnasium.Env):
             tm = self.client.get_trafficmanager()
             tm.set_synchronous_mode(False)
         except Exception:
+<<<<<<< HEAD
             pass
+=======
+            pass
+
+    def render_hud(self, action=None, matrix_length=25, matrix_width=11, cell_length=2.0, cell_width=2.0):
+        """
+        Draws a live debug HUD over the CARLA world.
+        - Draws a cyan perimeter on the ground showing the exact BEV grid boundaries.
+        - Highlights vehicles GREEN if they are inside the grid, RED if outside.
+        - Floats a live telemetry string above the ego vehicle's roof.
+        """
+        if self.ego_vehicle is None or not self.ego_vehicle.is_alive:
+            return
+
+        world = self.world
+        ego_transform = self.ego_vehicle.get_transform()
+        ego_loc = ego_transform.location
+        theta = math.radians(ego_transform.rotation.yaw)
+
+        # Use 0.06 life_time. Since step dt is 0.05, 0.06 ensures it lives for exactly 1 frame 
+        # without flickering, but disappears before the next frame creates a "ghost" trail.
+        draw_time = 0.06
+
+        # ==========================================
+        # 1. LIVE TELEMETRY (Floating Text)
+        # ==========================================
+        speed_ms = self.ego_vehicle.get_velocity().length()
+        control = self.ego_vehicle.get_control()
+        thr = control.throttle
+        brk = control.brake
+        strg = control.steer
+
+        hud_text = f"Spd: {speed_ms:.1f} m/s | Thr: {thr:.2f} | Brk: {brk:.2f} | Str: {strg:.2f}"
+        
+        # Yellow text is easier to read against CARLA's bright sky/fog
+        text_loc = ego_loc + carla.Location(z=3.5) # Float 3.5 meters above the car
+        world.debug.draw_string(text_loc, hud_text, draw_shadow=True,
+                                color=carla.Color(0, 0, 0), life_time=draw_time)
+
+        # ==========================================
+        # 2. SCALABLE GRID HORIZON (Cyan Box)
+        # ==========================================
+        # Calculate local physical bounds based on grid dimensions and ego offset
+        min_x = -(matrix_length // 2) * cell_length
+        max_x = (matrix_length - (matrix_length // 2)) * cell_length
+        min_y = -(matrix_width // 2) * cell_width
+        max_y = (matrix_width - (matrix_width // 2)) * cell_width
+
+        # Helper to convert local (x,y) to global CARLA Location
+        def local_to_global(lx, ly):
+            gx = ego_loc.x + (lx * math.cos(theta) - ly * math.sin(theta))
+            gy = ego_loc.y + (lx * math.sin(theta) + ly * math.cos(theta))
+            return carla.Location(x=gx, y=gy, z=ego_loc.z + 0.2) # Draw slightly above asphalt
+
+        # Map the 4 corners of the grid
+        fl = local_to_global(max_x, min_y) # Front-Left
+        fr = local_to_global(max_x, max_y) # Front-Right
+        bl = local_to_global(min_x, min_y) # Back-Left
+        br = local_to_global(min_x, max_y) # Back-Right
+
+        # # Draw the Cyan Perimeter
+        # box_color = carla.Color(0, 255, 255)
+        # world.debug.draw_line(fl, fr, thickness=0.15, color=box_color, life_time=draw_time)
+        # world.debug.draw_line(fr, br, thickness=0.15, color=box_color, life_time=draw_time)
+        # world.debug.draw_line(br, bl, thickness=0.15, color=box_color, life_time=draw_time)
+        # world.debug.draw_line(bl, fl, thickness=0.15, color=box_color, life_time=draw_time)
+
+        # ==========================================
+        # 3. DYNAMIC VEHICLE COLORING
+        # ==========================================
+        for npc in world.get_actors().filter('vehicle.*'):
+            if npc.id == self.ego_vehicle.id:
+                continue
+            
+            npc_loc = npc.get_location()
+            dx = npc_loc.x - ego_loc.x
+            dy = npc_loc.y - ego_loc.y
+            
+            # Rotate NPC position into ego's local coordinate frame
+            dx_local = dx * math.cos(theta) + dy * math.sin(theta)
+            dy_local = -dx * math.sin(theta) + dy * math.cos(theta)
+
+            # Check if NPC is inside the mathematical grid bounds
+            in_x = min_x <= dx_local < max_x
+            in_y = min_y <= dy_local < max_y
+
+            # Green if visible to the AI, Red if outside the AI's sensor horizon
+            color = carla.Color(0, 255, 0) if (in_x and in_y) else carla.Color(255, 0, 0)
+            
+            # Convert local bounding box to global world space!
+            bb = npc.bounding_box
+            npc_transform = npc.get_transform()
+            
+            # The bounding box location is an offset from the car's center. 
+            # We must add it to the car's global location to draw it properly.
+            global_bb = carla.BoundingBox(npc_transform.location + bb.location, bb.extent)
+            
+            world.debug.draw_box(global_bb, npc_transform.rotation, thickness=0.1, color=color, life_time=draw_time)
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480

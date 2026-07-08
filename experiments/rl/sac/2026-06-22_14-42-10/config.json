@@ -152,6 +152,7 @@
   "PRELOAD_EXPERT_DATA": false,
   "COMPILED_DATASET_PATH": "C:\\Users\\H\\Desktop\\IOT\\Carla-Integration-Modules\\imitation\\data\\processed\\dataset_rl_buffer.npz",
   "USE_Q_NORM": true
+<<<<<<< HEAD
 }
 
 
@@ -599,3 +600,6 @@ Saved checkpoint at step 60000 (1062MB)
 [Episode 41] return=-1066.89 len=2000 time=670.2s
 WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 130 (sensor.other.collision)
 Spawned ego vehicle at random spawn point
+=======
+}
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480

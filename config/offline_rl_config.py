@@ -15,14 +15,31 @@ MAX_STEPS = 2000              # max steps per episode (same as env)
 # ---------- Paths ----------
 # Root directory where Behavior Cloning experiments and checkpoints are stored
 BC_CHECKPOINTS_ROOT = REPO_ROOT / "experiments" / "bc" 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 # NOTE: the original offline_noisy_data is gone (offline_rl/data is empty after the lab sync).
 # Point IQL/AWAC at the BC demos, which have the same npz format incl. a 'rewards' key (178 eps).
 # (To do offline RL *properly* later, re-record diverse/noisy rollouts via offline_rl/record_demos.py.)
 SAVE_DIR = REPO_ROOT / "imitation" / "data" / "demos" / "map1_30car"
+<<<<<<< HEAD
 # Number of episodes of data to collect for offline RL training sets
 COLLECT_EPISODES = 500
 # Specific Behavior Cloning model checkpoint file path to use for offline data collection/warmup
 BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # base BC (stronger than DAgger round 1)
+=======
+COLLECT_EPISODES = 500
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # base BC (stronger than DAgger round 1)
+=======
+# Output directory path where collected offline dataset files are saved
+SAVE_DIR = REPO_ROOT / "offline_rl" / "data"
+# Number of episodes of data to collect for offline RL training sets
+COLLECT_EPISODES = 500
+# Specific Behavior Cloning model checkpoint file path to use for offline data collection/warmup
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # choose the bc path manually
+>>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 
 # =========================================================
 # AWAC & RL HYPERPARAMETERS

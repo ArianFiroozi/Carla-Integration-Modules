@@ -88,6 +88,14 @@ python
 imitation/data/archive
 imitation/data/processed
 
+__pycache__/
+
+report.txt
+
+experiments/**/*.pt
+experiments/**/*.pkl
+offline_rl/**/*.npz
+test
 # Ignore RL experiment logs and datasets
 *.tfevents.*
 *.zip
@@ -97,10 +105,12 @@ experiments_tb_only
 offline_rl/**/*.npz
 test
 
-# Specific model folders
-./sac_carla_model.zip
-.sac_carla
-./sac_carla
-.ppo_carla
-./sac_carla/*
-./sac_carla/*/*
+imitation/data/archive
+imitation/data/processed
+
+
+experiments_tb_only
+experiments_archive/**/*.pt
+experiments_archive/**/*.pkl
+.gitignore
+imitation\DAGGER_LOOP.md

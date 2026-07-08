@@ -1,0 +1,17 @@
+{
+  "model_path": "experiments\\rl\\sac\\2026-06-28_19-12-01\\models\\best_model.pt",
+  "episodes": 10,
+  "avg_return": 626.7761872036809,
+  "std_return": 356.03945511417294,
+  "min_return": 202.66235333820674,
+  "max_return": 1392.0244245503636,
+  "avg_length": 597.9,
+  "std_length": 291.84805978453926,
+  "end_reasons": {
+    "terminated": 10
+  },
+  "wall_time_sec": 132.43895959854126,
+  "carla_vehicles": 30,
+  "carla_walkers": 0,
+  "video_recorded": true
+}
