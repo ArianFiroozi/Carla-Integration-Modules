@@ -63,6 +63,13 @@ class VehicleController():
         # State trackers for smoothness penalties
         self.prev_steer = 0.0
         self.prev_throttle = 0.0
+        # Per-episode cache of other vehicles for the lead-gap scan (the controller is
+        # recreated on every env.reset, so the actor list is stable for its lifetime)
+        self._nearby_vehicles = None
+        # Raw (pre-exclusivity) policy pedals; env.step sets these each tick so the reward can
+        # punish a throttle+brake hedge before the env zeroes the throttle.
+        self.raw_throttle = 0.0
+        self.raw_brake = 0.0
 
     def __init_control(self):
         self.control = carla.VehicleControl()
@@ -119,7 +126,9 @@ class VehicleController():
         # Terminals & Violations
         info['is_terminal_crash'] = int(self.collision_happened or vehicle_loc.z <= -5)
         info['is_lane_invaded'] = int(self.lane_invaded)
-        info['is_pedal_overlap'] = int(self.control.throttle > 0.1 and self.control.brake > 0.1)
+        # Judge pedal overlap on the RAW policy action (before the env zeroed the throttle), so
+        # the agent is punished for the throttle+brake hedge instead of escaping it for free.
+        info['is_pedal_overlap'] = int(self.raw_throttle > 0.1 and self.raw_brake > 0.1)
         
         # Vectors (Saved as raw lists/arrays)
         info['velocity_x'] = float(velocity.x)
@@ -143,6 +152,10 @@ class VehicleController():
         info['steer_change'] = float(abs(self.control.steer - self.prev_steer))
         info['throttle_change'] = float(abs(self.control.throttle - self.prev_throttle))
 
+        # Proximity shaping input: center-to-center distance to the nearest vehicle in the
+        # forward ego-lane corridor (see PROXIMITY_* in general_config). 999 = nothing ahead.
+        info['lead_gap_m'] = self._lead_vehicle_gap()
+
         # --- RESET SENSORS & STATE ---
         if info['is_terminal_crash'] == 1:
             self.collision_happened = False
@@ -157,6 +170,34 @@ class VehicleController():
         reward , _ = compile_reward(info, config, is_tensor=False)
         
         return reward, info
+    def _lead_vehicle_gap(self, max_dist=30.0):
+        """
+        Center-to-center longitudinal distance (m) to the nearest other vehicle inside the
+        forward corridor (|lateral| < PROXIMITY_LAT_HALFWIDTH_M). Returns 999.0 when the
+        corridor is clear (beyond max_dist the proximity penalty is zero anyway).
+        """
+        try:
+            if self._nearby_vehicles is None:
+                self._nearby_vehicles = [a for a in self.world.get_actors().filter("vehicle.*")
+                                         if a.id != self.vehicle.id]
+            if not self._nearby_vehicles:
+                return 999.0
+            tr = self.vehicle.get_transform()
+            loc = tr.location
+            fwd = tr.get_forward_vector()
+            best = None
+            for v in self._nearby_vehicles:
+                vloc = v.get_location()
+                dx, dy = vloc.x - loc.x, vloc.y - loc.y
+                lon = dx * fwd.x + dy * fwd.y            # distance ahead along heading
+                lat = -dx * fwd.y + dy * fwd.x           # lateral offset from heading axis
+                if 0.0 < lon < max_dist and abs(lat) < config.PROXIMITY_LAT_HALFWIDTH_M:
+                    if best is None or lon < best:
+                        best = lon
+            return float(best) if best is not None else 999.0
+        except Exception:
+            return 999.0   # actor churn mid-query: no penalty rather than a crashed step
+
     # ==============================================================================
     # ACTION EXECUTION METHODS
     # ==============================================================================

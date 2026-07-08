@@ -78,6 +78,121 @@ def resolve_paths(args):
     return model_path, config_path, eval_dir
 
 
+# FORCE JPG FRAME DUMPING — bypass cv2.VideoWriter entirely.
+# On the lab server, cv2.VideoWriter reports isOpened()=True for mp4v and then SEGFAULTS
+# natively on the first write() (confirmed 2026-07-05: "[VIDEO] Recording ... mp4v" prints,
+# process dies silently — the crash is in OpenCV's videoio/ffmpeg DLL, below Python, so no
+# try/except can catch it). JPG encoding uses a different native path (imgcodecs) and works.
+# Frames land in <video_name>_frames/ next to the intended video path; stitch with ffmpeg
+# (the exact command is printed at record time). Set False to re-try real video encoding
+# (e.g. after `pip install --force-reinstall opencv-python` on the server).
+FORCE_JPG_FRAMES = True
+
+
+class RobustVideoRecorder:
+    """
+    Crash-proof video sink for CARLA camera callbacks.
+
+    CARLA runs sensor callbacks on a background thread: any exception or native fault there
+    (unsupported codec, frame-size mismatch, non-contiguous buffer) kills the whole process
+    SILENTLY — no traceback, straight back to the prompt. This recorder therefore:
+      - initializes the cv2.VideoWriter LAZILY from the first real frame, so the writer's
+        dimensions always match what the camera actually delivers;
+      - tries a ladder of codecs (mp4v -> XVID -> MJPG) and trusts none until isOpened();
+      - writes contiguous BGR arrays only;
+      - never lets an exception escape: on any failure it degrades to dumping JPG frames
+        that can be stitched with ffmpeg later.
+    """
+
+    CODEC_LADDER = [("mp4v", ".mp4"), ("XVID", ".avi"), ("MJPG", ".avi")]
+
+    def __init__(self, save_path, fps=20, force_frames=None):
+        self.save_path = Path(save_path)
+        self.fps = fps
+        self.force_frames = FORCE_JPG_FRAMES if force_frames is None else force_frames
+        self.writer = None
+        self.frames_dir = None   # set when in JPG-fallback mode
+        self.frame_idx = 0
+        self.closed = False
+        self.final_path = None
+
+    def _open_writer(self, w, h):
+        for fourcc, ext in self.CODEC_LADDER:
+            path = self.save_path.with_suffix(ext)
+            writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*fourcc), self.fps, (w, h))
+            if writer.isOpened():
+                print(f"[VIDEO] Recording {w}x{h}@{self.fps} with codec {fourcc} -> {path.name}")
+                self.final_path = path
+                return writer
+            writer.release()
+            try:
+                if path.exists():
+                    path.unlink()   # remove the 0-byte stub a failed writer leaves behind
+            except OSError:
+                pass
+            print(f"[VIDEO WARN] Codec {fourcc} not available on this machine, trying next...")
+        return None
+
+    def _fallback_to_frames(self):
+        self.frames_dir = self.save_path.parent / (self.save_path.stem + "_frames")
+        self.frames_dir.mkdir(parents=True, exist_ok=True)
+        reason = "FORCE_JPG_FRAMES=True (cv2.VideoWriter bypassed)" if self.force_frames \
+                 else "no working video codec"
+        print(f"[VIDEO] Dumping JPG frames ({reason}) -> {self.frames_dir}")
+        print(f"[VIDEO] Stitch later with:\n"
+              f"  ffmpeg -framerate {self.fps} -i \"{self.frames_dir}\\frame_%06d.jpg\" "
+              f"-c:v libx264 -pix_fmt yuv420p \"{self.save_path.with_suffix('.mp4')}\"")
+
+    def write(self, frame_bgr):
+        if self.closed:
+            return
+        try:
+            # cv2's native writer can crash on reversed-stride/non-contiguous views
+            frame_bgr = np.ascontiguousarray(frame_bgr)
+            if self.writer is None and self.frames_dir is None:
+                if self.force_frames:
+                    # cv2.VideoWriter is NEVER touched in this mode (native segfault on
+                    # this server's videoio backend) — straight to JPG dumping.
+                    self._fallback_to_frames()
+                else:
+                    h, w = frame_bgr.shape[:2]
+                    self.writer = self._open_writer(w, h)
+                    if self.writer is None:
+                        self._fallback_to_frames()
+            if self.writer is not None:
+                self.writer.write(frame_bgr)
+            else:
+                cv2.imwrite(str(self.frames_dir / f"frame_{self.frame_idx:06d}.jpg"), frame_bgr)
+            self.frame_idx += 1
+        except Exception as e:
+            # NEVER raise out of a CARLA sensor callback thread — degrade instead.
+            print(f"[VIDEO WARN] Frame write failed ({e}); switching to JPG frame fallback.")
+            try:
+                if self.writer is not None:
+                    self.writer.release()
+            except Exception:
+                pass
+            self.writer = None
+            if self.frames_dir is None:
+                try:
+                    self._fallback_to_frames()
+                except Exception as e2:
+                    print(f"[VIDEO WARN] JPG fallback also failed ({e2}); recording disabled.")
+                    self.closed = True
+
+    def release(self):
+        self.closed = True
+        if self.writer is not None:
+            try:
+                self.writer.release()
+                print(f"[VIDEO] Saved {self.frame_idx} frames -> {self.final_path}")
+            except Exception as e:
+                print(f"[VIDEO WARN] Writer release failed: {e}")
+            self.writer = None
+        elif self.frames_dir is not None:
+            print(f"[VIDEO] Dumped {self.frame_idx} JPG frames -> {self.frames_dir}")
+
+
 def create_third_person_camera(env, save_path, width=640, height=360, fps=20):
     """
     Create a third-person chase camera attached to the ego vehicle.
@@ -105,23 +220,22 @@ def create_third_person_camera(env, save_path, width=640, height=360, fps=20):
 
     camera = world.spawn_actor(cam_bp, cam_transform, attach_to=ego_vehicle)
 
-    # Setup video writer
-    video = cv2.VideoWriter(
-        str(save_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        fps,
-        (width, height)
-    )
+    recorder = RobustVideoRecorder(save_path, fps=fps)
 
     def callback(image):
-        array = np.frombuffer(image.raw_data, dtype=np.uint8)
-        array = array.reshape((image.height, image.width, 4))
-        frame = array[:, :, :3]   # Remove alpha channel
-        frame = frame[:, :, ::-1] # BGRA → BGR for OpenCV
-        video.write(frame)
+        try:
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = array.reshape((image.height, image.width, 4))
+            frame = array[:, :, :3]   # CARLA raw_data is BGRA; dropping alpha yields BGR,
+                                      # which is exactly cv2's expected order. (The old code
+                                      # additionally reversed channels — that produced RGB,
+                                      # i.e. color-swapped videos, AND a non-contiguous view.)
+            recorder.write(frame)
+        except Exception as e:
+            print(f"[VIDEO WARN] Camera callback error: {e}")
 
     camera.listen(callback)
-    return camera, video
+    return camera, recorder
 
 
 def create_top_down_camera(env, save_path, width=640, height=360, fps=20):
@@ -253,9 +367,19 @@ def main():
     parser.add_argument("--experiments_root", type=str, default=str(cfg.SAVE_DIR))
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
     parser.add_argument("--record", action="store_true", default=cfg.RECORD_SAC_EVAL_VID,help="Record video of evaluation episodes")
+    parser.add_argument("--no-record", action="store_true",
+                        help="Disable video recording AND the camera sensor entirely, overriding "
+                             "config RECORD_SAC_EVAL_VID. Use on machines where spawning an RGB "
+                             "camera segfaults (e.g. remote sessions without a rendering context) "
+                             "— metrics-only headless eval, same conditions training ran under.")
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
-    
+    parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
+
     args = parser.parse_args()
+
+    # --no-record beats the config default (argparse can't turn off a default=True store_true)
+    if args.no_record:
+        args.record = False
 
     # Set device
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -306,7 +430,8 @@ def main():
         init_speed=cfg.CARLA_INIT_SPEED,
         action_mode="continuous",
         random_ego_spawn=cfg.RANDOM_EGO_START_POS,
-        random_vehicle_spawn=cfg.RANDOM_VEHICLE_START_POS
+        random_vehicle_spawn=cfg.RANDOM_VEHICLE_START_POS,
+        no_rendering=not (args.watch or args.record),  # watching/recording needs the server to render
     )
 
     all_returns = []
@@ -362,7 +487,7 @@ def main():
             )
             if args.record:
                 print(f"  Video saved: {video_path}")
-            
+
             # TensorBoard episode metrics
             tb_writer.add_scalar("eval/episode_return", result["return"], ep + 1)
             tb_writer.add_scalar("eval/episode_length", result["length"], ep + 1)

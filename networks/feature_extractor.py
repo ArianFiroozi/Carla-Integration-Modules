@@ -3,9 +3,9 @@ import torch.nn as nn
 import numpy as np
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, grid_channels=15, scalar_dim=4, latent_dim=128, 
-                 cnn_channels=[32, 64, 128], kernel_sizes=[3, 3, 3], 
-                 n_mlp_layers=2, mlp_hidden_size=64):
+    def __init__(self, grid_channels=15, scalar_dim=4, latent_dim=128,
+                 cnn_channels=[32, 64, 128], kernel_sizes=[3, 3, 3],
+                 n_mlp_layers=2, mlp_hidden_size=64, dropout=0.2):
         super().__init__()
 
         cnn_layers = []
@@ -38,7 +38,7 @@ class FeatureExtractor(nn.Module):
         self.fuse = nn.Sequential(
             nn.Linear(cnn_dim + scalar_out_dim, 256),
             nn.ReLU(inplace=True),
-            nn.Dropout(0.2),
+            nn.Dropout(dropout),   # 0.0 for SAC actor/critic; default 0.2 preserves BC behavior
             nn.Linear(256, latent_dim),
             nn.ReLU(inplace=True),
         )

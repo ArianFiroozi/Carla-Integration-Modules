@@ -1,0 +1,21 @@
+{
+  "episodes": 30,
+  "avg_return": 312.8566835209131,
+  "std_return": 637.4772676076669,
+  "avg_length": 300.23333333333335,
+  "std_length": 494.23271733960405,
+  "median_length": 56.0,
+  "avg_distance_m": 71.97763244228767,
+  "std_distance_m": 147.92860881217405,
+  "avg_speed_ms": 1.2680215103914818,
+  "crash_rate": 0.23333333333333334,
+  "crashes_per_km": 3.241747823817658,
+  "end_reasons": {
+    "crash": 7,
+    "stall": 23
+  },
+  "wall_time_sec": 399.11874866485596,
+  "action_mode": "continuous",
+  "smooth_steering": false,
+  "number of cars": 30
+}

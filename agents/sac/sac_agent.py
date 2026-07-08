@@ -1,4 +1,5 @@
 import copy
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -34,7 +35,8 @@ class SACActor(nn.Module):
             cnn_channels=cfg.CNN_CHANNELS,
             kernel_sizes=cfg.KERNEL_SIZES,
             n_mlp_layers=cfg.SCALAR_N_MLP_LAYERS,
-            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE
+            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE,
+            dropout=0.0,   # no dropout in the RL actor (consistent train/eval, no stochastic latents)
         )
         self.head = BCGaussianContinuousHead(
             latent_dim=latent_dim,
@@ -104,8 +106,9 @@ class SACCritic(nn.Module):
             cnn_channels=cfg.CNN_CHANNELS,
             kernel_sizes=cfg.KERNEL_SIZES,
             n_mlp_layers=cfg.SCALAR_N_MLP_LAYERS,
-            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE
-        )   
+            mlp_hidden_size=cfg.SCALAR_MLP_HIDDEN_SIZE,
+            dropout=0.0,   # no dropout in the Q-network: dropout in the target made TD targets noisy
+        )
         self.head = TwinQCriticHead(
             latent_dim=latent_dim,
             action_dim=action_dim,
@@ -142,6 +145,7 @@ class SACAgent:
         ).to(self.device)
 
         self.critic_target = copy.deepcopy(self.critic).to(self.device)
+        self.critic_target.eval()   # never run stochastic layers (e.g. dropout) inside the TD target
         for p in self.critic_target.parameters():
             p.requires_grad = False
 
@@ -244,8 +248,6 @@ class SACAgent:
                 critic_loss = ((q1 - target_q).pow(2) + (q2 - target_q).pow(2)).mean()
 
             self.critic_opt.zero_grad()
-
-            self.critic_opt.zero_grad()
             critic_loss.backward()
             
             # Compute critic gradient norm BEFORE clipping
@@ -290,16 +292,18 @@ class SACAgent:
             # Calculate MSE between RL mean and BC mean
             bc_mse = torch.nn.functional.mse_loss(mean_action, bc_mean_action)
             
-            # Calculate current beta (decays linearly to 0)
-            beta = max(0.0, self.bc_penalty_init * (1.0 - self.train_step / self.bc_penalty_steps))
+            # Calculate current beta (decays linearly, but never below BC_PENALTY_FLOOR).
+            # The floor is a permanent tether: with beta -> 0 the actor eventually
+            # free-maximizes an imperfect critic (extrapolation exploits, stall equilibrium).
+            beta_floor = getattr(cfg, 'BC_PENALTY_FLOOR', 0.0)
+            beta = max(beta_floor, self.bc_penalty_init * (1.0 - self.train_step / self.bc_penalty_steps))
             
-            # Q-Normalization
-            # Normalizes the RL loss so it doesn't overpower the BC penalty
-            q_norm = torch.max(q_pi.abs().mean().detach() , torch.tensor(1.0,device=self.device))
-            normalized_rl_loss = actor_rl_loss / q_norm
-            
-            # 3. Combine Losses using the normalized RL loss
-            actor_loss = normalized_rl_loss + beta * bc_mse
+            if cfg.USE_Q_NORM:
+                q_norm = torch.max(q_pi.abs().mean().detach() , torch.tensor(1.0, device=self.device))
+                normalized_rl_loss = actor_rl_loss / q_norm
+                actor_loss = normalized_rl_loss + beta * bc_mse
+            else:
+                actor_loss = actor_rl_loss + beta * bc_mse
 
             self.actor_opt.zero_grad()
             actor_loss.backward()
@@ -329,10 +333,19 @@ class SACAgent:
             alpha_loss = -(self.log_alpha * (logp.detach() + self.target_entropy)).mean()
             self.alpha_opt.zero_grad()
             alpha_loss.backward()
-            
+
             # Compute alpha gradient norm
             alpha_grad_norm = self.log_alpha.grad.abs().item() if self.log_alpha.grad is not None else 0.0
             self.alpha_opt.step()
+
+            # Hard ceiling on alpha: a policy whose entropy sits below an unreachable target
+            # produces a CONSTANT-sign alpha gradient, which Adam integrates into exponential
+            # alpha growth (0.1 -> 1.8 in the 400k run) that then poisons the TD target via
+            # -alpha*logpi'. The clamp caps the damage no matter how targets are configured.
+            alpha_max = getattr(cfg, 'ALPHA_MAX', None)
+            if alpha_max is not None:
+                with torch.no_grad():
+                    self.log_alpha.clamp_(max=math.log(alpha_max))
 
             # Save state for logging
             self.last_alpha_loss = alpha_loss.item()
@@ -433,7 +446,15 @@ class SACAgent:
                 translated_state[k] = v
                 
         missing, unexpected = self.actor.load_state_dict(translated_state, strict=strict)
-        
+
+        # CRITICAL: refresh the frozen BC anchor so bc_mse regularizes toward the REAL BC
+        # policy. In __init__ bc_actor was a deepcopy of the still-random actor, so without
+        # this the actor was being pulled toward random noise.
+        self.bc_actor = copy.deepcopy(self.actor).to(self.device)
+        for p in self.bc_actor.parameters():
+            p.requires_grad = False
+        self.bc_actor.eval()
+
         print("\n[INFO] BC Weights Loaded into SAC Actor Successfully!")
         if missing:
             print(f"[WARN] Missing keys during load (Usually safe if just log_std): {missing}")

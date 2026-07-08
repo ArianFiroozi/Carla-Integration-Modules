@@ -25,7 +25,10 @@ def spawn_ego_vehicle(world,
 
             spawn_point = spawn_points[i]
 
-            lateral_offset = random.uniform(-3.0, 3.0)
+            # CURRICULUM: use CARLA's spawn points AS-IS (they are collision-free & lane-centered).
+            # Any lateral offset risks clipping into geometry; 0.0 is the bulletproof safe start.
+            # Widen this back toward +-3.0 later, once the agent reliably drives.
+            lateral_offset = 0.0
 
             right_vec = spawn_point.get_right_vector()
             spawn_point.location.x += right_vec.x * lateral_offset

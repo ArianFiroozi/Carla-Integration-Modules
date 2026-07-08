@@ -549,9 +549,13 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         for i, src_idx in enumerate(scalar_src):
             # Attempt to extract the rich info dict
             step_info = {k[5:]: d[k][src_idx] for k in d.keys() if k.startswith("info_")}
-            
+
             if step_info:
                 # We have the new data format!
+                # Demos recorded before lead_gap_m existed get the presence-grid fallback so
+                # relabeled proximity penalties stay consistent with the online reward.
+                if 'lead_gap_m' not in step_info and 'obs_presence' in d:
+                    step_info['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_info, general_config, mode="info", is_tensor=False)
             else:
                 # We have the old data format! Calculate smoothness manually.
@@ -573,6 +577,8 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
                     'steer_change': abs(steer_curr - steer_prev),
                     'throttle_change': abs(throttle_curr - throttle_prev)
                 }
+                if 'obs_presence' in d:   # proximity shaping from the grid (see reward_compiler)
+                    step_obs['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_obs, general_config, mode="obs", is_tensor=False)
                 
             out_rewards[idx + i] = compiled_reward
@@ -638,11 +644,29 @@ def compute_normalization_stats(out_obs):
             
     return norm_stats
 
-def run_pipeline(mode, visualize=False):
+def run_pipeline(mode, visualize=False, extra_dirs=None, upweight=1):
     print(f"[{mode.upper()}] Starting dataset pipeline with Window Size {WINDOW_SIZE}...")
     rng = np.random.default_rng(RNG_SEED)
     stats = init_stats()
-    files = gather_demo_files(DEMO_DIRS)
+    # Base demos (required). Then AGGREGATE extra dirs (e.g. DAgger interventions) into the
+    # dataset, each replicated `upweight` times so the agent pays EXTRA attention to the
+    # corrected failure states. Replicating files = replicating their kept samples downstream.
+    files = list(gather_demo_files(DEMO_DIRS))
+    if extra_dirs:
+        upweight = int(max(1, upweight))
+        extra_files = []
+        for d in extra_dirs:
+            p = Path(d)
+            if not p.exists():
+                print(f"[WARN] --extra-dir does not exist (skipping): {p}")
+                continue
+            found = sorted(p.glob("*.npz"))
+            print(f"[AGGREGATE] {len(found)} extra demos in {p.resolve()}  (upweight x{upweight})")
+            extra_files.extend(found)
+        if extra_files:
+            files = files + extra_files * upweight
+            print(f"[AGGREGATE] Dataset now spans {len(files)} episode-files "
+                  f"({len(extra_files)} unique interventions x{upweight}).\n")
 
     # =========================================================================
     # PASS A: RUN SUPERVISED LEARNING COMPILATION (BC POLICY FORMAT)
@@ -807,9 +831,14 @@ if __name__ == "__main__":
     parser.add_argument("--out-path", type=str, default=None)
     parser.add_argument("--visualize", action="store_true")
     parser.add_argument("--action-mode", type=str, default=bc_config.ACTION_MODE, choices=["discrete", "continuous"])
+    parser.add_argument("--extra-dirs", type=str, nargs="*", default=None,
+                        help="Extra demo dirs to AGGREGATE in (DAgger loop: imitation/data/interventions_raw)")
+    parser.add_argument("--upweight", type=int, default=1,
+                        help="Replicate each --extra-dirs episode N times (emphasize corrected failure states)")
     args = parser.parse_args()
 
     if args.out_path:
         BC_OUT_PATH = Path(args.BC_OUT_PATH)
 
-    run_pipeline(mode=args.action_mode, visualize=args.visualize or bc_config.BUILD_VISUALIZE)
+    run_pipeline(mode=args.action_mode, visualize=args.visualize or bc_config.BUILD_VISUALIZE,
+                 extra_dirs=args.extra_dirs, upweight=args.upweight)
