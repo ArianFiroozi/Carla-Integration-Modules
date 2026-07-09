@@ -209,7 +209,7 @@ MANUAL_PRINT_EVERY = 500
 MANUAL_DEBUG_GRIDS = False
 
 # True to record dataset trajectories during manual drive sessions
-MANUAL_RECORD = False
+MANUAL_RECORD = True
 # Prefix basename for manual demonstration run directories
 MANUAL_BASE_NAME = "map1"
 

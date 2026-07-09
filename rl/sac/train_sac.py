@@ -5,6 +5,7 @@ import random
 import argparse
 import datetime
 import pickle
+import shutil
 from pathlib import Path
 from utils.seed_utils import seed_everything
 import numpy as np
@@ -105,12 +106,42 @@ def find_checkpoint_state(exp_dir):
     return state_files[-1]
 
 def save_full_checkpoint(exp_dir, step, agent, replay_buffer=None, optimizer_states=None, extra_info=None):
+    """
+    Crash-safe full checkpoint. Guarantees:
+      - NEVER raises: a failed save (e.g. disk full) logs a loud warning and training continues.
+        (The 2026-07-04 run died with [Errno 28] at the step-100k buffer save — never again.)
+      - Atomic-ish: the big .pkl is written to a .tmp file and renamed only when complete, so a
+        crash mid-write can't leave a truncated file that masquerades as a valid checkpoint.
+      - Graceful degradation: if free disk looks too small for a buffer-included save (estimated
+        from the newest existing checkpoint), the buffer is skipped for THIS save — weights and
+        optimizer states are always worth keeping.
+    """
     models_dir = exp_dir / "models"
-    
-    # Always save model weights (small, ~10MB)
-    model_path = models_dir / f"checkpoint_step_{step}.pt"
-    agent.save(model_path)
-    
+
+    # Always save model weights first (small, ~10MB)
+    try:
+        model_path = models_dir / f"checkpoint_step_{step}.pt"
+        agent.save(model_path)
+    except Exception as e:
+        print(f"[CHECKPOINT WARN] Could not save model weights at step {step}: {e}")
+        return None, None
+
+    # Disk preflight: estimate the state-file size from the newest existing one (if any)
+    if replay_buffer is not None:
+        try:
+            existing = sorted(models_dir.glob("checkpoint_state_*.pkl"),
+                              key=lambda p: p.stat().st_size)
+            if existing:
+                est_bytes = existing[-1].stat().st_size * 1.2 + 200 * 1024 * 1024
+                free_bytes = shutil.disk_usage(models_dir).free
+                if free_bytes < est_bytes:
+                    print(f"[CHECKPOINT WARN] Low disk: {free_bytes/1e9:.1f}GB free < "
+                          f"~{est_bytes/1e9:.1f}GB needed. Saving WITHOUT replay buffer this time "
+                          f"— free up space before the next resume!")
+                    replay_buffer = None
+        except Exception:
+            pass  # preflight is best-effort; the write itself is also guarded
+
     # Build state dict
     state = {
         'step': step,
@@ -124,40 +155,70 @@ def save_full_checkpoint(exp_dir, step, agent, replay_buffer=None, optimizer_sta
             'torch_cuda': torch.cuda.get_rng_state() if torch.cuda.is_available() else None,
         }
     }
-    
+
     if replay_buffer is not None:
         state['replay_buffer'] = replay_buffer
         print("  Including replay buffer in this checkpoint")
-    
+
     state_path = models_dir / f"checkpoint_state_{step}.pkl"
-    with open(state_path, 'wb') as f:
-        pickle.dump(state, f)
-    
-    size_mb = state_path.stat().st_size / (1024*1024)
-    print(f"Saved checkpoint at step {step} ({size_mb:.0f}MB)")
-    return model_path, state_path
+    tmp_path = models_dir / f"checkpoint_state_{step}.pkl.tmp"
+    try:
+        with open(tmp_path, 'wb') as f:
+            pickle.dump(state, f)
+        tmp_path.replace(state_path)   # atomic rename: only complete files get the real name
+        size_mb = state_path.stat().st_size / (1024*1024)
+        print(f"Saved checkpoint at step {step} ({size_mb:.0f}MB)")
+        return model_path, state_path
+    except Exception as e:
+        print(f"[CHECKPOINT WARN] Failed to save state at step {step}: {e}")
+        print("[CHECKPOINT WARN] Training CONTINUES — but fix the disk before relying on --resume.")
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()   # don't leave multi-GB partial files around
+        except Exception:
+            pass
+        return model_path, None
 
 
 def load_full_checkpoint(exp_dir, device):
-    """Load the latest checkpoint including model, buffer, and training state."""
-    latest_model = find_latest_checkpoint(exp_dir)
-    latest_state = find_checkpoint_state(exp_dir)
-    
-    if latest_model is None or latest_state is None:
+    """
+    Load the newest COMPLETE checkpoint: a step whose .pt (weights) and .pkl (state) both
+    exist and whose pickle actually deserializes. Walks backwards through older checkpoints
+    if the newest is unpaired (a save died halfway) or corrupt (truncated by a crash).
+    """
+    models_dir = Path(exp_dir) / "models"
+    if not models_dir.exists():
         print("No complete checkpoint found.")
         return None
-    
-    print(f"Loading model from: {latest_model}")
-    print(f"Loading state from: {latest_state}")
-    
-    # Load state
-    with open(latest_state, 'rb') as f:
-        checkpoint_state = pickle.load(f)
-    
-    return {
-        'model_path': latest_model,
-        'checkpoint_state': checkpoint_state
-    }
+
+    state_files = sorted(models_dir.glob("checkpoint_state_*.pkl"),
+                         key=lambda p: int(p.stem.split("_")[-1]))
+
+    for state_path in reversed(state_files):
+        step = int(state_path.stem.split("_")[-1])
+        model_path = models_dir / f"checkpoint_step_{step}.pt"
+        if not model_path.exists():
+            print(f"[RESUME WARN] {state_path.name} has no matching weights file — trying older checkpoint.")
+            continue
+        try:
+            with open(state_path, 'rb') as f:
+                checkpoint_state = pickle.load(f)
+        except Exception as e:
+            print(f"[RESUME WARN] {state_path.name} is unreadable ({e}) — trying older checkpoint.")
+            continue
+
+        print(f"Loading model from: {model_path}")
+        print(f"Loading state from: {state_path}")
+        if checkpoint_state.get('replay_buffer') is None:
+            print(f"[RESUME WARN] Checkpoint at step {step} has NO replay buffer — resuming from "
+                  f"it will reset the buffer (catastrophic-forgetting risk in off-policy RL).")
+        return {
+            'model_path': model_path,
+            'checkpoint_state': checkpoint_state
+        }
+
+    print("No complete checkpoint found.")
+    return None
 
 
 # -------------------------------------------------------------
@@ -390,6 +451,9 @@ def load_specific_checkpoint(pkl_path, device):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=str, default=cfg.CARLA_MAP_PATH)
+    parser.add_argument("--vehicles", type=int, default=cfg.CARLA_VEHICLES,
+                        help="NPC vehicle count (Scenario B traffic = 30). Defaults to config "
+                             "CARLA_VEHICLES; pass explicitly so the scenario is always on record.")
     parser.add_argument("--max-steps", type=int, default=cfg.CARLA_MAX_STEPS)
     parser.add_argument("--device", type=str, default=cfg.DEVICE)
     parser.add_argument("--seed", type=int, default=cfg.GLOBAL_SEED)
@@ -409,6 +473,22 @@ def main():
     # -------------------------------------------------------------------
 
     seed_everything(args.seed)
+
+    # Fail fast if SAVE_DIR is unreachable (e.g. external drive not plugged in) — a clear
+    # message beats a cryptic WinError mkdir crash after CARLA is already running.
+    save_root = Path(cfg.SAVE_DIR)
+    try:
+        save_root.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(
+            f"[FATAL] SAVE_DIR is not reachable: {save_root} ({e})\n"
+            f"        Is the drive connected? Fix SAVE_DIR in config/sac_config.py."
+        )
+    free_gb = shutil.disk_usage(save_root).free / 1e9
+    print(f"[DISK] Experiments root: {save_root} | free space: {free_gb:.1f} GB")
+    if free_gb < 30:
+        print(f"[DISK WARN] < 30 GB free. Two rolling buffer checkpoints can need ~25 GB at "
+              f"full buffer capacity — consider lowering REPLAY_BUFFER_SIZE or freeing space.")
 
     # Determine experiment directory
     if args.branch_from:
@@ -442,10 +522,16 @@ def main():
         print("[WARN] No normalization stats found. Wrapper will use empty stats.")
 
     # Create environment
+    print("\n" + "!" * 60)
+    print(f"!!  SCENARIO: {args.vehicles} NPC vehicles "
+          f"({'A — empty map' if args.vehicles == 0 else 'B — traffic' if args.vehicles >= 30 else 'custom'})")
+    print("!" * 60 + "\n")
+    tb_writer.add_scalar("Config/carla_vehicles_actual", args.vehicles, 0)
+
     env = CarlaEnv(
         map_path=args.map,
         walkers_count=cfg.CARLA_WALKERS,
-        vehicles_count=cfg.CARLA_VEHICLES,
+        vehicles_count=args.vehicles,
         max_steps=args.max_steps,
         init_speed=cfg.CARLA_INIT_SPEED,
         action_mode="continuous",
@@ -470,6 +556,20 @@ def main():
         checkpoint_data = load_full_checkpoint(exp_dir, args.device)
         
     if checkpoint_data is not None:
+        # Restore the frozen BC anchor FIRST: load_actor_from_bc sets both actor and bc_actor
+        # to the BC weights; agent.load() below then overwrites actor/critic with the trained
+        # checkpoint, leaving bc_actor = real BC policy. Without this, bc_actor stayed the
+        # RANDOM deepcopy from __init__ after every resume, and the BC penalty (beta~25) pulled
+        # the policy toward noise — a likely second contributor to the 75k-resume collapse.
+        if cfg.LOAD_BC_WEIGHTS and Path(cfg.BC_CHECKPOINT_PATH).exists():
+            agent.load_actor_from_bc(cfg.BC_CHECKPOINT_PATH, strict=False)
+        elif cfg.LOAD_BC_WEIGHTS:
+            raise SystemExit(
+                f"[FATAL] Resuming with LOAD_BC_WEIGHTS=True but BC checkpoint not found:\n"
+                f"        {cfg.BC_CHECKPOINT_PATH}\n"
+                f"        The BC-penalty anchor would be RANDOM weights. Restore the checkpoint first."
+            )
+
         # Load model
         agent.load(checkpoint_data['model_path'])
         
@@ -533,7 +633,13 @@ def main():
             print(f"Loading BC weights from: {cfg.BC_CHECKPOINT_PATH}")
             agent.load_actor_from_bc(cfg.BC_CHECKPOINT_PATH, strict=False)
         elif cfg.LOAD_BC_WEIGHTS:
-            print(f"[WARN] BC checkpoint not found at: {cfg.BC_CHECKPOINT_PATH}")
+            # Fail fast: silently training a RANDOM actor (and anchoring the BC penalty to
+            # random weights) through a 100k warmup is a wasted day, not a run.
+            raise SystemExit(
+                f"[FATAL] LOAD_BC_WEIGHTS=True but BC checkpoint not found:\n"
+                f"        {cfg.BC_CHECKPOINT_PATH}\n"
+                f"        Restore the checkpoint (or set LOAD_BC_WEIGHTS=False deliberately)."
+            )
     
     # Continue training if not finished
     if total_steps >= cfg.MAX_TRAIN_STEPS:
@@ -681,17 +787,21 @@ def main():
                 }
                 
                 save_buffer_this_time = (total_steps % (cfg.CHECKPOINT_INTERVAL * cfg.SAVE_BUFFER_EVERY) == 0)
-    
-                
+
+                # ROLLING CHECKPOINTS: prune to KEEP-1 BEFORE writing the new one, so peak disk
+                # usage during the multi-GB buffer write is (KEEP-1) + 1 checkpoints, and a
+                # failed write still leaves the newest good checkpoint intact.
+                # e.g. saving 85k: delete 75k (keeping 80k) -> write 85k -> 80k + 85k on disk.
+                cleanup_old_checkpoints(exp_dir, keep=max(1, cfg.KEEP_CHECKPOINTS - 1))
+
                 save_full_checkpoint(
                     exp_dir=exp_dir,
                     step=total_steps,
                     agent=agent,
-                    replay_buffer=replay_buffer if save_buffer_this_time else None, 
+                    replay_buffer=replay_buffer if save_buffer_this_time else None,
                     optimizer_states=optimizer_states,
                     extra_info=extra_info
                 )
-                cleanup_old_checkpoints(exp_dir, keep=cfg.KEEP_CHECKPOINTS)
 
         print("Training finished.")
 

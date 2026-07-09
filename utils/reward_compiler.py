@@ -1,6 +1,33 @@
 import torch
 import numpy as np
 
+
+def _lead_gap_from_presence(presence, cell_length=2.0):
+    """
+    Approximate longitudinal center-to-center distance (m) to the nearest vehicle ahead,
+    from the 25x11 ego-centric presence grid (ego at row len//2; cols 4-5 span the ego
+    lane's +-2 m corridor, matching PROXIMITY_LAT_HALFWIDTH_M). Used when a live
+    'lead_gap_m' measurement is unavailable (offline relabeling) so preloaded expert
+    rewards stay consistent with the online reward. Returns a large value (= no penalty)
+    when nothing is ahead or the grid is unusable.
+    """
+    try:
+        p = presence
+        if hasattr(p, "detach"):
+            p = p.detach().cpu().numpy()
+        p = np.asarray(p)
+        if p.ndim != 2 or p.shape[0] < 15 or p.shape[1] < 6:
+            return 999.0
+        ego_row = p.shape[0] // 2
+        corridor = p[ego_row + 1:, 4:6]          # cells strictly ahead, ego-lane corridor
+        occupied_rows = np.where((corridor > 0.5).any(axis=1))[0]
+        if occupied_rows.size == 0:
+            return 999.0
+        return float((occupied_rows[0] + 1) * cell_length)
+    except Exception:
+        return 999.0
+
+
 def compile_reward(data, cfg, mode="info", is_tensor=False):
     """
     Unified Reward Compiler.
@@ -54,6 +81,12 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
         is_lane_invaded_raw = data['is_lane_invaded']
         is_terminal_raw = data['is_terminal_crash']
 
+        # Lead-vehicle gap: live measurement from the env if present; otherwise approximate
+        # from the presence grid (pre-change recordings); otherwise no vehicle ahead.
+        lead_gap = data.get('lead_gap_m', None) if isinstance(data, dict) else None
+        if lead_gap is None:
+            lead_gap = _lead_gap_from_presence(data['obs_presence']) if (isinstance(data, dict) and 'obs_presence' in data) else 999.0
+
     elif mode == "obs":
         speed_ms = sqrt(data['obs_ego_speed_x']**2 + data['obs_ego_speed_y']**2)
         
@@ -71,6 +104,9 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
         is_reversing_raw = data['obs_reverse']
         is_lane_invaded_raw = 0.0  # We don't have lane invasion sensors in the old dataset, default to safe
         is_terminal_raw = data['terminated']
+
+        # Lead-vehicle gap approximated from the presence grid (offline data has no live scan)
+        lead_gap = _lead_gap_from_presence(data['obs_presence']) if (isinstance(data, dict) and 'obs_presence' in data) else 999.0
 
     else:
         raise ValueError("Invalid mode. Choose 'info' or 'obs'.")
@@ -102,9 +138,20 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
     lane_penalty = lane_flag * cfg.PENALTY_LANE_INVASION
     stall_penalty = is_stalling * cfg.PENALTY_STALLING
 
-    total_reward = (progress_score + centering_score + heading_score + 
-                    steer_penalty + throttle_penalty + 
-                    pedal_penalty + rolling_penalty + lane_penalty + stall_penalty)
+    # Proximity/headway shaping: linear ramp from 0 (at PROXIMITY_DIST_M) to PENALTY_PROXIMITY
+    # (bumper-to-bumper). Gives the critic a smooth pre-crash gradient — before this, the -10
+    # crash penalty was a cliff with no warning signal, so "freeze and wait" was the only safe
+    # behavior the value function could represent.
+    if is_tensor and torch.is_tensor(lead_gap):
+        proximity_frac = torch.clamp(1.0 - lead_gap / cfg.PROXIMITY_DIST_M, 0.0, 1.0)
+    else:
+        proximity_frac = min(1.0, max(0.0, 1.0 - float(lead_gap) / cfg.PROXIMITY_DIST_M))
+    proximity_penalty = proximity_frac * cfg.PENALTY_PROXIMITY
+
+    total_reward = (progress_score + centering_score + heading_score +
+                    steer_penalty + throttle_penalty +
+                    pedal_penalty + rolling_penalty + lane_penalty + stall_penalty +
+                    proximity_penalty)
                     
     final_reward = (crash_mask * cfg.PENALTY_TERMINAL_CRASH) + ((1.0 - crash_mask) * total_reward)
 
@@ -120,6 +167,8 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
             'penalty_rolling': float(rolling_penalty),
             'penalty_lane': float(lane_penalty),
             'penalty_stall': float(stall_penalty),
+            'penalty_proximity': float(proximity_penalty),
+            'lead_gap_m': float(lead_gap) if not (is_tensor and torch.is_tensor(lead_gap)) else float('nan'),
             'terminal_crash': float(crash_mask * cfg.PENALTY_TERMINAL_CRASH)
         }
         

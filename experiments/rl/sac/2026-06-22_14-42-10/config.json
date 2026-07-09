@@ -152,4 +152,454 @@
   "PRELOAD_EXPERT_DATA": false,
   "COMPILED_DATASET_PATH": "C:\\Users\\H\\Desktop\\IOT\\Carla-Integration-Modules\\imitation\\data\\processed\\dataset_rl_buffer.npz",
   "USE_Q_NORM": true
+<<<<<<< HEAD
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2026-06-24_00-51-27
+
+Microsoft Windows [Version 10.0.19045.6466]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>taskkill /F /IM CarlaUE4-Win64-Shipping.exe /T
+ERROR: The process "CarlaUE4-Win64-Shipping.exe" not found.
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27"
+Resuming experiment from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+[TB] Config logged to TensorBoard
+Experiment dir: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+Device: cuda
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+Skipping OpenDRIVE load (file not found or not .xodr): C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr
+Using current CARLA map: Carla/Maps/Town10HD_Opt
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD_Opt.bin
+SYNC: True dt: 0.05
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:235: UserWarning: WARN: Box low's precision lowered by casting to float32, current low.dtype=float64
+  gym.logger.warn(
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:305: UserWarning: WARN: Box high's precision lowered by casting to float32, current high.dtype=float64
+  gym.logger.warn(
+[TB] Network info logged (603,080 total params)
+Looking for state files in: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models
+Found state files: [WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_27000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_28000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29000.pkl')]
+Loading model from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_step_29000.pt
+Loading state from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_state_29000.pkl
+[WARN] Replay buffer not found in this checkpoint. Initializing a fresh one.
+Restored actor optimizer state
+Restored critic optimizer state
+Restored alpha optimizer state
+Restored log_alpha: 0.0047
+Resumed training from step 29000, episode 25
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 25 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 28 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 31 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 34 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+
+Training interrupted by user. Saving final checkpoint...
+  Including replay buffer in this checkpoint
+Traceback (most recent call last):
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 647, in main
+    eval_result = evaluate(agent, env, wrapper, cfg.EVAL_EPISODES, args.max_steps)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 195, in evaluate
+    result = run_eval_episode(env, agent, wrapper, max_steps)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 173, in run_eval_episode
+    obs, reward, terminated, truncated, info = env.step(action)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\env.py", line 244, in step
+    prev_obs = self._get_observation()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\env.py", line 324, in _get_observation
+    x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = get_speed_matrices(self.ego_vehicle)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\ObservationAdaptors\ObjectSpeeds.py", line 69, in get_speed_matrices
+    if presence_matrix[i, j] == 0:
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 760, in <module>
+    main()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 709, in main
+    save_full_checkpoint(
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 127, in save_full_checkpoint
+    pickle.dump(state, f)
+KeyboardInterrupt
+^C
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>taskkill /F /IM CarlaUE4.exe /T
+SUCCESS: The process with PID 5896 (child process of PID 9196) has been terminated.
+SUCCESS: The process with PID 9196 (child process of PID 10708) has been terminated.
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27"
+Resuming experiment from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+[TB] Config logged to TensorBoard
+Experiment dir: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+Device: cuda
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+Skipping OpenDRIVE load (file not found or not .xodr): C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr
+Using current CARLA map: Carla/Maps/Town10HD_Opt
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD_Opt.bin
+SYNC: True dt: 0.05
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:235: UserWarning: WARN: Box low's precision lowered by casting to float32, current low.dtype=float64
+  gym.logger.warn(
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:305: UserWarning: WARN: Box high's precision lowered by casting to float32, current high.dtype=float64
+  gym.logger.warn(
+[TB] Network info logged (603,080 total params)
+Looking for state files in: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models
+Found state files: [WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_27000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_28000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_30000.pkl')]
+Loading model from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_step_30000.pt
+Loading state from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_state_30000.pkl
+Traceback (most recent call last):
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 760, in <module>
+    main()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 463, in main
+    checkpoint_data = load_full_checkpoint(exp_dir, args.device)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 148, in load_full_checkpoint
+    checkpoint_state = pickle.load(f)
+EOFError: Ran out of input
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27"
+Resuming experiment from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+[TB] Config logged to TensorBoard
+Experiment dir: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+Device: cuda
+Skipping OpenDRIVE load (file not found or not .xodr): C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr
+Using current CARLA map: Carla/Maps/Town10HD_Opt
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD_Opt.bin
+SYNC: True dt: 0.05
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:235: UserWarning: WARN: Box low's precision lowered by casting to float32, current low.dtype=float64
+  gym.logger.warn(
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:305: UserWarning: WARN: Box high's precision lowered by casting to float32, current high.dtype=float64
+  gym.logger.warn(
+[TB] Network info logged (603,080 total params)
+Looking for state files in: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models
+Found state files: [WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_27000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_28000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29000.pkl')]
+Loading model from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_step_29000.pt
+Loading state from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_state_29000.pkl
+[WARN] Replay buffer not found in this checkpoint. Initializing a fresh one.
+Restored actor optimizer state
+Restored critic optimizer state
+Restored alpha optimizer state
+Restored log_alpha: 0.0047
+Resumed training from step 29000, episode 25
+Spawned ego vehicle at random spawn point
+
+Training interrupted by user. Saving final checkpoint...
+  Including replay buffer in this checkpoint
+Traceback (most recent call last):
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 562, in main
+    next_obs, reward, terminated, truncated, info = env.step(raw_action)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\env.py", line 307, in step
+    obs = self._get_observation()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\env.py", line 324, in _get_observation
+    x_speed_matrix, y_speed_matrix, presence_matrix, vx_local, vy_local = get_speed_matrices(self.ego_vehicle)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\ObservationAdaptors\ObjectSpeeds.py", line 82, in get_speed_matrices
+    if not is_on_road(cell_location, world):
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\CarlaEnv\ObservationAdaptors\ObjectSpeeds.py", line 91, in is_on_road
+    waypoint = world.get_map().get_waypoint(location, project_to_road=False)
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 760, in <module>
+    main()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 709, in main
+    save_full_checkpoint(
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 127, in save_full_checkpoint
+    pickle.dump(state, f)
+KeyboardInterrupt
+^C
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>taskkill /F /IM CarlaUE4.exe /T
+SUCCESS: The process with PID 12500 (child process of PID 11988) has been terminated.
+SUCCESS: The process with PID 11988 (child process of PID 10708) has been terminated.
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27"
+Resuming experiment from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+[TB] Config logged to TensorBoard
+Experiment dir: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+Device: cuda
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+Skipping OpenDRIVE load (file not found or not .xodr): C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr
+Using current CARLA map: Carla/Maps/Town10HD_Opt
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD_Opt.bin
+SYNC: True dt: 0.05
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:235: UserWarning: WARN: Box low's precision lowered by casting to float32, current low.dtype=float64
+  gym.logger.warn(
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:305: UserWarning: WARN: Box high's precision lowered by casting to float32, current high.dtype=float64
+  gym.logger.warn(
+[TB] Network info logged (603,080 total params)
+Looking for state files in: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models
+Found state files: [WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_27000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_28000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29205.pkl')]
+Loading model from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_step_29205.pt
+Loading state from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_state_29205.pkl
+Traceback (most recent call last):
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\H\AppData\Local\Programs\Python\Python38\lib\runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 760, in <module>
+    main()
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 463, in main
+    checkpoint_data = load_full_checkpoint(exp_dir, args.device)
+  File "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\rl\sac\train_sac.py", line 148, in load_full_checkpoint
+    checkpoint_state = pickle.load(f)
+EOFError: Ran out of input
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>taskkill /F /IM CarlaUE4-Win64-Shipping.exe /T
+SUCCESS: The process with PID 2264 (child process of PID 14132) has been terminated.
+
+C:\Users\H\Desktop\IOT\Carla-Integration-Modules>python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27"
+Resuming experiment from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+[TB] Config logged to TensorBoard
+Experiment dir: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27
+Device: cuda
+INFO:  Found the required file in cache!  Carla/Maps/Nav/Town10HD_Opt.bin
+Skipping OpenDRIVE load (file not found or not .xodr): C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr
+Using current CARLA map: Carla/Maps/Town10HD_Opt
+INFO:  Found the required file in cache!  Carla/Maps/TM/Town10HD_Opt.bin
+SYNC: True dt: 0.05
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:235: UserWarning: WARN: Box low's precision lowered by casting to float32, current low.dtype=float64
+  gym.logger.warn(
+C:\Users\H\AppData\Local\Programs\Python\Python38\lib\site-packages\gymnasium\spaces\box.py:305: UserWarning: WARN: Box high's precision lowered by casting to float32, current high.dtype=float64
+  gym.logger.warn(
+[TB] Network info logged (603,080 total params)
+Looking for state files in: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models
+Found state files: [WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_27000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_28000.pkl'), WindowsPath('C:/Users/H/Desktop/IOT/Carla-Integration-Modules/experiments/rl/sac/2026-06-24_00-51-27/models/checkpoint_state_29000.pkl')]
+Loading model from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_step_29000.pt
+Loading state from: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\checkpoint_state_29000.pkl
+[WARN] Replay buffer not found in this checkpoint. Initializing a fresh one.
+Restored actor optimizer state
+Restored critic optimizer state
+Restored alpha optimizer state
+Restored log_alpha: 0.0047
+Resumed training from step 29000, episode 25
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 25 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 28 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 31 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 34 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 37 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+[EVAL @ step 30000] avg_return=-435.84
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 30000 (1062MB)
+  Deleted old: checkpoint_step_27000.pt
+  Deleted old: checkpoint_state_27000.pkl
+[Episode 26] return=-204.07 len=1001 time=551.2s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 40 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 31000 (5MB)
+  Deleted old: checkpoint_step_28000.pt
+  Deleted old: checkpoint_state_28000.pkl
+Saved checkpoint at step 32000 (5MB)
+  Deleted old: checkpoint_step_29000.pt
+  Deleted old: checkpoint_state_29000.pkl
+[Episode 27] return=-327.07 len=2000 time=146.8s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 43 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 33000 (5MB)
+  Deleted old: checkpoint_step_30000.pt
+  Deleted old: checkpoint_state_30000.pkl
+Saved checkpoint at step 34000 (5MB)
+  Deleted old: checkpoint_step_31000.pt
+  Deleted old: checkpoint_state_31000.pkl
+[Episode 28] return=-1216.57 len=2000 time=150.6s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 46 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 35000 (1062MB)
+  Deleted old: checkpoint_step_32000.pt
+  Deleted old: checkpoint_state_32000.pkl
+Saved checkpoint at step 36000 (5MB)
+  Deleted old: checkpoint_step_33000.pt
+  Deleted old: checkpoint_state_33000.pkl
+[Episode 29] return=-394.10 len=2000 time=157.9s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 49 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 37000 (5MB)
+  Deleted old: checkpoint_step_34000.pt
+  Deleted old: checkpoint_state_34000.pkl
+Saved checkpoint at step 38000 (5MB)
+  Deleted old: checkpoint_step_35000.pt
+  Deleted old: checkpoint_state_35000.pkl
+[Episode 30] return=-163.82 len=2000 time=162.8s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 52 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 39000 (5MB)
+  Deleted old: checkpoint_step_36000.pt
+  Deleted old: checkpoint_state_36000.pkl
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 55 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 58 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 61 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 64 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 67 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+[EVAL @ step 40000] avg_return=-302.98
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 40000 (1062MB)
+  Deleted old: checkpoint_step_37000.pt
+  Deleted old: checkpoint_state_37000.pkl
+[Episode 31] return=-518.96 len=2000 time=686.2s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 70 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 41000 (5MB)
+  Deleted old: checkpoint_step_38000.pt
+  Deleted old: checkpoint_state_38000.pkl
+Saved checkpoint at step 42000 (5MB)
+  Deleted old: checkpoint_step_39000.pt
+  Deleted old: checkpoint_state_39000.pkl
+[Episode 32] return=-352.38 len=2000 time=141.2s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 73 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 43000 (5MB)
+  Deleted old: checkpoint_step_40000.pt
+  Deleted old: checkpoint_state_40000.pkl
+Saved checkpoint at step 44000 (5MB)
+  Deleted old: checkpoint_step_41000.pt
+  Deleted old: checkpoint_state_41000.pkl
+[Episode 33] return=-1012.78 len=2000 time=155.7s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 76 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 45000 (1062MB)
+  Deleted old: checkpoint_step_42000.pt
+  Deleted old: checkpoint_state_42000.pkl
+Saved checkpoint at step 46000 (5MB)
+  Deleted old: checkpoint_step_43000.pt
+  Deleted old: checkpoint_state_43000.pkl
+[Episode 34] return=-301.60 len=2000 time=156.3s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 79 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 47000 (5MB)
+  Deleted old: checkpoint_step_44000.pt
+  Deleted old: checkpoint_state_44000.pkl
+Saved checkpoint at step 48000 (5MB)
+  Deleted old: checkpoint_step_45000.pt
+  Deleted old: checkpoint_state_45000.pkl
+[Episode 35] return=-362.70 len=2000 time=173.4s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 82 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 49000 (5MB)
+  Deleted old: checkpoint_step_46000.pt
+  Deleted old: checkpoint_state_46000.pkl
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 85 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 88 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 91 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 94 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 97 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+[EVAL @ step 50000] avg_return=-318.28
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 50000 (1062MB)
+  Deleted old: checkpoint_step_47000.pt
+  Deleted old: checkpoint_state_47000.pkl
+[Episode 36] return=-426.87 len=2000 time=724.9s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 100 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 51000 (5MB)
+  Deleted old: checkpoint_step_48000.pt
+  Deleted old: checkpoint_state_48000.pkl
+Saved checkpoint at step 52000 (5MB)
+  Deleted old: checkpoint_step_49000.pt
+  Deleted old: checkpoint_state_49000.pkl
+[Episode 37] return=-195.76 len=2000 time=147.2s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 103 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 53000 (5MB)
+  Deleted old: checkpoint_step_50000.pt
+  Deleted old: checkpoint_state_50000.pkl
+Saved checkpoint at step 54000 (5MB)
+  Deleted old: checkpoint_step_51000.pt
+  Deleted old: checkpoint_state_51000.pkl
+[Episode 38] return=-257.39 len=2000 time=142.7s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 106 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 55000 (1062MB)
+  Deleted old: checkpoint_step_52000.pt
+  Deleted old: checkpoint_state_52000.pkl
+Saved checkpoint at step 56000 (5MB)
+  Deleted old: checkpoint_step_53000.pt
+  Deleted old: checkpoint_state_53000.pkl
+[Episode 39] return=-335.67 len=2000 time=211.0s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 109 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 57000 (5MB)
+  Deleted old: checkpoint_step_54000.pt
+  Deleted old: checkpoint_state_54000.pkl
+Saved checkpoint at step 58000 (5MB)
+  Deleted old: checkpoint_step_55000.pt
+  Deleted old: checkpoint_state_55000.pkl
+[Episode 40] return=-54.73 len=2000 time=170.6s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 112 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+Saved checkpoint at step 59000 (5MB)
+  Deleted old: checkpoint_step_56000.pt
+  Deleted old: checkpoint_state_56000.pkl
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 115 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 118 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 121 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 124 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 127 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+[EVAL @ step 60000] avg_return=-194.51
+Saved best model: C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-24_00-51-27\models\best_model.pt
+  Including replay buffer in this checkpoint
+Saved checkpoint at step 60000 (1062MB)
+  Deleted old: checkpoint_step_57000.pt
+  Deleted old: checkpoint_state_57000.pkl
+[Episode 41] return=-1066.89 len=2000 time=670.2s
+WARNING: attempting to unsubscribe from stream but sensor wasn't listening: Actor 130 (sensor.other.collision)
+Spawned ego vehicle at random spawn point
+=======
+}
+>>>>>>> b839bdd08d0540886b8073421df83ef8934ad480

@@ -1,0 +1,9 @@
+{
+  "return": 1593.1389022672556,
+  "mean_reward": 1.2745111218138045,
+  "length": 1250,
+  "distance_m": 378.068448856204,
+  "mean_speed_ms": 6.049095181699264,
+  "end_reason": "crash",
+  "action_counts": {}
+}

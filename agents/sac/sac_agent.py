@@ -1,4 +1,5 @@
 import copy
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -291,8 +292,11 @@ class SACAgent:
             # Calculate MSE between RL mean and BC mean
             bc_mse = torch.nn.functional.mse_loss(mean_action, bc_mean_action)
             
-            # Calculate current beta (decays linearly to 0)
-            beta = max(0.0, self.bc_penalty_init * (1.0 - self.train_step / self.bc_penalty_steps))
+            # Calculate current beta (decays linearly, but never below BC_PENALTY_FLOOR).
+            # The floor is a permanent tether: with beta -> 0 the actor eventually
+            # free-maximizes an imperfect critic (extrapolation exploits, stall equilibrium).
+            beta_floor = getattr(cfg, 'BC_PENALTY_FLOOR', 0.0)
+            beta = max(beta_floor, self.bc_penalty_init * (1.0 - self.train_step / self.bc_penalty_steps))
             
             if cfg.USE_Q_NORM:
                 q_norm = torch.max(q_pi.abs().mean().detach() , torch.tensor(1.0, device=self.device))
@@ -329,10 +333,19 @@ class SACAgent:
             alpha_loss = -(self.log_alpha * (logp.detach() + self.target_entropy)).mean()
             self.alpha_opt.zero_grad()
             alpha_loss.backward()
-            
+
             # Compute alpha gradient norm
             alpha_grad_norm = self.log_alpha.grad.abs().item() if self.log_alpha.grad is not None else 0.0
             self.alpha_opt.step()
+
+            # Hard ceiling on alpha: a policy whose entropy sits below an unreachable target
+            # produces a CONSTANT-sign alpha gradient, which Adam integrates into exponential
+            # alpha growth (0.1 -> 1.8 in the 400k run) that then poisons the TD target via
+            # -alpha*logpi'. The clamp caps the damage no matter how targets are configured.
+            alpha_max = getattr(cfg, 'ALPHA_MAX', None)
+            if alpha_max is not None:
+                with torch.no_grad():
+                    self.log_alpha.clamp_(max=math.log(alpha_max))
 
             # Save state for logging
             self.last_alpha_loss = alpha_loss.item()

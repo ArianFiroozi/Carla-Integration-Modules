@@ -549,9 +549,13 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         for i, src_idx in enumerate(scalar_src):
             # Attempt to extract the rich info dict
             step_info = {k[5:]: d[k][src_idx] for k in d.keys() if k.startswith("info_")}
-            
+
             if step_info:
                 # We have the new data format!
+                # Demos recorded before lead_gap_m existed get the presence-grid fallback so
+                # relabeled proximity penalties stay consistent with the online reward.
+                if 'lead_gap_m' not in step_info and 'obs_presence' in d:
+                    step_info['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_info, general_config, mode="info", is_tensor=False)
             else:
                 # We have the old data format! Calculate smoothness manually.
@@ -573,6 +577,8 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
                     'steer_change': abs(steer_curr - steer_prev),
                     'throttle_change': abs(throttle_curr - throttle_prev)
                 }
+                if 'obs_presence' in d:   # proximity shaping from the grid (see reward_compiler)
+                    step_obs['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_obs, general_config, mode="obs", is_tensor=False)
                 
             out_rewards[idx + i] = compiled_reward
