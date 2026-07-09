@@ -19,7 +19,9 @@ from config import general_config
 from utils.reward_compiler import compile_reward
 from utils.obs_wrapper import CarlaObsWrapper
 from utils.seed_utils import seed_everything
-
+import random
+import matplotlib.pyplot as plt
+from scipy import stats as scipy_stats
 
 DEVICE = cfg.DEVICE
 
@@ -185,9 +187,11 @@ def update_spectator(env):
     spectator.set_transform(carla.Transform(cam_loc, cam_rot))
 
 
-def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_path=None, update_spectator_flag=True):
-    """Run a single evaluation episode."""
-    obs, _ = env.reset()
+def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_path=None, update_spectator_flag=True, seed=None):
+    """Run a single evaluation episode.
+    If seed is provided, pass it to env.reset for deterministic initial state.
+    """
+    obs, _ = env.reset(seed=seed)
     wrapper.reset()
 
     # Setup camera and video recording if requested
@@ -257,6 +261,7 @@ def main():
     parser.add_argument("--record", action="store_true", default=cfg.RECORD_SAC_EVAL_VID,help="Record video of evaluation episodes")
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
     parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
+    parser.add_argument("--compare_with", type=str, default=None, help="Path to a second model checkpoint for paired comparison (Wilcoxon test).")
 
     seed_everything(bc_config.GLOBAL_SEED)
 
@@ -315,11 +320,16 @@ def main():
         no_rendering=not (args.watch or args.record),  # watching/recording needs the server to render
     )
 
+    # ---- Generate deterministic episode seeds ----
+    master_seed = args.seed
+    rng = random.Random(master_seed)
+    num_episodes = args.episodes
+    episode_seeds = [rng.randint(0, 2**32 - 1) for _ in range(num_episodes)]
+
     all_returns = []
     all_lengths = []
     end_reasons = Counter()
     overall_t0 = time.time()
-    num_episodes = args.episodes
 
     print(f"\n{'='*50}")
     print(f"Starting evaluation: {num_episodes} episodes")
@@ -344,6 +354,7 @@ def main():
                 record_video=args.record,
                 video_path=video_path,
                 update_spectator_flag=not args.no_spectator,
+                seed=episode_seeds[ep],
             )
 
             # Save episode results
@@ -376,14 +387,16 @@ def main():
         total_time = time.time() - overall_t0
 
         # Summary statistics
+        primary_returns = np.array(all_returns)
+        primary_lengths = np.array(all_lengths)
         print(f"\n{'='*50}")
         print("EVALUATION SUMMARY")
         print(f"{'='*50}")
         print(f"Episodes: {num_episodes}")
-        print(f"Avg return: {np.mean(all_returns):.2f} ± {np.std(all_returns):.2f}")
-        print(f"Min return: {np.min(all_returns):.2f}")
-        print(f"Max return: {np.max(all_returns):.2f}")
-        print(f"Avg length: {np.mean(all_lengths):.1f} ± {np.std(all_lengths):.1f}")
+        print(f"Avg return: {primary_returns.mean():.2f} ± {primary_returns.std():.2f}")
+        print(f"Min return: {primary_returns.min():.2f}")
+        print(f"Max return: {primary_returns.max():.2f}")
+        print(f"Avg length: {primary_lengths.mean():.1f} ± {primary_lengths.std():.1f}")
         print(f"End reasons: {dict(end_reasons)}")
         print(f"Wall time: {total_time:.1f}s")
         print(f"Model: {model_path}")
@@ -392,12 +405,12 @@ def main():
         summary = {
             "model_path": str(model_path),
             "episodes": num_episodes,
-            "avg_return": float(np.mean(all_returns)),
-            "std_return": float(np.std(all_returns)),
-            "min_return": float(np.min(all_returns)),
-            "max_return": float(np.max(all_returns)),
-            "avg_length": float(np.mean(all_lengths)),
-            "std_length": float(np.std(all_lengths)),
+            "avg_return": float(primary_returns.mean()),
+            "std_return": float(primary_returns.std()),
+            "min_return": float(primary_returns.min()),
+            "max_return": float(primary_returns.max()),
+            "avg_length": float(primary_lengths.mean()),
+            "std_length": float(primary_lengths.std()),
             "end_reasons": dict(end_reasons),
             "wall_time_sec": total_time,
             "carla_vehicles": cfg.CARLA_VEHICLES,
@@ -410,9 +423,9 @@ def main():
             json.dump(summary, f, indent=2)
 
         # TensorBoard summary metrics
-        tb_writer.add_scalar("eval/avg_return", np.mean(all_returns), 0)
-        tb_writer.add_scalar("eval/std_return", np.std(all_returns), 0)
-        tb_writer.add_scalar("eval/avg_length", np.mean(all_lengths), 0)
+        tb_writer.add_scalar("eval/avg_return", primary_returns.mean(), 0)
+        tb_writer.add_scalar("eval/std_return", primary_returns.std(), 0)
+        tb_writer.add_scalar("eval/avg_length", primary_lengths.mean(), 0)
         
         tb_writer.flush()
         tb_writer.close()
@@ -420,10 +433,108 @@ def main():
         print(f"\nSaved summary to: {summary_path}")
 
     finally:
-        try:
-            env.close()
-        except Exception:
-            pass
+        pass  # We'll close env later after possible comparison run
+
+    # ---------- Comparison Model (if requested) ----------
+    if args.compare_with:
+        print("\n" + "="*50)
+        print("COMPARISON MODE")
+        print(f"Loading comparison model from: {args.compare_with}")
+        compare_model_path = Path(args.compare_with)
+        if not compare_model_path.exists():
+            print(f"[ERROR] Comparison model not found at {compare_model_path}")
+        else:
+            # Load second agent (no tensorboard logs, no videos, no per-episode saves)
+            compare_agent = SACAgent(device=device)
+            compare_agent.load(compare_model_path)
+            compare_agent.actor.eval()
+
+            compare_returns = []
+            compare_lengths = []
+
+            t0_compare = time.time()
+            for ep in range(num_episodes):
+                print(f"Comparison Episode {ep+1}/{num_episodes}")
+                # Run same episode seed, no video (unless you want, but we skip)
+                result_cmp = run_eval_episode(
+                    env=env,
+                    agent=compare_agent,
+                    wrapper=wrapper,
+                    max_steps=args.max_steps,
+                    record_video=False,           # no video for comparison
+                    video_path=None,
+                    update_spectator_flag=not args.no_spectator,
+                    seed=episode_seeds[ep],
+                )
+                compare_returns.append(result_cmp["return"])
+                compare_lengths.append(result_cmp["length"])
+
+            compare_time = time.time() - t0_compare
+            compare_returns = np.array(compare_returns)
+            compare_lengths = np.array(compare_lengths)
+
+            # Wilcoxon signed-rank test on returns and lengths
+            stat_return, p_return = scipy_stats.wilcoxon(primary_returns, compare_returns)
+            stat_length, p_length = scipy_stats.wilcoxon(primary_lengths, compare_lengths)
+
+            print("\n--- Comparison Results ---")
+            print(f"Primary model   : mean return={primary_returns.mean():.2f} ± {primary_returns.std():.2f}, mean length={primary_lengths.mean():.1f} ± {primary_lengths.std():.1f}")
+            print(f"Comparison model: mean return={compare_returns.mean():.2f} ± {compare_returns.std():.2f}, mean length={compare_lengths.mean():.1f} ± {compare_lengths.std():.1f}")
+            print(f"Mean difference (primary - comparison): return={primary_returns.mean()-compare_returns.mean():.2f}, length={primary_lengths.mean()-compare_lengths.mean():.1f}")
+            print(f"Wilcoxon test on returns: statistic={stat_return:.2f}, p-value={p_return:.4f}")
+            print(f"Wilcoxon test on lengths: statistic={stat_length:.2f}, p-value={p_length:.4f}")
+
+            # Plot distributions side-by-side
+            fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+            axes[0].hist(primary_returns, alpha=0.7, label="Primary", bins=max(10, num_episodes//3), color="steelblue")
+            axes[0].hist(compare_returns, alpha=0.7, label="Comparison", bins=max(10, num_episodes//3), color="darkorange")
+            axes[0].axvline(primary_returns.mean(), color="steelblue", linestyle="--", linewidth=1.5)
+            axes[0].axvline(compare_returns.mean(), color="darkorange", linestyle="--", linewidth=1.5)
+            axes[0].set_xlabel("Return")
+            axes[0].set_ylabel("Frequency")
+            axes[0].set_title(f"Returns distribution\n(Wilcoxon p={p_return:.3f})")
+            axes[0].legend()
+
+            axes[1].hist(primary_lengths, alpha=0.7, label="Primary", bins=max(10, num_episodes//3), color="steelblue")
+            axes[1].hist(compare_lengths, alpha=0.7, label="Comparison", bins=max(10, num_episodes//3), color="darkorange")
+            axes[1].axvline(primary_lengths.mean(), color="steelblue", linestyle="--", linewidth=1.5)
+            axes[1].axvline(compare_lengths.mean(), color="darkorange", linestyle="--", linewidth=1.5)
+            axes[1].set_xlabel("Length")
+            axes[1].set_ylabel("Frequency")
+            axes[1].set_title(f"Lengths distribution\n(Wilcoxon p={p_length:.3f})")
+            axes[1].legend()
+
+            plt.tight_layout()
+            plot_path = current_eval_dir / "comparison_plot.png"
+            plt.savefig(plot_path)
+            plt.close()
+            print(f"Comparison plot saved to: {plot_path}")
+
+            # Also save a comparison JSON
+            comparison_summary = {
+                "primary_model": str(model_path),
+                "comparison_model": str(compare_model_path),
+                "primary_return_mean": float(primary_returns.mean()),
+                "primary_return_std": float(primary_returns.std()),
+                "comparison_return_mean": float(compare_returns.mean()),
+                "comparison_return_std": float(compare_returns.std()),
+                "primary_length_mean": float(primary_lengths.mean()),
+                "primary_length_std": float(primary_lengths.std()),
+                "comparison_length_mean": float(compare_lengths.mean()),
+                "comparison_length_std": float(compare_lengths.std()),
+                "wilcoxon_return_pvalue": float(p_return),
+                "wilcoxon_length_pvalue": float(p_length),
+                "episodes": num_episodes,
+            }
+            comparison_json_path = current_eval_dir / "comparison_summary.json"
+            with open(comparison_json_path, "w") as f:
+                json.dump(comparison_summary, f, indent=2)
+
+    # Final cleanup
+    try:
+        env.close()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

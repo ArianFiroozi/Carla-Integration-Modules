@@ -1,0 +1,15 @@
+{
+  "primary_model": "experiments\\rl\\sac\\2026-07-07_02-54-05\\models\\best_model.pt",
+  "comparison_model": "experiments\\rl\\sac\\2026-07-05_02-54-05\\models\\checkpoint_step_300000.pt",
+  "primary_return_mean": 1466.6022951097214,
+  "primary_return_std": 929.6956581828305,
+  "comparison_return_mean": 1369.8589239893056,
+  "comparison_return_std": 955.8937042400962,
+  "primary_length_mean": 1279.3333333333333,
+  "primary_length_std": 740.6052629812697,
+  "comparison_length_mean": 1206.5,
+  "comparison_length_std": 769.6774973974489,
+  "wilcoxon_return_pvalue": 0.21293285302817822,
+  "wilcoxon_length_pvalue": 0.21795726558824124,
+  "episodes": 30
+}
