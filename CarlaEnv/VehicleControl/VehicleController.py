@@ -92,9 +92,44 @@ class VehicleController():
 
         self.collision_happened = False
         self.lane_invaded = False
+        self.last_collision = None   # forensics dict describing the most recent impact
 
         def collision_callback(event):
             self.collision_happened = True
+            # COLLISION FORENSICS (headless debugging): classify who caused the impact so the
+            # episode JSONs distinguish at-fault crashes (policy's problem) from NPC-caused
+            # ones (environment's problem). Runs on the sensor thread — never raise from here.
+            try:
+                other = event.other_actor
+                other_type = other.type_id if other is not None else "unknown"
+                ego_tr = self.vehicle.get_transform()
+                fwd = ego_tr.get_forward_vector()
+                eloc = ego_tr.location
+                oloc = other.get_location() if other is not None else eloc
+                dx, dy = oloc.x - eloc.x, oloc.y - eloc.y
+                lon = dx * fwd.x + dy * fwd.y   # impact source position along ego heading
+                vel = self.vehicle.get_velocity()
+                ego_speed = (vel.x ** 2 + vel.y ** 2 + vel.z ** 2) ** 0.5
+
+                if not other_type.startswith("vehicle."):
+                    verdict = "at_fault_static"   # wall / pole / off-road object: lane-keeping failure
+                elif lon > 1.0:
+                    verdict = "at_fault_front"    # we drove into a vehicle ahead: following/merging failure
+                elif lon < -1.0:
+                    verdict = "npc_rear_end"      # a vehicle drove into our rear: likely blameless
+                else:
+                    verdict = "side_contact"      # lateral scrape: lane-change conflict, ambiguous
+
+                self.last_collision = {
+                    "verdict": verdict,
+                    "other_type": other_type,
+                    "impact_lon_m": round(float(lon), 2),
+                    "ego_speed_ms": round(float(ego_speed), 2),
+                    "loc_x": round(float(eloc.x), 1),
+                    "loc_y": round(float(eloc.y), 1),
+                }
+            except Exception:
+                self.last_collision = {"verdict": "unknown", "other_type": "unknown"}
 
         def lane_callback(event):
             self.lane_invaded = True
@@ -155,6 +190,11 @@ class VehicleController():
         # Proximity shaping input: center-to-center distance to the nearest vehicle in the
         # forward ego-lane corridor (see PROXIMITY_* in general_config). 999 = nothing ahead.
         info['lead_gap_m'] = self._lead_vehicle_gap()
+
+        # Attach collision forensics on the terminal step (see collision_callback)
+        if info['is_terminal_crash'] == 1:
+            info['collision_forensics'] = self.last_collision or {"verdict": "unknown",
+                                                                  "other_type": "off_map_fall"}
 
         # --- RESET SENSORS & STATE ---
         if info['is_terminal_crash'] == 1:

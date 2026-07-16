@@ -516,10 +516,17 @@ def main():
     print("Experiment dir:", exp_dir)
     print("Device:", args.device)
 
-    # Load norm stats (optional)
+    # Load norm stats — NOT optional in practice: with empty stats the z-score wrapper
+    # zeroes/garbles every observation and the agent trains blind with no error raised.
+    # (Risk is real here: the BC experiment folder was deleted and restored from a zip —
+    # if config.json didn't make it back, this is the only guard that catches it.)
     norm_stats = load_norm_stats_from_bc_checkpoint()
     if not norm_stats:
-        print("[WARN] No normalization stats found. Wrapper will use empty stats.")
+        raise SystemExit(
+            f"[FATAL] No normalization stats found in the BC experiment's config.json:\n"
+            f"        {Path(cfg.BC_CHECKPOINT_PATH).parents[1] / 'config.json'}\n"
+            f"        Restore the FULL BC experiment folder (incl. config.json), not just the .pt."
+        )
 
     # Create environment
     print("\n" + "!" * 60)

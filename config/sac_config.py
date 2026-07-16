@@ -5,7 +5,10 @@ from pathlib import Path
 # ========================================================= 
 
 # Discount factor for future reward estimation (determining the agent's horizon)
-GAMMA = 0.99     
+GAMMA = 0.995    # ULTIMATE UPGRADE (was 0.99): effective horizon 100 -> 200 steps (5s -> 10s of
+                 # sim time), enough to value a full overtake maneuver end-to-end. NOTE: value
+                 # scale roughly DOUBLES (V ~ r/(1-gamma)) — feasible Q band is now ~[-400,+300],
+                 # so judge critic health against those bounds, not the old +-200.
 # Coefficient for soft updates of target Q-networks parameters (exponential moving average factor)
 TAU = 0.005         
 
@@ -21,7 +24,10 @@ INIT_ALPHA = 0.01         # start low; the controller raises it only if entropy 
 TARGET_ENTROPY_SCALE = 1.7  # target = -1.7*3 = -5.1 (about sigma~0.12 driving policy)
 # Hard ceiling on alpha when AUTO_ENTROPY is on (clamped after each alpha update). Prevents the
 # unbounded exponential ratchet even if the target entropy is misconfigured again.
-ALPHA_MAX = 0.3
+ALPHA_MAX = 0.1   # TIGHTENED from 0.3: the 500k run's healthy operating range was alpha ~0.02-0.06,
+                  # and in the last ~5% alpha drifted up with a small Q1 dip / log_std rise. 0.1
+                  # gives headroom above the healthy band but caps the late drift on the 300k
+                  # extension. Applied live each update, so it's safe on resume.
 # =========================================================
 # OPTIMIZATION  
 # =========================================================

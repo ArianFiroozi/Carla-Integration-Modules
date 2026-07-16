@@ -114,3 +114,21 @@ experiments_archive/**/*.pt
 experiments_archive/**/*.pkl
 .gitignore
 imitation\DAGGER_LOOP.md
+
+
+# Ignore Experiments and Models
+experiments/
+E:/SAC_Experiments/
+*.pt
+*.pkl
+
+# Ignore Datasets and Buffers
+imitation/data/
+*.npz
+
+# Ignore Maps and Videos
+CarlaEnv/LoadOpenDrive2/*.xodr
+CarlaEnv/LoadOpenDrive2/*.bin
+videos/
+*.mp4
+*.jpg

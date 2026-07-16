@@ -55,9 +55,12 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
     if mode == "info":
         speed_ms = sqrt(data['velocity_x']**2 + data['velocity_y']**2 + data['velocity_z']**2)
         
-        # Progress
+        # Progress — PEAKED at TARGET_SPEED_MS (was saturating: clip(v/T,0,1) paid the same
+        # +1.0 for 6 m/s and 12 m/s, so overspeeding was FREE — visual eval showed reckless
+        # full-throttle driving). Peak reward at v=T, linearly falling to 0 at v=0 and v=2T:
+        # driving too fast now costs exactly as much as driving too slow.
         raw_progress = (data['velocity_x'] * data['road_forward_x']) + (data['velocity_y'] * data['road_forward_y'])
-        progress_score = clip(raw_progress / cfg.TARGET_SPEED_MS, 0.0, 1.0) * cfg.WEIGHT_PROGRESS
+        progress_score = clip(1.0 - abs_val(raw_progress - cfg.TARGET_SPEED_MS) / cfg.TARGET_SPEED_MS, 0.0, 1.0) * cfg.WEIGHT_PROGRESS
         
         # Alignment
         car_vec_norm_x = data['car_forward_x'] / (sqrt(data['car_forward_x']**2 + data['car_forward_y']**2) + 1e-6)
@@ -90,9 +93,10 @@ def compile_reward(data, cfg, mode="info", is_tensor=False):
     elif mode == "obs":
         speed_ms = sqrt(data['obs_ego_speed_x']**2 + data['obs_ego_speed_y']**2)
         
-        # Progress (Trig Approximation)
+        # Progress (Trig Approximation) — PEAKED at TARGET_SPEED_MS, mirroring the info-mode
+        # form so relabeled preload rewards stay consistent with the online reward.
         progress_velocity = speed_ms * cos(data['obs_lane_angle'])
-        progress_score = clip(progress_velocity / cfg.TARGET_SPEED_MS, 0.0, 1.0) * cfg.WEIGHT_PROGRESS
+        progress_score = clip(1.0 - abs_val(progress_velocity - cfg.TARGET_SPEED_MS) / cfg.TARGET_SPEED_MS, 0.0, 1.0) * cfg.WEIGHT_PROGRESS
         
         # Alignment
         lane_distance = abs_val(data['obs_ego_in_lane_position_x'])

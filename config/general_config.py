@@ -109,7 +109,13 @@ OBS_BOUNDS = {
 
 
 # Number of consecutive history frames stacked as input observations
-WINDOW_SIZE = 1
+WINDOW_SIZE = 1   # REVERTED from 3 (executive call 2026-07-09). A/B result for the record:
+                  # with the train/eval scalar-permutation bug FIXED, the window-3 BC still
+                  # evaluated at ~248 avg length vs the window-1 May-3 baseline's 667 in
+                  # traffic — frame stacking hurt BC at this capacity (likely the 16-filter
+                  # first conv choking on 3x input channels). Revisit only with a wider CNN
+                  # and its own BC retrain cycle. Window-1 restores compatibility with the
+                  # proven 2026_05_03 BC checkpoint (5 grid channels).
 # Whether to represent sign/presence elements in the grid as one-hot vectors
 USE_ONE_HOT_GRID = True
 
@@ -160,9 +166,13 @@ RANDOM_EGO_START_POS = True
 
 # 1. The Progress Engine
 # Target forward speed in meters/second for progress reward scaling
-TARGET_SPEED_MS = 6.0         
-# Multiplier weight for the forward progress velocity reward
-WEIGHT_PROGRESS = 1.0     
+TARGET_SPEED_MS = 6.0
+# Multiplier weight for the forward progress velocity reward.
+# ULTIMATE UPGRADE: the progress term is now PEAKED, not saturating:
+#   reward = clip(1 - |v_fwd - TARGET| / TARGET, 0, 1) * WEIGHT_PROGRESS
+# Max at exactly TARGET_SPEED_MS, zero at standstill AND at 2x target — overspeeding
+# (Mani's "pressing the gas pedal highly") is no longer free. See utils/reward_compiler.py.
+WEIGHT_PROGRESS = 1.0
 
 # 2. The Alignment Engine
 # Multiplier weight for staying close to the center line of the lane
