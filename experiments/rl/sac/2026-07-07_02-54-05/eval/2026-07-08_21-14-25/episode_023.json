@@ -1,0 +1,6 @@
+{
+  "return": 2130.669403273946,
+  "mean_reward": 1.065334701636973,
+  "length": 2000,
+  "end_reason": "truncated"
+}
