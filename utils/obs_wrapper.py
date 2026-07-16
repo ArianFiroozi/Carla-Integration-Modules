@@ -199,8 +199,14 @@ class CarlaObsWrapper:
         speed_y    = _normalize_value(obs["ego_speed_y"][0], "obs_ego_speed_y", self.norm_stats)
 
         if getattr(bc_config, "USE_SPATIAL_FEATURES", False):
+            # ORDER MUST MATCH BCDataset.add_scalar order (imitation/datasets/bc_dataset.py):
+            # [lane_angle, lane_pos, speed_x, speed_y, dist_front, dist_LEFT, dist_RIGHT, dist_BACK].
+            # The wrapper previously fed [.., dist_front, dist_BACK, dist_LEFT, dist_RIGHT] —
+            # three of eight scalars PERMUTED between training and driving, so at eval time the
+            # policy read "car on the left" as "car behind", etc. Training metrics can never
+            # catch this class of bug; only closed-loop driving degrades.
             scalars = np.array([lane_angle, lane_pos, speed_x, speed_y,
-                                dist_front, dist_back, dist_left, dist_right], dtype=np.float32)
+                                dist_front, dist_left, dist_right, dist_back], dtype=np.float32)
         else:
             scalars = np.array([lane_angle, lane_pos, speed_x, speed_y], dtype=np.float32)
 

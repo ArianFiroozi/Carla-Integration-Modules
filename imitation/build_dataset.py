@@ -131,11 +131,19 @@ def gather_demo_files(dirs):
     for d in dirs:
         path = Path(d)
 
+        # A configured directory that is missing or empty is a CONFIG/SYNC ERROR, not a
+        # shrug: silently continuing is how the 2026-07-09 BC got trained on 55 intervention
+        # files instead of the 178-demo main dataset. Fail loudly instead.
         if not path.exists():
-            print(f"[WARN] Directory does not exist: {path}")
-            continue
+            raise FileNotFoundError(
+                f"[DATA FATAL] DEMO_LIST directory does not exist: {path}\n"
+                f"  Fix DEMO_LIST in config/bc_config.py or restore/sync the demo data.")
 
         found = sorted(path.glob("*.npz"))
+        if not found:
+            raise FileNotFoundError(
+                f"[DATA FATAL] DEMO_LIST directory contains no .npz demos: {path}\n"
+                f"  Fix DEMO_LIST in config/bc_config.py or restore/sync the demo data.")
         print(f"[DATA] Found {len(found)} demos in {path.resolve()}")
         all_files.extend(found)
 
@@ -584,6 +592,19 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
             out_rewards[idx + i] = compiled_reward
 
         idx += n
+
+    # SANITY GATE: continuous control targets must be physically plausible. Corrupt demo
+    # files (e.g. round-1 interventions with throttle=9.0) must abort the build, not
+    # silently poison a week of downstream training.
+    if out_actions.dtype.kind == "f" and out_actions.shape[1] == 3:
+        thr_max, brk_max = float(out_actions[:, 0].max()), float(out_actions[:, 1].max())
+        steer_abs = float(np.abs(out_actions[:, 2]).max())
+        if thr_max > 1.01 or brk_max > 1.01 or steer_abs > 1.01 or float(out_actions[:, :2].min()) < -0.01:
+            raise ValueError(
+                f"[DATA FATAL] Corrupt control targets in demo data: "
+                f"throttle_max={thr_max:.2f}, brake_max={brk_max:.2f}, |steer|_max={steer_abs:.2f} "
+                f"(expected throttle/brake in [0,1], steer in [-1,1]). "
+                f"A source demo file is corrupt — inspect the directories in DEMO_LIST.")
 
     return out_obs, out_actions, out_rewards, out_next_obs, out_dones
 

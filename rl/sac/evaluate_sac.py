@@ -195,10 +195,14 @@ class RobustVideoRecorder:
             print(f"[VIDEO] Dumped {self.frame_idx} JPG frames -> {self.frames_dir}")
 
 
-def create_third_person_camera(env, save_path, width=640, height=360, fps=20):
+def create_third_person_camera(env, save_path, width=1280, height=720, fps=20):
     """
     Create a third-person chase camera attached to the ego vehicle.
     Camera positioned behind and above the vehicle.
+
+    720p (was 640x360) for a presentable showcase video. The RECORDING camera is purely
+    cosmetic — the policy acts on the BEV state grid, never on these pixels — so resolution
+    and CARLA -quality-level affect only how the clip LOOKS, never how the agent drives.
     """
     world = env.world
     ego_vehicle = env.ego_vehicle
@@ -314,6 +318,7 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
     action_history = []
     terminated_flag = False
     truncated_flag = False
+    last_info = {}
 
     for t in range(max_steps):
         grid, scalars = wrapper.preprocess(obs)
@@ -331,6 +336,7 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
         obs, raw_reward, terminated, truncated, info = env.step(action)
         reward, _ = compile_reward(info, general_config, is_tensor=False)
         rewards.append(float(reward))
+        last_info = info
 
         # Update spectator camera in CARLA window
         if update_spectator_flag:
@@ -353,6 +359,7 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
         "mean_reward": float(np.mean(rewards)) if rewards else 0.0,
         "length": len(rewards),
         "end_reason": "terminated" if terminated_flag else ("truncated" if truncated_flag else "max_steps"),
+        "collision": last_info.get("collision_forensics"),   # None unless the episode crashed
         "rewards": rewards,
         "actions": action_history,
     }
@@ -377,11 +384,6 @@ def main():
     parser.add_argument("--no-spectator", action="store_true", help="Don't update spectator camera")
     parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
 
-<<<<<<< HEAD
-=======
-    seed_everything(bc_config.GLOBAL_SEED)
-
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
     args = parser.parse_args()
 
     # --no-record beats the config default (argparse can't turn off a default=True store_true)
@@ -444,6 +446,7 @@ def main():
     all_returns = []
     all_lengths = []
     end_reasons = Counter()
+    collision_verdicts = Counter()
     overall_t0 = time.time()
     num_episodes = args.episodes
 
@@ -480,17 +483,21 @@ def main():
                     "mean_reward": result["mean_reward"],
                     "length": result["length"],
                     "end_reason": result["end_reason"],
+                    "collision": result["collision"],
                 }, f, indent=2)
 
             all_returns.append(result["return"])
             all_lengths.append(result["length"])
             end_reasons[result["end_reason"]] += 1
+            if result["collision"]:
+                collision_verdicts[result["collision"].get("verdict", "unknown")] += 1
 
+            crash_note = f", crash={result['collision']['verdict']}" if result["collision"] else ""
             print(
                 f"Episode {ep+1}: return={result['return']:.2f}, "
                 f"mean_reward={result['mean_reward']:.3f}, "
                 f"length={result['length']}, "
-                f"end={result['end_reason']}"
+                f"end={result['end_reason']}{crash_note}"
             )
             if args.record:
                 print(f"  Video saved: {video_path}")
@@ -511,6 +518,8 @@ def main():
         print(f"Max return: {np.max(all_returns):.2f}")
         print(f"Avg length: {np.mean(all_lengths):.1f} ± {np.std(all_lengths):.1f}")
         print(f"End reasons: {dict(end_reasons)}")
+        print(f"Collision verdicts (at_fault_* = policy's problem, npc_* = environment's): "
+              f"{dict(collision_verdicts)}")
         print(f"Wall time: {total_time:.1f}s")
         print(f"Model: {model_path}")
 
@@ -525,6 +534,7 @@ def main():
             "avg_length": float(np.mean(all_lengths)),
             "std_length": float(np.std(all_lengths)),
             "end_reasons": dict(end_reasons),
+            "collision_verdicts": dict(collision_verdicts),
             "wall_time_sec": total_time,
             "carla_vehicles": cfg.CARLA_VEHICLES,
             "carla_walkers": cfg.CARLA_WALKERS,

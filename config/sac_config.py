@@ -5,7 +5,10 @@ from pathlib import Path
 # ========================================================= 
 
 # Discount factor for future reward estimation (determining the agent's horizon)
-GAMMA = 0.99     
+GAMMA = 0.995    # ULTIMATE UPGRADE (was 0.99): effective horizon 100 -> 200 steps (5s -> 10s of
+                 # sim time), enough to value a full overtake maneuver end-to-end. NOTE: value
+                 # scale roughly DOUBLES (V ~ r/(1-gamma)) — feasible Q band is now ~[-400,+300],
+                 # so judge critic health against those bounds, not the old +-200.
 # Coefficient for soft updates of target Q-networks parameters (exponential moving average factor)
 TAU = 0.005         
 
@@ -32,7 +35,10 @@ INIT_ALPHA = 0.01         # start low; the controller raises it only if entropy 
 TARGET_ENTROPY_SCALE = 1.7  # target = -1.7*3 = -5.1 (about sigma~0.12 driving policy)
 # Hard ceiling on alpha when AUTO_ENTROPY is on (clamped after each alpha update). Prevents the
 # unbounded exponential ratchet even if the target entropy is misconfigured again.
-ALPHA_MAX = 0.3
+ALPHA_MAX = 0.1   # TIGHTENED from 0.3: the 500k run's healthy operating range was alpha ~0.02-0.06,
+                  # and in the last ~5% alpha drifted up with a small Q1 dip / log_std rise. 0.1
+                  # gives headroom above the healthy band but caps the late drift on the 300k
+                  # extension. Applied live each update, so it's safe on resume.
 # =========================================================
 # OPTIMIZATION  
 # =========================================================
@@ -82,10 +88,10 @@ KEEP_CHECKPOINTS = 2
 # =========================================================
 
 # Maximum total environment simulation steps allowed for the training run
-MAX_TRAIN_STEPS = 500_000     # ROUND 3: fresh run REQUIRED (the reward function changed, so
-                              # old checkpoints/buffers carry incompatible reward scales —
-                              # do NOT --resume across a reward change). 100k warmup + 400k
-                              # learning; beta reaches its floor (5) at ~417k.
+MAX_TRAIN_STEPS = 800_000     # EXTENDED from 500k: the 2026-07-10 run (14/30 survivals, best yet)
+                              # was STILL rising in return/length at 500k — resume to 800k to keep
+                              # exploiting the un-plateaued curve. Resume is reward-compatible:
+                              # nothing in the reward function changed, so the saved buffer is valid.
 
 # Environment steps to collect before starting optimization updates on the actor network
 CRITIC_WARMUP_STEPS = 100_000   # Mani's tested value for the 30-vehicle setup: longer critic
