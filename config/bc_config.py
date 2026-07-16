@@ -43,8 +43,8 @@ DEMO_LIST= [
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
-    DATA_DIR/ "interventions_raw",
-    # MANUAL_DIR / "map1_30car",
+    # DATA_DIR/ "interventions_raw",
+    MANUAL_DIR / "map1_30car",
 ]
 
 

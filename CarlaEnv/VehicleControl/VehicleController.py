@@ -63,12 +63,9 @@ class VehicleController():
         # State trackers for smoothness penalties
         self.prev_steer = 0.0
         self.prev_throttle = 0.0
-<<<<<<< HEAD
         # Per-episode cache of other vehicles for the lead-gap scan (the controller is
         # recreated on every env.reset, so the actor list is stable for its lifetime)
         self._nearby_vehicles = None
-=======
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         # Raw (pre-exclusivity) policy pedals; env.step sets these each tick so the reward can
         # punish a throttle+brake hedge before the env zeroes the throttle.
         self.raw_throttle = 0.0

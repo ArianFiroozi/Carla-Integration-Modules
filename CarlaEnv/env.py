@@ -37,11 +37,7 @@ class CarlaEnv(gymnasium.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     
     def __init__(self, map_path, walkers_count, vehicles_count, max_steps=40000, init_speed=0.5, action_mode="discrete",
-<<<<<<< HEAD
-                 random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False, no_rendering=True):
-=======
                  random_ego_spawn=True, random_vehicle_spawn=True, smooth_steering=False, no_rendering=False):
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         super(CarlaEnv, self).__init__()
 
         self.walkers_count = walkers_count
@@ -149,12 +145,6 @@ class CarlaEnv(gymnasium.Env):
         except Exception as e:
             print(f"[WARN] world actor cleanup failed: {e}")
 
-<<<<<<< HEAD
-=======
-
-
-
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
     def reset(self, seed=None):
         super().reset(seed=seed)
         self.current_step = 0
@@ -169,16 +159,11 @@ class CarlaEnv(gymnasium.Env):
             # every time you run the script with the same GLOBAL_SEED.
             self._env_seed = random.randint(0, 2**32 - 1)
 
-<<<<<<< HEAD
-        # Stop our own sensor callbacks first (so they don't fire mid-teardown), then do a
-        # GLOBAL cleanup that also removes zombie actors orphaned by a previous force-killed run.
-=======
         # Create a private RNG that controls ALL randomness for this episode
         self._rng = random.Random(self._env_seed)
 
 
         # --- CLEANUP PREVIOUS ACTORS ---
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         if self.vehicle_controller is not None:
             for s in ("sensor_c", "sensor_l"):
                 sensor = getattr(self.vehicle_controller, s, None)
@@ -193,10 +178,7 @@ class CarlaEnv(gymnasium.Env):
         self.vehicles = []
         self.walkers = []
         self.ego_vehicle = None
-<<<<<<< HEAD
         # Tick so CARLA actually removes them
-=======
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         self.world.tick()
 
         self.vehicles = spawn_vehicles(
@@ -219,11 +201,8 @@ class CarlaEnv(gymnasium.Env):
             rng=self._rng                # <-- pass the RNG object!
         )
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
-<<<<<<< HEAD
 
         # Tick again so ego sensors + physics start stable
-=======
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
         self.world.tick()
         return self._get_observation(), {}
 
@@ -248,11 +227,7 @@ class CarlaEnv(gymnasium.Env):
             tm.set_hybrid_physics_radius(70.0)
         except Exception as e:
             print(f"[WARN] Could not enable TM hybrid physics: {e}")
-<<<<<<< HEAD
     
-=======
-        
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 
     def _process_action(self, action):
         """
@@ -293,14 +268,9 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
-<<<<<<< HEAD
-        
-        action_mode = None
-=======
         # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
         # continuous AI control normally, but discrete keyboard during a human takeover).
         action_mode = new_action_mode if new_action_mode is not None else self.action_mode
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
 
         if new_action_mode is not None:
             action_mode = new_action_mode
@@ -458,9 +428,6 @@ class CarlaEnv(gymnasium.Env):
             tm = self.client.get_trafficmanager()
             tm.set_synchronous_mode(False)
         except Exception:
-<<<<<<< HEAD
-            pass
-=======
             pass
 
     def render_hud(self, action=None, matrix_length=25, matrix_width=11, cell_length=2.0, cell_width=2.0):
@@ -557,4 +524,3 @@ class CarlaEnv(gymnasium.Env):
             global_bb = carla.BoundingBox(npc_transform.location + bb.location, bb.extent)
             
             world.debug.draw_box(global_bb, npc_transform.rotation, thickness=0.1, color=color, life_time=draw_time)
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480

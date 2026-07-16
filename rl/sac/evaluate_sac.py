@@ -90,7 +90,7 @@ def resolve_paths(args):
 # Frames land in <video_name>_frames/ next to the intended video path; stitch with ffmpeg
 # (the exact command is printed at record time). Set False to re-try real video encoding
 # (e.g. after `pip install --force-reinstall opencv-python` on the server).
-FORCE_JPG_FRAMES = True
+FORCE_JPG_FRAMES = False
 
 
 class RobustVideoRecorder:
@@ -382,11 +382,8 @@ def main():
     parser.add_argument("--watch", action="store_true", help="Render the CARLA window so you can watch the agent (turns off headless no_rendering)")
     parser.add_argument("--compare_with", type=str, default=None, help="Path to a second model checkpoint for paired comparison (Wilcoxon test).")
 
-<<<<<<< HEAD
-=======
     seed_everything(bc_config.GLOBAL_SEED)
 
->>>>>>> b839bdd08d0540886b8073421df83ef8934ad480
     args = parser.parse_args()
 
     # --no-record beats the config default (argparse can't turn off a default=True store_true)

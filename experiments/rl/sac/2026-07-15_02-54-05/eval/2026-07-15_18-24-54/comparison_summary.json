@@ -1,0 +1,15 @@
+{
+  "primary_model": "experiments\\rl\\sac\\2026-07-15_02-54-05\\models\\checkpoint_step_1000000.pt",
+  "comparison_model": "experiments\\rl\\sac\\2026-07-05_02-54-05\\models\\checkpoint_step_300000.pt",
+  "primary_return_mean": 1361.0242407495073,
+  "primary_return_std": 906.7734043606505,
+  "comparison_return_mean": 1172.6943931171038,
+  "comparison_return_std": 835.2829691493694,
+  "primary_length_mean": 1250.3,
+  "primary_length_std": 744.0808267027626,
+  "comparison_length_mean": 1038.3333333333333,
+  "comparison_length_std": 674.6026155366498,
+  "wilcoxon_return_pvalue": 0.22064675763249397,
+  "wilcoxon_length_pvalue": 0.023999149663337077,
+  "episodes": 30
+}
