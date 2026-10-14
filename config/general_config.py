@@ -176,7 +176,11 @@ WEIGHT_PROGRESS = 1.0
 
 # 2. The Alignment Engine
 # Multiplier weight for staying close to the center line of the lane
-WEIGHT_CENTERING = 0.3         
+WEIGHT_CENTERING = 0.4         # Iteration 1: Forensics-driven lane departure fix (was 0.3).
+                               # Sustained lateral gradient: at the lane edge (d~1.75 m) the term now
+                               # drops by 0.23/step instead of 0.18; progress (1.0) still dominates.
+                               # PENALTY_STALLING moved -0.5 -> -0.6 with it so a stalled, centered car
+                               # still nets exactly 0/step (0.4 + 0.2 - 0.6) instead of becoming +0.1.
 # Curve steepness coefficient determining how quickly lane deviation drops centering reward
 LANE_ALPHA = 0.5             
 # Multiplier weight for reward based on alignment with the road's heading direction
@@ -194,13 +198,24 @@ PENALTY_PEDAL_OVERLAP = -0.5
 # Terminal penalty/negative reward applied when a vehicle collision occurs
 PENALTY_TERMINAL_CRASH = -10.0
 # Step penalty/tax applied when crossing over lane markings/boundaries
-PENALTY_LANE_INVASION = 0.0   # Tax for crossing the solid white line
+PENALTY_LANE_INVASION = -0.5  # Iteration 1: Forensics-driven lane departure fix (was 0.0).
+                              # Collision forensics at 1M steps: 9/16 failures were at_fault_static
+                              # (off-road), 1/16 traffic. The flag is a one-step pulse per marking
+                              # crossed (VehicleController resets it every step), so this is charged
+                              # per crossing, not per step off-lane. -0.5 = half a perfect progress
+                              # step: a legal overtake (out + back, ~2 pulses) costs ~1 step of
+                              # reward, well below the proximity relief it buys, so overtaking stays
+                              # viable while weaving and edge/centre-line crossings accumulate cost.
+                              # Note: the sensor fires on broken AND solid markings (map1 has both),
+                              # and obs-mode relabeling of old demos still assumes 0 (no sensor data).
 # Step penalty/tax applied when vehicle velocity goes in the reverse direction
 PENALTY_ROLLING_BACKWARD = -0.5 
 # Velocity limit (m/s) below which the ego vehicle is considered static/stalled
 STALL_SPEED_THRESHOLD = 1.0    
 # Step penalty applied when vehicle remains stalled below threshold (discourages standing still)
-PENALTY_STALLING = -0.5        
+PENALTY_STALLING = -0.6        # Iteration 1: Forensics-driven lane departure fix (was -0.5).
+                               # Compensates the WEIGHT_CENTERING increase so standing still is not
+                               # made more attractive (6/16 failures were stalls/timeouts).
 # 5. Proximity / headway shaping (anti-tailgate, pro-overtake)
 
 # Max per-step penalty when bumper-to-bumper with the vehicle ahead (linear ramp from 0)

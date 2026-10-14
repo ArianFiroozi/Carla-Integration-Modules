@@ -70,7 +70,9 @@ KEEP_CHECKPOINTS = 2
 # =========================================================
 
 # Maximum total environment simulation steps allowed for the training run
-MAX_TRAIN_STEPS = 500_000   
+MAX_TRAIN_STEPS = 1_000_000   # Iteration 1: fresh 0 -> 1M run (was 500_000; the 1M milestone run
+                              # reached 1M by resuming). BC_PENALTY_STEPS stays 500k, so beta decays
+                              # 30 -> 5 over the first half and sits at the floor for the second.
 
 # Environment steps to collect before starting optimization updates on the actor network
 CRITIC_WARMUP_STEPS = 100_000   
