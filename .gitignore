@@ -65,70 +65,40 @@ venv.bak/
 .claude/
 .codegpt
 
-# CARLA / UT-CAR Custom Ignored Files
-*.mp4
-CarlaEnv/LoadOpenDrive2/towns
-build_dataset.md
-explaination.md
-report.txt
-
-# Personal & Junk Files
+# Archive, runtime stats and local junk
 archive/
 cache/
 extra_stats/
 experiments_archive/
 checkpoints/
 mahdi.txt
-image.png
 python
-*.png
-
-# Ignore datasets and logs
-# *.npz
-imitation/data/archive
-imitation/data/processed
-
-__pycache__/
-
+test
+build_dataset.md
+explaination.md
 report.txt
 
-experiments/**/*.pt
-experiments/**/*.pkl
-offline_rl/**/*.npz
-test
-# Ignore RL experiment logs and datasets
-*.tfevents.*
-*.zip
-experiments/**/*.pt
-experiments/**/*.pkl
-experiments_tb_only
-offline_rl/**/*.npz
-test
-
-imitation/data/archive
-imitation/data/processed
-
-
-experiments_tb_only
-experiments_archive/**/*.pt
-experiments_archive/**/*.pkl
-.gitignore
-imitation\DAGGER_LOOP.md
-
-
-# Ignore Experiments and Models
+# Experiments, models and logs
 experiments/
+experiments_tb_only
 E:/SAC_Experiments/
 *.pt
 *.pkl
+*.tfevents.*
+*.zip
 
-# Ignore Datasets and Buffers
+# Datasets and buffers
 imitation/data/
 *.npz
 
-# Ignore Maps and Videos
+# Maps
+CarlaEnv/LoadOpenDrive2/towns
 CarlaEnv/LoadOpenDrive2/*.xodr
 CarlaEnv/LoadOpenDrive2/*.bin
+
+# Media
 videos/
 *.mp4
 *.jpg
+*.png
+image.png
