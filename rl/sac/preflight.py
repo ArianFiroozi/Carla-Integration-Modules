@@ -2,10 +2,10 @@
 Preflight checks for a fresh SAC run. Fails fast (exit code 1) on anything that would
 otherwise crash or silently corrupt a long training run.
 
-    python -m rl.sac.preflight [--wait-carla SECONDS] [--skip-buffer-check] [--ignore-sync]
+    python -m rl.sac.preflight [--wait-carla SECONDS] [--skip-buffer-check] [--ignore-sync] [--allow-cpu]
 
 Checks:
-  1. Python deps (carla, gymnasium, torch) import, and the configured DEVICE is usable.
+  1. Python deps (carla, gymnasium, torch) import, and a CUDA GPU is usable (unless --allow-cpu).
   2. sac_config describes a FRESH, BC-initialized run (no resume / branch).
   3. BC checkpoint exists and its experiment folder carries normalization stats.
   4. Replay-buffer preload file exists and is newer than config/general_config.py
@@ -41,7 +41,7 @@ def mtime(path):
     return datetime.datetime.fromtimestamp(Path(path).stat().st_mtime)
 
 
-def check_deps():
+def check_deps(allow_cpu):
     print("1. Python environment")
     for mod in ("carla", "gymnasium", "torch"):
         try:
@@ -53,8 +53,11 @@ def check_deps():
         import torch
         if str(cfg.DEVICE).startswith("cuda") and not torch.cuda.is_available():
             fail(f"DEVICE={cfg.DEVICE} but torch.cuda.is_available() is False")
+        elif not torch.cuda.is_available() and not allow_cpu:
+            fail(f"no CUDA GPU visible to torch {torch.__version__} (a 1M-step run on CPU is far "
+                 f"too slow). Install a CUDA build of torch, or pass --allow-cpu / set ALLOW_CPU=1")
         else:
-            ok(f"DEVICE={cfg.DEVICE}")
+            ok(f"DEVICE={cfg.DEVICE} (torch {torch.__version__})")
     except Exception:
         pass
 
@@ -141,10 +144,11 @@ def main():
     ap.add_argument("--wait-carla", type=int, default=0, help="seconds to wait for the server")
     ap.add_argument("--skip-buffer-check", action="store_true")
     ap.add_argument("--ignore-sync", action="store_true")
+    ap.add_argument("--allow-cpu", action="store_true")
     args = ap.parse_args()
 
     print("=" * 70 + "\nSAC PREFLIGHT\n" + "=" * 70)
-    check_deps()
+    check_deps(args.allow_cpu)
     check_config()
     check_bc()
     check_buffer(args.skip_buffer_check)

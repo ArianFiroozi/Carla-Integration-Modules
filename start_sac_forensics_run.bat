@@ -21,6 +21,7 @@ REM  no cameras, so no extra rendering flags are needed (or wanted) here.
 REM
 REM  Optional overrides: set PYTHON=C:\path\to\env\python.exe
 REM                      set SKIP_BUFFER_CHECK=1   (edit did not touch reward weights)
+REM                      set ALLOW_CPU=1           (train without a CUDA GPU - very slow)
 REM ==========================================================================
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
@@ -32,6 +33,7 @@ if "%SEED%"=="" set "SEED=42"
 
 set "PREFLIGHT_ARGS="
 if "%SKIP_BUFFER_CHECK%"=="1" set "PREFLIGHT_ARGS=--skip-buffer-check"
+if "%ALLOW_CPU%"=="1" set "PREFLIGHT_ARGS=%PREFLIGHT_ARGS% --allow-cpu"
 
 REM --- Optional: start CARLA off-screen if CARLA_EXE is set and port 2000 is closed ---
 if defined CARLA_EXE (
