@@ -62,7 +62,6 @@ venv.bak/
 .ipynb_checkpoints
 .idea/
 .vscode/
-.claude/
 .codegpt
 
 # Archive, runtime stats and local junk
