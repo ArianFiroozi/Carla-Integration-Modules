@@ -183,7 +183,7 @@ class ManualController:
             action = self._get_action_from_keyboard()
 
             if not done:
-                next_obs, reward, terminated, truncated, info = self.env.step(action.tolist())
+                next_obs, reward, terminated, truncated, info = self.env.step(action.tolist() , "discrete")
                 done = bool(terminated or truncated)
                 self._update_spectator()
 

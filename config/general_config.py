@@ -31,7 +31,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # True to use separate MLP heads for speed/steering control actions, False to use a single shared head
 IS_DECOUPLED = False
 # Initial bias value for standard deviation parameter in the Gaussian policy distribution
-LOG_STD_INIT_BIAS = -3.0
+LOG_STD_INIT_BIAS = -2.0   # DIVERGENCE FIX: was -3.0. BC checkpoints carry no log_std head, so
+                           # the SAC actor STARTS at this sigma (0.14). At -3.0 (sigma 0.05) the
+                           # policy was born with entropy ~-8..-14, unreachably far below any
+                           # sane target — the seed of the alpha ratchet in the 400k run.
 # ---BASELINE---
 # Channel output sizes for the CNN layers of the visual feature extractor
 CNN_CHANNELS = [16, 32, 64]
@@ -109,7 +112,13 @@ OBS_BOUNDS = {
 
 
 # Number of consecutive history frames stacked as input observations
-WINDOW_SIZE = 1
+WINDOW_SIZE = 1   # REVERTED from 3 (executive call 2026-07-09). A/B result for the record:
+                  # with the train/eval scalar-permutation bug FIXED, the window-3 BC still
+                  # evaluated at ~248 avg length vs the window-1 May-3 baseline's 667 in
+                  # traffic — frame stacking hurt BC at this capacity (likely the 16-filter
+                  # first conv choking on 3x input channels). Revisit only with a wider CNN
+                  # and its own BC retrain cycle. Window-1 restores compatibility with the
+                  # proven 2026_05_03 BC checkpoint (5 grid channels).
 # Whether to represent sign/presence elements in the grid as one-hot vectors
 USE_ONE_HOT_GRID = True
 
@@ -132,16 +141,11 @@ ACTION_HIGH = [1.0, 1.0, 1.0]
 # =========================================================
 # CARLA ENVIRONMENT DEFAULTS
 # =========================================================
-<<<<<<< HEAD
 # Machine-independent path to the repo's own copy of the map. The old hardcoded absolute path
 # did not exist on the lab machine, so the env silently fell back to Town10HD for every run --
 # while the BC was trained on map1. This points to map1 = the SAME map the BC knows (no mismatch).
 CARLA_MAP_PATH = str(REPO_ROOT / "CarlaEnv" / "LoadOpenDrive2" / "map1.xodr")
-=======
-# Absolute path to the OpenDrive format road map file for the simulation environment
-CARLA_MAP_PATH = r"C:\carla\Carla-Integration-Modules\CarlaEnv\LoadOpenDrive2\map1.xodr"
 # Number of pedestrian/walker entities to spawn in the environment simulation
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 CARLA_WALKERS = 0
 # Number of autonomous vehicle traffic obstacles to spawn in the environment simulation
 CARLA_VEHICLES = 30
@@ -167,9 +171,13 @@ RANDOM_EGO_START_POS = True
 
 # 1. The Progress Engine
 # Target forward speed in meters/second for progress reward scaling
-TARGET_SPEED_MS = 6.0         
-# Multiplier weight for the forward progress velocity reward
-WEIGHT_PROGRESS = 1.0     
+TARGET_SPEED_MS = 6.0
+# Multiplier weight for the forward progress velocity reward.
+# ULTIMATE UPGRADE: the progress term is now PEAKED, not saturating:
+#   reward = clip(1 - |v_fwd - TARGET| / TARGET, 0, 1) * WEIGHT_PROGRESS
+# Max at exactly TARGET_SPEED_MS, zero at standstill AND at 2x target — overspeeding
+# (Mani's "pressing the gas pedal highly") is no longer free. See utils/reward_compiler.py.
+WEIGHT_PROGRESS = 1.0
 
 # 2. The Alignment Engine
 # Multiplier weight for staying close to the center line of the lane
@@ -181,15 +189,18 @@ WEIGHT_HEADING = 0.2
 
 # 3. The Control Penalty (Shock Absorbers)
 # Penalty factor applied to the step reward for large steer changes (prevents erratic turning)
-PENALTY_STEER_DELTA = 0.1      
+PENALTY_STEER_DELTA = 0.4      # ANTI-WEAVE (was 0.1): visual eval showed left-right "drunk"
+                               # oscillation on open road. A weave burns steer_change every
+                               # step, so this taxes it directly; straight driving pays ~0.
+                               # Tune 0.3-0.6 if steering becomes sluggish in curves.
 # Penalty factor applied to the step reward for large throttle inputs changes (prevents rapid surging)
-PENALTY_THROTTLE_DELTA = 0.1  
+PENALTY_THROTTLE_DELTA = 0.15  # was 0.1: mild smoothing of slam-brake/slam-throttle cycles
 # Penalty applied when the agent presses throttle and brake pedals at the same time
 PENALTY_PEDAL_OVERLAP = -0.5   
 
 # 4. Terminals and Violations
 # Terminal penalty/negative reward applied when a vehicle collision occurs
-PENALTY_TERMINAL_CRASH = -10.0  
+PENALTY_TERMINAL_CRASH = -10.0
 # Step penalty/tax applied when crossing over lane markings/boundaries
 PENALTY_LANE_INVASION = 0.0   # Tax for crossing the solid white line
 # Step penalty/tax applied when vehicle velocity goes in the reverse direction
@@ -198,5 +209,18 @@ PENALTY_ROLLING_BACKWARD = -0.5 # STAGE 1c-v2: was -3.0; per-step penalty landmi
 STALL_SPEED_THRESHOLD = 1.0    # Speed below which we consider the car "stalling"
 # Step penalty applied when vehicle remains stalled below threshold (discourages standing still)
 PENALTY_STALLING = -0.5        # Tax for sitting still to avoid driving
+# 5. Proximity / headway shaping (anti-tailgate, pro-overtake)
+# Visual eval showed the agent freezing behind a lead car until it fully departs: the crash
+# penalty is a cliff with NO gradient before impact, so "wait forever" was the only safe policy
+# the critic could see. This term makes closeness itself expensive: parking 1 m behind a
+# stopped car now costs ~(-0.7 proximity - 0.5 stall)/step, while overtaking earns +1.5/step —
+# the freeze strategy becomes economically dominated by the smooth overtake.
+# Max per-step penalty when bumper-to-bumper with the vehicle ahead (linear ramp from 0)
+PENALTY_PROXIMITY = -0.8
+# Center-to-center distance (m) where the proximity penalty starts (12 m centers ≈ 7.5 m gap)
+PROXIMITY_DIST_M = 12.0
+# Half-width (m) of the forward corridor in which a vehicle counts as "lead" (ego lane only)
+PROXIMITY_LAT_HALFWIDTH_M = 2.0
+
 # Overall scaling factor multiplier applied to the final calculated step reward
 REWARD_SCALE_FACTOR = 1.0

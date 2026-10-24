@@ -31,6 +31,11 @@ RL_REPLAY_BUFFER_PATH =  PROCESSED_DIR / "dataset_rl_buffer.npz"
 BC_EXPERIMENT_FOLDER = REPO_ROOT / "experiments" / "bc"
 
 
+ENSEMBLE_PATH = REPO_ROOT / "experiments" / "dagger" / "20260701_094519"
+
+
+
+
 # input of build dataset and inspect demo
 # List of demonstration directories included when building the dataset
 DEMO_LIST= [
@@ -38,8 +43,11 @@ DEMO_LIST= [
     # MANUAL_DIR / "lab-map_0car",
     # MANUAL_DIR / "test",
     # MANUAL_DIR / "map1_0car",
-    MANUAL_DIR / "map1_30car",
-    MANUAL_DIR / "old" /"map1_30car",
+    MANUAL_DIR / "map1_30car",      # THE dataset: 178 demos / ~314k frames of 30-car driving.
+    # DATA_DIR / "interventions_raw",  # DO NOT re-enable blindly: round-1 keyboard interventions
+    #                                  # (empty-map, jerky, corrupt ranges e.g. throttle=9.0) —
+    #                                  # training on ONLY these produced the 2026-07-09 BC with
+    #                                  # avg length 256 in traffic. Use --extra-dirs deliberately.
 ]
 
 

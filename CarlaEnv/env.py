@@ -11,7 +11,7 @@ from CarlaEnv.ObjectSpawn import *
 import os
 import carla
 from pathlib import Path
-import time  
+import time
 import random
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -116,6 +116,11 @@ class CarlaEnv(gymnasium.Env):
         self.last_heartbeat_time = time.time()
         with open(HEARTBEAT_PATH, "w") as f:
             f.write(str(self.last_heartbeat_time))
+
+
+        self._env_seed = None
+        self._rng = random.Random()  
+           
                 
     def _cleanup_world_actors(self):
         """
@@ -141,12 +146,18 @@ class CarlaEnv(gymnasium.Env):
             print(f"[WARN] world actor cleanup failed: {e}")
 
     def reset(self, seed=None):
+        super().reset(seed=seed)
         self.current_step = 0
         self.prev_steer = 0.0
 
-        # RANDOMIZE SEED (so NPC spawns differ each episode)
+        # --- EPISODE SEED & RNG ---
         if seed is not None:
-            random.seed(seed)
+            self._env_seed = seed
+        else:
+            # Use global random (already seeded by seed_everything) to generate a seed.
+            # Because global random is deterministic, the sequence of seeds will be the same
+            # every time you run the script with the same GLOBAL_SEED.
+            self._env_seed = random.randint(0, 2**32 - 1)
 
         # Stop our own sensor callbacks first (so they don't fire mid-teardown), then do a
         # GLOBAL cleanup that also removes zombie actors orphaned by a previous force-killed run.
@@ -167,16 +178,29 @@ class CarlaEnv(gymnasium.Env):
         # Tick so CARLA actually removes them
         self.world.tick()
 
-        self.vehicles = spawn_vehicles(self.client, self.vehicles_count, random_spawn=self.random_vehicle_spawn)
-        self.walkers = spawn_pedestrians(self.world, self.walkers_count)
+        self.vehicles = spawn_vehicles(
+            self.client,
+            self.vehicles_count,
+            random_spawn=self.random_vehicle_spawn,
+            rng=self._rng               
+        )
+        self.walkers = spawn_pedestrians(
+            self.world,
+            self.walkers_count,
+            seed=self._env_seed          # spawn_pedestrians expects seed, not rng
+        )
         self.world.tick()
 
-        self.ego_vehicle = spawn_ego_vehicle(self.world, self.init_speed, random_spawn=self.random_ego_spawn)
+        self.ego_vehicle = spawn_ego_vehicle(
+            self.world,
+            self.init_speed,
+            random_spawn=self.random_ego_spawn,
+            rng=self._rng                # <-- pass the RNG object!
+        )
         self.vehicle_controller = VehicleController(self.world, self.ego_vehicle)
 
         # Tick again so ego sensors + physics start stable
         self.world.tick()
-
         return self._get_observation(), {}
 
     def _apply_sync(self, fixed_dt=0.05):
@@ -241,14 +265,8 @@ class CarlaEnv(gymnasium.Env):
 
         # Only execute manual control if 'action' is provided!
         # This prevents overwriting the Traffic Manager when recording Autopilot.
-<<<<<<< HEAD
-        # `new_action_mode` overrides the action format for THIS step only (used by DAgger:
-        # continuous AI control normally, but discrete keyboard during a human takeover).
-        action_mode = new_action_mode if new_action_mode is not None else self.action_mode
-=======
         
         action_mode = None
->>>>>>> 1e7f54cccfec0f7d0a8e9470bb2c8210dc36574e
 
         if new_action_mode is not None:
             action_mode = new_action_mode
@@ -294,7 +312,7 @@ class CarlaEnv(gymnasium.Env):
             reward, info = self.vehicle_controller.get_reward(prev_obs)
             return prev_obs, reward, False, False, info
 
-        step_peds(self.world, self.walkers)
+        step_peds(self.world, self.walkers,self._rng )
 
         # 2. Check for failure (Terminated)
         if self.vehicle_controller.collision_happened:
@@ -329,6 +347,11 @@ class CarlaEnv(gymnasium.Env):
         if self.current_step >= self.max_steps:
             truncated = True
             
+        if not self.no_rendering:
+            self.render_hud(action=action)
+
+
+
         return obs, reward, terminated, truncated, info
 
     def _get_observation(self):

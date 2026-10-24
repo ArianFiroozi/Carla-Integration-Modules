@@ -63,6 +63,9 @@ class VehicleController():
         # State trackers for smoothness penalties
         self.prev_steer = 0.0
         self.prev_throttle = 0.0
+        # Per-episode cache of other vehicles for the lead-gap scan (the controller is
+        # recreated on every env.reset, so the actor list is stable for its lifetime)
+        self._nearby_vehicles = None
         # Raw (pre-exclusivity) policy pedals; env.step sets these each tick so the reward can
         # punish a throttle+brake hedge before the env zeroes the throttle.
         self.raw_throttle = 0.0
@@ -89,9 +92,44 @@ class VehicleController():
 
         self.collision_happened = False
         self.lane_invaded = False
+        self.last_collision = None   # forensics dict describing the most recent impact
 
         def collision_callback(event):
             self.collision_happened = True
+            # COLLISION FORENSICS (headless debugging): classify who caused the impact so the
+            # episode JSONs distinguish at-fault crashes (policy's problem) from NPC-caused
+            # ones (environment's problem). Runs on the sensor thread — never raise from here.
+            try:
+                other = event.other_actor
+                other_type = other.type_id if other is not None else "unknown"
+                ego_tr = self.vehicle.get_transform()
+                fwd = ego_tr.get_forward_vector()
+                eloc = ego_tr.location
+                oloc = other.get_location() if other is not None else eloc
+                dx, dy = oloc.x - eloc.x, oloc.y - eloc.y
+                lon = dx * fwd.x + dy * fwd.y   # impact source position along ego heading
+                vel = self.vehicle.get_velocity()
+                ego_speed = (vel.x ** 2 + vel.y ** 2 + vel.z ** 2) ** 0.5
+
+                if not other_type.startswith("vehicle."):
+                    verdict = "at_fault_static"   # wall / pole / off-road object: lane-keeping failure
+                elif lon > 1.0:
+                    verdict = "at_fault_front"    # we drove into a vehicle ahead: following/merging failure
+                elif lon < -1.0:
+                    verdict = "npc_rear_end"      # a vehicle drove into our rear: likely blameless
+                else:
+                    verdict = "side_contact"      # lateral scrape: lane-change conflict, ambiguous
+
+                self.last_collision = {
+                    "verdict": verdict,
+                    "other_type": other_type,
+                    "impact_lon_m": round(float(lon), 2),
+                    "ego_speed_ms": round(float(ego_speed), 2),
+                    "loc_x": round(float(eloc.x), 1),
+                    "loc_y": round(float(eloc.y), 1),
+                }
+            except Exception:
+                self.last_collision = {"verdict": "unknown", "other_type": "unknown"}
 
         def lane_callback(event):
             self.lane_invaded = True
@@ -149,6 +187,15 @@ class VehicleController():
         info['steer_change'] = float(abs(self.control.steer - self.prev_steer))
         info['throttle_change'] = float(abs(self.control.throttle - self.prev_throttle))
 
+        # Proximity shaping input: center-to-center distance to the nearest vehicle in the
+        # forward ego-lane corridor (see PROXIMITY_* in general_config). 999 = nothing ahead.
+        info['lead_gap_m'] = self._lead_vehicle_gap()
+
+        # Attach collision forensics on the terminal step (see collision_callback)
+        if info['is_terminal_crash'] == 1:
+            info['collision_forensics'] = self.last_collision or {"verdict": "unknown",
+                                                                  "other_type": "off_map_fall"}
+
         # --- RESET SENSORS & STATE ---
         if info['is_terminal_crash'] == 1:
             self.collision_happened = False
@@ -163,6 +210,34 @@ class VehicleController():
         reward , _ = compile_reward(info, config, is_tensor=False)
         
         return reward, info
+    def _lead_vehicle_gap(self, max_dist=30.0):
+        """
+        Center-to-center longitudinal distance (m) to the nearest other vehicle inside the
+        forward corridor (|lateral| < PROXIMITY_LAT_HALFWIDTH_M). Returns 999.0 when the
+        corridor is clear (beyond max_dist the proximity penalty is zero anyway).
+        """
+        try:
+            if self._nearby_vehicles is None:
+                self._nearby_vehicles = [a for a in self.world.get_actors().filter("vehicle.*")
+                                         if a.id != self.vehicle.id]
+            if not self._nearby_vehicles:
+                return 999.0
+            tr = self.vehicle.get_transform()
+            loc = tr.location
+            fwd = tr.get_forward_vector()
+            best = None
+            for v in self._nearby_vehicles:
+                vloc = v.get_location()
+                dx, dy = vloc.x - loc.x, vloc.y - loc.y
+                lon = dx * fwd.x + dy * fwd.y            # distance ahead along heading
+                lat = -dx * fwd.y + dy * fwd.x           # lateral offset from heading axis
+                if 0.0 < lon < max_dist and abs(lat) < config.PROXIMITY_LAT_HALFWIDTH_M:
+                    if best is None or lon < best:
+                        best = lon
+            return float(best) if best is not None else 999.0
+        except Exception:
+            return 999.0   # actor churn mid-query: no penalty rather than a crashed step
+
     # ==============================================================================
     # ACTION EXECUTION METHODS
     # ==============================================================================

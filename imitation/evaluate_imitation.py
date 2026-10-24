@@ -8,7 +8,7 @@ import torch
 from CarlaEnv.env import CarlaEnv
 from agents.bc.imitation_policy import ImitationPolicy
 from config import bc_config
-from config import general_config # <--- ADDED: Needed for the reward compiler
+from config import general_config 
 import datetime
 from torch.utils.tensorboard import SummaryWriter
 import carla
@@ -152,8 +152,8 @@ def run_episode(env, policy, wrapper, max_steps=2000, render_log_every=200, vide
     for t in range(max_steps):
         env_action, action_log = predict_action(policy, obs, wrapper)
         obs, _, terminated, truncated, info = env.step(env_action)
-        
-        
+
+
         reward, _ = compile_reward(info, general_config, is_tensor=False)
 
         if action_log is not None:

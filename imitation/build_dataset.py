@@ -131,11 +131,19 @@ def gather_demo_files(dirs):
     for d in dirs:
         path = Path(d)
 
+        # A configured directory that is missing or empty is a CONFIG/SYNC ERROR, not a
+        # shrug: silently continuing is how the 2026-07-09 BC got trained on 55 intervention
+        # files instead of the 178-demo main dataset. Fail loudly instead.
         if not path.exists():
-            print(f"[WARN] Directory does not exist: {path}")
-            continue
+            raise FileNotFoundError(
+                f"[DATA FATAL] DEMO_LIST directory does not exist: {path}\n"
+                f"  Fix DEMO_LIST in config/bc_config.py or restore/sync the demo data.")
 
         found = sorted(path.glob("*.npz"))
+        if not found:
+            raise FileNotFoundError(
+                f"[DATA FATAL] DEMO_LIST directory contains no .npz demos: {path}\n"
+                f"  Fix DEMO_LIST in config/bc_config.py or restore/sync the demo data.")
         print(f"[DATA] Found {len(found)} demos in {path.resolve()}")
         all_files.extend(found)
 
@@ -549,9 +557,13 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
         for i, src_idx in enumerate(scalar_src):
             # Attempt to extract the rich info dict
             step_info = {k[5:]: d[k][src_idx] for k in d.keys() if k.startswith("info_")}
-            
+
             if step_info:
                 # We have the new data format!
+                # Demos recorded before lead_gap_m existed get the presence-grid fallback so
+                # relabeled proximity penalties stay consistent with the online reward.
+                if 'lead_gap_m' not in step_info and 'obs_presence' in d:
+                    step_info['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_info, general_config, mode="info", is_tensor=False)
             else:
                 # We have the old data format! Calculate smoothness manually.
@@ -573,11 +585,26 @@ def pass_2_build_dataset(files, keep_masks, total_kept, obs_keys, obs_shapes):
                     'steer_change': abs(steer_curr - steer_prev),
                     'throttle_change': abs(throttle_curr - throttle_prev)
                 }
+                if 'obs_presence' in d:   # proximity shaping from the grid (see reward_compiler)
+                    step_obs['obs_presence'] = d['obs_presence'][src_idx]
                 compiled_reward, _ = compile_reward(step_obs, general_config, mode="obs", is_tensor=False)
                 
             out_rewards[idx + i] = compiled_reward
 
         idx += n
+
+    # SANITY GATE: continuous control targets must be physically plausible. Corrupt demo
+    # files (e.g. round-1 interventions with throttle=9.0) must abort the build, not
+    # silently poison a week of downstream training.
+    if out_actions.dtype.kind == "f" and out_actions.shape[1] == 3:
+        thr_max, brk_max = float(out_actions[:, 0].max()), float(out_actions[:, 1].max())
+        steer_abs = float(np.abs(out_actions[:, 2]).max())
+        if thr_max > 1.01 or brk_max > 1.01 or steer_abs > 1.01 or float(out_actions[:, :2].min()) < -0.01:
+            raise ValueError(
+                f"[DATA FATAL] Corrupt control targets in demo data: "
+                f"throttle_max={thr_max:.2f}, brake_max={brk_max:.2f}, |steer|_max={steer_abs:.2f} "
+                f"(expected throttle/brake in [0,1], steer in [-1,1]). "
+                f"A source demo file is corrupt — inspect the directories in DEMO_LIST.")
 
     return out_obs, out_actions, out_rewards, out_next_obs, out_dones
 
