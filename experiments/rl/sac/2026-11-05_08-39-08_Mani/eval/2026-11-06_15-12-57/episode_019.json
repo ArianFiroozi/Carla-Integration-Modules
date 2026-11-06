@@ -1,0 +1,14 @@
+{
+  "return": 593.7521245159751,
+  "mean_reward": 1.0416703938876757,
+  "length": 570,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.seat.leon",
+    "impact_lon_m": 4.44,
+    "ego_speed_ms": 5.62,
+    "loc_x": 48.5,
+    "loc_y": 15.8
+  }
+}

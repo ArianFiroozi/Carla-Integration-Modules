@@ -1,0 +1,10 @@
+{
+  "return": 1068.8553585277232,
+  "mean_reward": 1.1334627343878294,
+  "length": 943,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "unknown",
+    "other_type": "off_map_fall"
+  }
+}

@@ -60,7 +60,7 @@ LOG_STD_MAX = -2.5
 # True to initialize policy network parameters using a pretrained behavior cloning model
 LOAD_BC_WEIGHTS = True
 # Path to the pretrained Behavior Cloning model checkpoint file
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous_Mani" / "models" / "best_model.pt"
 # True to pre-fill the replay buffer with expert demonstrations before online training starts
 PRELOAD_EXPERT_DATA = True
 # Path to the consolidated demonstration file (.npz) containing expert trajectories

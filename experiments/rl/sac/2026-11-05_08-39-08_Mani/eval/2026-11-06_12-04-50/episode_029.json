@@ -1,0 +1,14 @@
+{
+  "return": -10.028682016456642,
+  "mean_reward": -5.014341008228321,
+  "length": 2,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "side_contact",
+    "other_type": "vehicle.lincoln.mkz_2020",
+    "impact_lon_m": 0.22,
+    "ego_speed_ms": 0.98,
+    "loc_x": -12.8,
+    "loc_y": 80.4
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "return": 721.9452991387832,
+  "mean_reward": 0.6593107754692084,
+  "length": 1095,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.dodge.charger_police_2020",
+    "impact_lon_m": 3.71,
+    "ego_speed_ms": 2.86,
+    "loc_x": 200.7,
+    "loc_y": 59.9
+  }
+}

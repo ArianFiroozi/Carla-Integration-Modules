@@ -1,0 +1,14 @@
+{
+  "return": -98.58181196158398,
+  "mean_reward": -0.07594900767456393,
+  "length": 1298,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.nissan.patrol",
+    "impact_lon_m": 4.4,
+    "ego_speed_ms": 4.62,
+    "loc_x": -45.3,
+    "loc_y": -53.4
+  }
+}

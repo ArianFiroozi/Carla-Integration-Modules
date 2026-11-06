@@ -145,7 +145,7 @@ LOG_EVERY = 1000
 # True to initialize policy network parameters using a pretrained behavior cloning model
 LOAD_BC_WEIGHTS = True
 # Path to the pretrained Behavior Cloning model checkpoint file
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt"  
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous_Mani" / "models" / "best_model.pt"  
 # True to resume training from an existing SAC checkpoint found in SAVE_DIR
 RESUME_CHECKPOINT = False    
 # True to record video capture files of evaluation rollout episodes

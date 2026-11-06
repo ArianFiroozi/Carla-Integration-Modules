@@ -1,0 +1,24 @@
+{
+  "model_path": "experiments\\rl\\sac\\2026-11-05_08-39-08_Mani\\models\\best_model.pt",
+  "episodes": 30,
+  "avg_return": 1210.1012126421172,
+  "std_return": 858.1241942402673,
+  "min_return": -10.028682016456642,
+  "max_return": 2397.185560164846,
+  "avg_length": 1170.0333333333333,
+  "std_length": 726.2690724212036,
+  "end_reasons": {
+    "terminated": 21,
+    "truncated": 9
+  },
+  "collision_verdicts": {
+    "at_fault_static": 16,
+    "at_fault_front": 3,
+    "unknown": 1,
+    "side_contact": 1
+  },
+  "wall_time_sec": 1282.2684621810913,
+  "carla_vehicles": 30,
+  "carla_walkers": 0,
+  "video_recorded": true
+}

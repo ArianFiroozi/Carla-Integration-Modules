@@ -13,6 +13,7 @@ from config import offline_rl_config as cfg
 from utils.replay_buffer import SACReplayBuffer
 from utils.obs_wrapper import CarlaObsWrapper
 from offline_rl.iql.iql_agent import IQLAgent
+from utils.experiment_utils import get_experiment_creator
 
 def load_norm_stats():
     try:
@@ -69,8 +70,9 @@ def populate_buffer(buffer, wrapper, data_dir):
 # Logging & Directories Helpers
 # -------------------------------------------------------------
 def make_experiment_dir():
+    creator = get_experiment_creator()
     run_stamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    exp_dir = Path(cfg.REPO_ROOT) / "experiments" / "offline_rl" / f"{run_stamp}_iql"
+    exp_dir = Path(cfg.REPO_ROOT) / "experiments" / "offline_rl" / "iql" / f"{run_stamp}_iql_{creator}"
     
     (exp_dir / "models").mkdir(parents=True, exist_ok=True)
     (exp_dir / "tb").mkdir(exist_ok=True)
@@ -81,6 +83,7 @@ def make_experiment_dir():
 def save_config(exp_dir):
     config_path = exp_dir / "config.json"
     cfg_dict = {k: str(v) if isinstance(v, Path) else v for k, v in cfg.__dict__.items() if k.isupper() and not k.startswith('_')}
+    cfg_dict["creator"] = get_experiment_creator()
     with open(config_path, "w") as f:
         json.dump(cfg_dict, f, indent=4)
     return cfg_dict

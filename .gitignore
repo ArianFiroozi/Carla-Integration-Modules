@@ -65,26 +65,30 @@ venv.bak/
 .codegpt
 
 # Archive, runtime stats and local junk
-archive/
 cache/
 extra_stats/
-experiments_archive/
 checkpoints/
 mahdi.txt
 python
 test
 build_dataset.md
 explaination.md
-report.txt
 
-# Experiments, models and logs
-experiments/
+# Experiments, models and logs (keep configs, evals, logs, plots, and reports trackable; ignore heavy binaries)
 experiments_tb_only
 E:/SAC_Experiments/
 *.pt
+*.pth
+*.ckpt
 *.pkl
 *.tfevents.*
 *.zip
+*.tar
+*.gz
+*.7z
+*.avi
+*.mkv
+*.mov
 
 # Datasets and buffers
 imitation/data/
@@ -100,4 +104,6 @@ videos/
 *.mp4
 *.jpg
 *.png
+!experiments/**/*.png
+!experiments_archive/**/*.png
 image.png

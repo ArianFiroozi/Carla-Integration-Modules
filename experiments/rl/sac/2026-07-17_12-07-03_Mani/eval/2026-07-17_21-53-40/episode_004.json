@@ -1,0 +1,14 @@
+{
+  "return": -17.574710814263938,
+  "mean_reward": -1.5977009831149034,
+  "length": 11,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.tesla.cybertruck",
+    "impact_lon_m": 2.54,
+    "ego_speed_ms": 0.2,
+    "loc_x": 3.9,
+    "loc_y": -34.4
+  }
+}

@@ -31,7 +31,7 @@ RL_REPLAY_BUFFER_PATH =  PROCESSED_DIR / "dataset_rl_buffer.npz"
 BC_EXPERIMENT_FOLDER = REPO_ROOT / "experiments" / "bc"
 
 
-ENSEMBLE_PATH = REPO_ROOT / "experiments" / "dagger" / "20260701_094519"
+ENSEMBLE_PATH = REPO_ROOT / "experiments" / "dagger" / "20260701_094519_Mani"
 
 
 

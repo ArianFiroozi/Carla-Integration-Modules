@@ -16,6 +16,7 @@ from utils.obs_wrapper import CarlaObsWrapper
 from config import bc_config
 from imitation.datasets.bc_dataset import BCDatasetContinuous
 from utils.seed_utils import seed_everything
+from utils.experiment_utils import get_experiment_creator
 import concurrent.futures
 
 seed_everything(bc_config.GLOBAL_SEED)
@@ -190,7 +191,10 @@ class EnsembleDAgger:
         ckpt = {"model_state_dict": self.models[model_index].state_dict()}
         torch.save(ckpt, out_dir / "models" / "best_model.pt")
         with open(out_dir / "config.json", "w") as f:
-            json.dump({"dataset_meta": {"normalization_stats": norm_stats or {}}}, f, indent=2)
+            json.dump({
+                "creator": get_experiment_creator(),
+                "dataset_meta": {"normalization_stats": norm_stats or {}},
+            }, f, indent=2)
         print(f"[EXPORT] SAC-compatible BC checkpoint -> {out_dir / 'models' / 'best_model.pt'}")
         print(f"         (set sac_config.BC_CHECKPOINT_PATH to that path to warm-start SAC)")
 
@@ -487,7 +491,8 @@ if __name__ == "__main__":
     dagger_system = EnsembleDAgger(env, wrapper, args.device, grid_channels, scalar_dim)
 
     # Persist the warmed ensemble (so re-runs don't re-warm) and drop a SAC-testable BC export.
-    dagger_exp_dir = Path(bc_config.REPO_ROOT) / "experiments" / "dagger" / time.strftime("%Y%m%d_%H%M%S")
+    creator = get_experiment_creator()
+    dagger_exp_dir = Path(bc_config.REPO_ROOT) / "experiments" / "dagger" / f"{time.strftime('%Y%m%d_%H%M%S')}_{creator}"
     if args.load_ensemble:
         dagger_system.load_ensemble(args.load_ensemble)
     else:

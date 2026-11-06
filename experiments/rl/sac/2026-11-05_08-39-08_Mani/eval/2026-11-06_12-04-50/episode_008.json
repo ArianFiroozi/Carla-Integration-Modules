@@ -1,0 +1,14 @@
+{
+  "return": 1134.9817736219259,
+  "mean_reward": 0.9725636449202449,
+  "length": 1167,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.vespa.zx125",
+    "impact_lon_m": 3.39,
+    "ego_speed_ms": 6.25,
+    "loc_x": 0.1,
+    "loc_y": -29.4
+  }
+}

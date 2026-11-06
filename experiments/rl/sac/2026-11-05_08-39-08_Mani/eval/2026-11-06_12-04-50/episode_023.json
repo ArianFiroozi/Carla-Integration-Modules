@@ -1,0 +1,14 @@
+{
+  "return": 1587.2491747184235,
+  "mean_reward": 1.1645261736745587,
+  "length": 1363,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "side_contact",
+    "other_type": "vehicle.tesla.cybertruck",
+    "impact_lon_m": 0.94,
+    "ego_speed_ms": 3.81,
+    "loc_x": 170.5,
+    "loc_y": 48.2
+  }
+}

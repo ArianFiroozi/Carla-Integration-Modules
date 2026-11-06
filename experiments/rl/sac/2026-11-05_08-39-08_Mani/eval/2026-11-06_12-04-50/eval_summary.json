@@ -1,0 +1,23 @@
+{
+  "model_path": "C:\\carla\\Carla-Integration-Modules\\experiments\\rl\\sac\\2026-11-05_08-39-08_Mani\\models\\best_model.pt",
+  "episodes": 30,
+  "avg_return": 1185.7873795894013,
+  "std_return": 854.4672089633917,
+  "min_return": -10.028682016456642,
+  "max_return": 2367.78482007759,
+  "avg_length": 1147.9666666666667,
+  "std_length": 729.0794873598412,
+  "end_reasons": {
+    "terminated": 21,
+    "truncated": 9
+  },
+  "collision_verdicts": {
+    "at_fault_static": 14,
+    "at_fault_front": 5,
+    "side_contact": 2
+  },
+  "wall_time_sec": 906.3058440685272,
+  "carla_vehicles": 30,
+  "carla_walkers": 0,
+  "video_recorded": true
+}

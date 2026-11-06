@@ -1,0 +1,14 @@
+{
+  "return": 1224.5094924809773,
+  "mean_reward": 1.1911570938530909,
+  "length": 1028,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.bmw.grandtourer",
+    "impact_lon_m": 4.39,
+    "ego_speed_ms": 5.9,
+    "loc_x": 111.4,
+    "loc_y": -39.8
+  }
+}

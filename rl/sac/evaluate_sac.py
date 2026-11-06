@@ -1,6 +1,7 @@
 # File: rl/sac/eval_sac.py
 
 import time
+import queue
 from collections import Counter
 from pathlib import Path
 import argparse
@@ -95,17 +96,18 @@ FORCE_JPG_FRAMES = False
 
 class RobustVideoRecorder:
     """
-    Crash-proof video sink for CARLA camera callbacks.
+    Crash-proof, thread-safe video sink for CARLA camera recording.
 
-    CARLA runs sensor callbacks on a background thread: any exception or native fault there
-    (unsupported codec, frame-size mismatch, non-contiguous buffer) kills the whole process
-    SILENTLY — no traceback, straight back to the prompt. This recorder therefore:
-      - initializes the cv2.VideoWriter LAZILY from the first real frame, so the writer's
-        dimensions always match what the camera actually delivers;
-      - tries a ladder of codecs (mp4v -> XVID -> MJPG) and trusts none until isOpened();
-      - writes contiguous BGR arrays only;
-      - never lets an exception escape: on any failure it degrades to dumping JPG frames
-        that can be stitched with ffmpeg later.
+    CARLA runs sensor callbacks on an internal background thread. In synchronous mode,
+    encoding video directly inside that callback causes race conditions, frame drops,
+    and corrupted video files upon episode teardown.
+
+    This recorder solves this by:
+      - Enqueuing incoming carla.Image objects via a lightweight thread-safe queue.Queue (non-blocking);
+      - Processing and writing video frames synchronously on the main thread (write_pending)
+        after each env.step(action), ensuring a strict 1:1 step-to-frame correspondence;
+      - Initializing cv2.VideoWriter lazily from the first real frame;
+      - Draining all pending queue items upon release and closing cleanly without race conditions.
     """
 
     CODEC_LADDER = [("mp4v", ".mp4"), ("XVID", ".avi"), ("MJPG", ".avi")]
@@ -119,6 +121,12 @@ class RobustVideoRecorder:
         self.frame_idx = 0
         self.closed = False
         self.final_path = None
+        self.queue = queue.Queue()
+
+    def callback(self, image):
+        """Called on CARLA's sensor background thread. Fast, non-blocking enqueue."""
+        if not self.closed:
+            self.queue.put(image)
 
     def _open_writer(self, w, h):
         for fourcc, ext in self.CODEC_LADDER:
@@ -147,29 +155,30 @@ class RobustVideoRecorder:
               f"  ffmpeg -framerate {self.fps} -i \"{self.frames_dir}\\frame_%06d.jpg\" "
               f"-c:v libx264 -pix_fmt yuv420p \"{self.save_path.with_suffix('.mp4')}\"")
 
-    def write(self, frame_bgr):
+    def _process_image(self, image):
+        """Converts carla.Image to BGR numpy array and writes it (runs on main thread)."""
         if self.closed:
             return
         try:
-            # cv2's native writer can crash on reversed-stride/non-contiguous views
-            frame_bgr = np.ascontiguousarray(frame_bgr)
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = array.reshape((image.height, image.width, 4))
+            frame_bgr = np.ascontiguousarray(array[:, :, :3])
+
             if self.writer is None and self.frames_dir is None:
                 if self.force_frames:
-                    # cv2.VideoWriter is NEVER touched in this mode (native segfault on
-                    # this server's videoio backend) — straight to JPG dumping.
                     self._fallback_to_frames()
                 else:
                     h, w = frame_bgr.shape[:2]
                     self.writer = self._open_writer(w, h)
                     if self.writer is None:
                         self._fallback_to_frames()
+
             if self.writer is not None:
                 self.writer.write(frame_bgr)
-            else:
+            elif self.frames_dir is not None:
                 cv2.imwrite(str(self.frames_dir / f"frame_{self.frame_idx:06d}.jpg"), frame_bgr)
             self.frame_idx += 1
         except Exception as e:
-            # NEVER raise out of a CARLA sensor callback thread — degrade instead.
             print(f"[VIDEO WARN] Frame write failed ({e}); switching to JPG frame fallback.")
             try:
                 if self.writer is not None:
@@ -184,7 +193,28 @@ class RobustVideoRecorder:
                     print(f"[VIDEO WARN] JPG fallback also failed ({e2}); recording disabled.")
                     self.closed = True
 
+    def write_pending(self, timeout=2.0):
+        """Pulls and writes a frame from the queue on the main thread after an env step."""
+        if self.closed:
+            return
+        try:
+            image = self.queue.get(timeout=timeout)
+            self._process_image(image)
+        except queue.Empty:
+            print(f"[VIDEO WARN] Timeout waiting for camera frame at step {self.frame_idx}")
+
+    def drain(self):
+        """Drains any remaining frames in the queue."""
+        while not self.queue.empty():
+            try:
+                image = self.queue.get_nowait()
+                self._process_image(image)
+            except queue.Empty:
+                break
+
     def release(self):
+        """Flushes remaining frames and closes video writer safely on the main thread."""
+        self.drain()
         self.closed = True
         if self.writer is not None:
             try:
@@ -227,22 +257,9 @@ def create_third_person_camera(env, save_path, width=1280, height=720, fps=20):
     )
 
     camera = world.spawn_actor(cam_bp, cam_transform, attach_to=ego_vehicle)
-
     recorder = RobustVideoRecorder(save_path, fps=fps)
 
-    def callback(image):
-        try:
-            array = np.frombuffer(image.raw_data, dtype=np.uint8)
-            array = array.reshape((image.height, image.width, 4))
-            frame = array[:, :, :3]   # CARLA raw_data is BGRA; dropping alpha yields BGR,
-                                      # which is exactly cv2's expected order. (The old code
-                                      # additionally reversed channels — that produced RGB,
-                                      # i.e. color-swapped videos, AND a non-contiguous view.)
-            recorder.write(frame)
-        except Exception as e:
-            print(f"[VIDEO WARN] Camera callback error: {e}")
-
-    camera.listen(callback)
+    camera.listen(recorder.callback)
     return camera, recorder
 
 
@@ -338,6 +355,8 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
         })
 
         obs, raw_reward, terminated, truncated, info = env.step(action)
+        if video is not None:
+            video.write_pending(timeout=2.0)
         reward, _ = compile_reward(info, general_config, is_tensor=False)
         rewards.append(float(reward))
         last_info = info
@@ -351,10 +370,17 @@ def run_eval_episode(env, agent, wrapper, max_steps, record_video=False, video_p
             truncated_flag = truncated
             break
 
-    # Clean up camera
+    # Clean up camera and video recorder
     if camera is not None:
-        camera.stop()
-        camera.destroy()
+        try:
+            if camera.is_listening:
+                camera.stop()
+        except Exception:
+            pass
+        try:
+            camera.destroy()
+        except Exception:
+            pass
     if video is not None:
         video.release()
 

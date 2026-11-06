@@ -1,0 +1,14 @@
+{
+  "return": 1349.1347076192628,
+  "mean_reward": 0.9534520901902918,
+  "length": 1415,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.carlamotors.european_hgv",
+    "impact_lon_m": 4.52,
+    "ego_speed_ms": 8.77,
+    "loc_x": 13.8,
+    "loc_y": -2.9
+  }
+}

@@ -22,7 +22,7 @@ SAVE_DIR = REPO_ROOT / "imitation" / "data" / "demos" / "map1_30car"
 # Number of episodes of data to collect for offline RL training sets
 COLLECT_EPISODES = 500
 # Specific Behavior Cloning model checkpoint file path to use for offline data collection/warmup
-BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous" / "models" / "best_model.pt" # base BC (stronger than DAgger round 1)
+BC_CHECKPOINT_PATH = REPO_ROOT / "experiments" / "bc" / "2026_05_03_21_45_02_bc_continuous_Mani" / "models" / "best_model.pt" # base BC (stronger than DAgger round 1)
 
 # =========================================================
 # AWAC & RL HYPERPARAMETERS

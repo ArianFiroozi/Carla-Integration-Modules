@@ -2,6 +2,7 @@ import os
 import json
 import datetime
 import subprocess
+from utils.experiment_utils import get_experiment_creator
 
 
 class ExperimentLogger:
@@ -9,7 +10,8 @@ class ExperimentLogger:
     def __init__(self, experiment_name="experiment", base_dir="experiments"):
 
         timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        self.run_name = f"{timestamp}_{experiment_name}"
+        self.creator = get_experiment_creator()
+        self.run_name = f"{timestamp}_{experiment_name}_{self.creator}"
 
         self.base_path = os.path.join(base_dir, self.run_name)
 
@@ -27,9 +29,11 @@ class ExperimentLogger:
 
         metadata = {
             "timestamp": datetime.datetime.now().isoformat(),
-            "git_commit": self.get_git_commit()
+            "git_commit": self.get_git_commit(),
+            "creator": self.creator,
         }
 
+        config_dict["creator"] = self.creator
         config_dict["metadata"] = metadata
 
         with open(config_path, "w") as f:

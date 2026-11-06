@@ -19,7 +19,7 @@ from utils.replay_buffer import SACReplayBuffer
 from utils.obs_wrapper import CarlaObsWrapper
 from config import sac_config as cfg
 from config import bc_config  # for wrapper settings
-import socket
+from utils.experiment_utils import get_experiment_creator
  
 # -------------------------------------------------------------
 # Helpers
@@ -54,12 +54,9 @@ def make_experiment_dir(resume_dir=None):
         print(f"Resuming experiment from: {exp_dir}")
         return exp_dir
     else:
-        # 1. Get the computer's hostname
-        pc_name = socket.gethostname()
-
-        # 2. Add the pc_name into the timestamp string
+        creator = get_experiment_creator()
         run_stamp = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{pc_name}"
+            f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{creator}"
         )
 
         # dynamic path creation remains the same
@@ -71,6 +68,7 @@ def make_experiment_dir(resume_dir=None):
 def save_config(exp_dir):
     config_path = exp_dir / "config.json"
     cfg_dict = {k: str(v) if isinstance(v, Path) else v for k, v in cfg.__dict__.items() if k.isupper()}
+    cfg_dict["creator"] = get_experiment_creator()
     with open(config_path, "w") as f:
         json.dump(cfg_dict, f, indent=2)
 

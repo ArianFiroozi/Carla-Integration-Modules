@@ -21,6 +21,7 @@ from config import awac_config as cfg
 from utils.replay_buffer import SACReplayBuffer
 from utils.obs_wrapper import CarlaObsWrapper
 from config import bc_config
+from utils.experiment_utils import get_experiment_creator
 
 # -------------------------------------------------------------
 # Helpers & Checkpointing
@@ -48,8 +49,9 @@ def make_experiment_dir(resume_dir=None):
         print(f"Resuming experiment from: {exp_dir}")
         return exp_dir
     else:
+        creator = get_experiment_creator()
         run_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        exp_dir = Path(cfg.SAVE_DIR) / f"{run_stamp}_awac"
+        exp_dir = Path(cfg.SAVE_DIR) / f"{run_stamp}_awac_{creator}"
         (exp_dir / "models").mkdir(parents=True, exist_ok=True)
         (exp_dir / "tb").mkdir(exist_ok=True)
         return exp_dir
@@ -57,6 +59,7 @@ def make_experiment_dir(resume_dir=None):
 def save_config(exp_dir):
     config_path = exp_dir / "config.json"
     cfg_dict = {k: str(v) if isinstance(v, Path) else v for k, v in cfg.__dict__.items() if k.isupper()}
+    cfg_dict["creator"] = get_experiment_creator()
     with open(config_path, "w") as f:
         json.dump(cfg_dict, f, indent=2)
 

@@ -1,0 +1,14 @@
+{
+  "return": 1323.385549127222,
+  "mean_reward": 1.0079097860831852,
+  "length": 1313,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_static",
+    "other_type": "static.unknown",
+    "impact_lon_m": -82.32,
+    "ego_speed_ms": 5.83,
+    "loc_x": 105.3,
+    "loc_y": -6.9
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "return": 1267.2110610663472,
+  "mean_reward": 0.8955555201882313,
+  "length": 1415,
+  "end_reason": "terminated",
+  "collision": {
+    "verdict": "at_fault_front",
+    "other_type": "vehicle.carlamotors.carlacola",
+    "impact_lon_m": 2.37,
+    "ego_speed_ms": 5.06,
+    "loc_x": 4.2,
+    "loc_y": -34.0
+  }
+}
