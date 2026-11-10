@@ -8,7 +8,7 @@ REM  Usage:   start_sac_forensics_run.bat [SEED]      (default seed 42)
 REM           e.g. run seeds 42, 43, 44 one after another for the 3-seed protocol.
 REM
 REM  Before running:
-REM    1. rebuild_buffer.bat   (once, after any reward-weight change)
+REM    1. scripts\rebuild_buffer.bat   (once, after any reward-weight change)
 REM    2. A FRESHLY STARTED CARLA server on port 2000, e.g.
 REM         CarlaUE4.exe -quality-level=Low -carla-rpc-port=2000
 REM       Never reuse a server that survived a force-killed run (it stays wedged
@@ -24,7 +24,7 @@ REM                      set SKIP_BUFFER_CHECK=1   (edit did not touch reward we
 REM                      set ALLOW_CPU=1           (train without a CUDA GPU - very slow)
 REM ==========================================================================
 setlocal EnableExtensions EnableDelayedExpansion
-cd /d "%~dp0"
+cd /d "%~dp0.."
 if not defined PYTHON set "PYTHON=python"
 set "PYTHONUNBUFFERED=1"
 

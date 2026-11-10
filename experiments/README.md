@@ -25,3 +25,7 @@ Historical and archived runs live in [`../experiments_archive/`](../experiments_
 | `rl/sac` | [`2026-07-15_02-54-05_Mehdi`](rl/sac/2026-07-15_02-54-05_Mehdi/) | **Mehdi** | Evaluated by Mani |
 | `rl/sac` | [`2026-07-17_12-07-03_Mani`](rl/sac/2026-07-17_12-07-03_Mani/) | **Mani** | Active run |
 | `rl/sac` | [`2026-11-05_08-39-08_Mani`](rl/sac/2026-11-05_08-39-08_Mani/) | **Mani** | Active run |
+
+## current state:
+
+the car can drive quite a while before crashing into other cars can sometimes even finish the 2000 step loop. it can overtake but fails in many conditions. for example, it can not turn at a corner and overtake shortly afterwards.

@@ -95,7 +95,7 @@ def check_buffer(skip):
     print("4. Replay-buffer preload")
     buf = Path(cfg.COMPILED_DATASET_PATH)
     if not buf.exists():
-        fail(f"buffer missing: {buf} - run rebuild_buffer.bat")
+        fail(f"buffer missing: {buf} - run scripts/rebuild_buffer.bat")
         return
     reward_cfg = Path(general_config.__file__)
     b, r = mtime(buf), mtime(reward_cfg)
@@ -105,7 +105,7 @@ def check_buffer(skip):
         ok(f"buffer older than reward config, but --skip-buffer-check given ({b:%Y-%m-%d %H:%M})")
     else:
         fail(f"buffer built {b:%Y-%m-%d %H:%M} is OLDER than general_config.py "
-             f"({r:%Y-%m-%d %H:%M}) - it still carries old rewards; run rebuild_buffer.bat "
+             f"({r:%Y-%m-%d %H:%M}) - it still carries old rewards; run scripts/rebuild_buffer.bat "
              f"(or pass --skip-buffer-check if the edit did not touch reward weights)")
 
 

@@ -5,7 +5,7 @@ python -m rl.sac.train_sac --resume-dir "C:\Users\H\Desktop\IOT\Carla-Integratio
 new:
 python -m rl.sac.train_sac
 plot:
-python plot_run.py "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-28_19-12-01" 
+python scripts/plot_run.py "C:\Users\H\Desktop\IOT\Carla-Integration-Modules\experiments\rl\sac\2026-06-28_19-12-01" 
 
 carla:
 .\CarlaUE4.exe -quality-level=Low -carla-rpc-port=2000    

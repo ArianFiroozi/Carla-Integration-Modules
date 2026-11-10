@@ -4,9 +4,9 @@ a PNG of the key training curves. This bypasses the TensorBoard web UI entirely
 (useful when the TB server is broken by a protobuf/version mismatch).
 
 Usage (from repo root):
-    python plot_run.py                                  # plots the latest run in experiments/rl/sac
-    python plot_run.py experiments/rl/sac/2026-06-22_14-42-10
-    python plot_run.py <run_dir> --out myplots.png
+    python scripts/plot_run.py                                  # plots the latest run in experiments/rl/sac
+    python scripts/plot_run.py experiments/rl/sac/2026-06-22_14-42-10
+    python scripts/plot_run.py <run_dir> --out myplots.png
 
 Output: <run_dir>/plots.png  (or the --out path)
 """
@@ -19,6 +19,8 @@ import matplotlib
 matplotlib.use("Agg")  # no display needed (works over SSH / headless)
 import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # (tensorboard tag, human title) for each panel we want to draw
 PANELS = [
@@ -33,11 +35,21 @@ PANELS = [
 ]
 
 
+def resolve_path(p: Path) -> Path:
+    if not p.is_absolute() and not p.exists():
+        repo_p = REPO_ROOT / p
+        if repo_p.exists():
+            return repo_p
+    return p
+
+
 def find_latest_run(base="experiments/rl/sac"):
-    base = Path(base)
-    runs = [d for d in base.iterdir() if d.is_dir() and (d / "tb").exists()]
+    base_path = resolve_path(Path(base))
+    if not base_path.exists():
+        sys.exit(f"Base folder not found: {base} (checked {base_path})")
+    runs = [d for d in base_path.iterdir() if d.is_dir() and (d / "tb").exists()]
     if not runs:
-        sys.exit(f"No runs with a tb/ folder found under {base}")
+        sys.exit(f"No runs with a tb/ folder found under {base_path}")
     return max(runs, key=lambda d: d.stat().st_mtime)
 
 
@@ -54,7 +66,7 @@ def main():
     ap.add_argument("--out", default=None, help="output PNG path")
     args = ap.parse_args()
 
-    run_dir = Path(args.run_dir) if args.run_dir else find_latest_run()
+    run_dir = resolve_path(Path(args.run_dir)) if args.run_dir else find_latest_run()
     tb_dir = run_dir / "tb" if (run_dir / "tb").exists() else run_dir
     print(f"Reading events from: {tb_dir}")
 

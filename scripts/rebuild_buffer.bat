@@ -14,7 +14,7 @@ REM  or point PYTHON at its interpreter first, e.g.
 REM    set PYTHON=C:\path\to\env\python.exe
 REM ==========================================================================
 setlocal EnableExtensions
-cd /d "%~dp0"
+cd /d "%~dp0.."
 if not defined PYTHON set "PYTHON=python"
 
 set "PROC=imitation\data\processed"
